@@ -215,6 +215,41 @@ to its own origin (no CORS, and SSE works cleanly). `/api/history/*` is served b
 a Vercel route handler reading Supabase directly — one hop instead of two, and it
 keeps working when the engine is offline.
 
+### Keeping your whitelisted IP: run the engine locally
+
+Angel One whitelists the IP that *calls its API*. Only the engine does that, so
+the simplest way to keep using the home/office IP you already registered is to
+run the engine on that machine and let the hosted HUD reach it:
+
+```
+browser ──▶ Vercel HUD ──▶ tunnel ──▶ engine on your machine ──▶ Angel One
+                                                                (sees YOUR IP)
+```
+
+Next.js rewrites run **server-side**, so Vercel forwards `/api/*` to whatever
+`NEXT_PUBLIC_API_URL` points at. Expose the local engine with a tunnel:
+
+```bash
+uvicorn app.main:app --port 8000          # terminal 1
+cloudflared tunnel --url http://localhost:8000   # terminal 2
+```
+
+Then set `NEXT_PUBLIC_API_URL` in Vercel to the tunnel URL, and add it to
+`DK_CORS_ORIGINS`. Angel One still sees your machine's IP, because your machine
+is what opens the connection. (Simpler still for solo use: skip Vercel and run
+`npm run dev` locally too.)
+
+**What does not work for this**, despite being tempting:
+
+- **Calling Angel One straight from the browser.** SmartAPI's REST endpoints are
+  built for server-side use and are not CORS-enabled for arbitrary origins —
+  Angel One's browser-facing path is the separate Publisher Login redirect flow.
+  It would also put your API key, PIN and the returned JWT/feed tokens inside
+  the page, where any XSS reaches them.
+- **Supabase Edge Functions.** They run on a global edge runtime with dynamic
+  egress IPs; there is no static outbound IP to whitelist. (Supabase's IPv4
+  add-on gives the *database* a fixed address, not function egress.)
+
 ### Engine → a persistent host
 
 Fly.io, Railway, Render, or any VM. **Not Vercel**: the engine needs always-on
