@@ -23,7 +23,7 @@ export function OrderBook({
 
   if (!ledger) {
     return (
-      <Card>
+      <Card className="shrink-0">
         <CardContent className="py-6 text-center text-xs text-zinc-600">
           Ledger loading…
         </CardContent>
@@ -48,7 +48,7 @@ export function OrderBook({
   const positions = ledger.open_positions;
 
   return (
-    <Card className="min-h-0">
+    <Card className="shrink-0">
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle>Order Book</CardTitle>

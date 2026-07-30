@@ -64,7 +64,7 @@ export function SignalPanel({
 
   if (!signal) {
     return (
-      <Card>
+      <Card className="shrink-0">
         <CardContent className="py-6 text-center text-xs text-zinc-600">
           Signal engine warming up…
         </CardContent>
@@ -100,7 +100,7 @@ export function SignalPanel({
   }
 
   return (
-    <Card>
+    <Card className="shrink-0">
       <CardHeader>
         <CardTitle>Delta-K Signal Engine</CardTitle>
         <Badge className={cn("font-semibold", meta.tone)}>

@@ -2,12 +2,19 @@
 
 import { X } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 
 /**
  * Minimal modal: focus-trapped enough for a single-form dialog, closes on
  * Escape and on backdrop click.
+ *
+ * Rendered through a portal to `document.body` — and that is load-bearing, not
+ * tidiness. This dialog is mounted from the header, which uses `backdrop-blur`,
+ * and any `backdrop-filter` ancestor becomes the containing block for
+ * `position: fixed`. Left in place, the overlay anchors to the header instead
+ * of the viewport and the top of the form is clipped off-screen.
  */
 export function Dialog({
   open,
@@ -25,6 +32,9 @@ export function Dialog({
   className?: string;
 }) {
   const panelRef = React.useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => setMounted(true), []);
 
   React.useEffect(() => {
     if (!open) return;
@@ -41,9 +51,9 @@ export function Dialog({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
@@ -57,11 +67,13 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "dk-panel w-full max-w-md bg-zinc-900 shadow-quantum",
+          // Cap to the viewport and scroll the body: a tall form must never
+          // push its own header off the top of the screen.
+          "dk-panel flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col bg-zinc-900 shadow-quantum",
           className,
         )}
       >
-        <div className="dk-panel-header">
+        <div className="dk-panel-header shrink-0">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-quantum">
               {title}
@@ -78,8 +90,9 @@ export function Dialog({
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

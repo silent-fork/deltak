@@ -120,7 +120,7 @@ export function Header({
         : "text-amber-400";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+    <header className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2">
         {/* Brand */}
         <div className="flex items-center gap-2 pr-1">

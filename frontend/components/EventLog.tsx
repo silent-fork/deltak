@@ -27,7 +27,7 @@ const KIND_META: Record<
 
 export function EventLog({ events }: { events: RiskEvent[] }) {
   return (
-    <Card className="min-h-0">
+    <Card className="shrink-0">
       <CardHeader>
         <CardTitle>Risk Event Log</CardTitle>
         <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">

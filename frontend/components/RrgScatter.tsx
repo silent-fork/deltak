@@ -125,7 +125,7 @@ export function RrgScatter({
   const active = hovered;
 
   return (
-    <Card className="min-h-0">
+    <Card className="shrink-0">
       <CardHeader>
         <CardTitle>RRG Momentum</CardTitle>
         <div className="flex items-center gap-1">

@@ -35,7 +35,7 @@ export default function TerminalPage() {
   const nodes = snapshot?.rrg[selected] ?? [];
 
   return (
-    <div className="dk-grid-bg flex min-h-screen flex-col">
+    <div className="dk-grid-bg flex h-dvh flex-col overflow-hidden">
       <Header
         snapshot={snapshot}
         streamState={state}
@@ -61,14 +61,14 @@ export default function TerminalPage() {
         </div>
       ) : null}
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 p-2 xl:grid-cols-3">
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 xl:grid-cols-3">
         {/* Columns 1 & 2 — the 4-quadrant option chain matrix */}
-        <section className="min-h-0 xl:col-span-2">
+        <section className="min-h-0 overflow-hidden xl:col-span-2">
           <OptionChainMatrix chain={chain} signalToken={signal?.token} />
         </section>
 
         {/* Column 3 — Intelligence & Signal HUD */}
-        <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto">
+        <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
           <RrgScatter nodes={nodes} highlightToken={signal?.token} />
           <SignalPanel
             signal={signal}
@@ -80,7 +80,7 @@ export default function TerminalPage() {
         </aside>
       </main>
 
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-1 text-[9px] uppercase tracking-wider text-zinc-600">
+      <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-1 text-[9px] uppercase tracking-wider text-zinc-600">
         <span>
           Delta-K Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
         </span>
