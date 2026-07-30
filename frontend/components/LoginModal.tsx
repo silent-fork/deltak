@@ -19,7 +19,6 @@ export function LoginModal({
 }) {
   const [clientCode, setClientCode] = useState("");
   const [pin, setPin] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [totp, setTotp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +26,6 @@ export function LoginModal({
   const valid =
     clientCode.trim().length >= 3 &&
     pin.trim().length >= 4 &&
-    apiKey.trim().length >= 4 &&
     /^\d{6}$/.test(totp.trim());
 
   async function submit(e: React.FormEvent) {
@@ -39,7 +37,6 @@ export function LoginModal({
       await api.login({
         client_code: clientCode.trim(),
         pin: pin.trim(),
-        api_key: apiKey.trim(),
         totp: totp.trim(),
       });
       // The TOTP is single-use — never keep it around after submission.
@@ -83,16 +80,6 @@ export function LoginModal({
           />
         </Field>
 
-        <Field label="API Key" hint="The private key from your SmartAPI app.">
-          <Input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="X-PrivateKey"
-            spellCheck={false}
-          />
-        </Field>
-
         <Field
           label="TOTP"
           hint="The six digits currently shown in your authenticator app. Single-use — never stored."
@@ -118,8 +105,8 @@ export function LoginModal({
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[10px] leading-tight text-zinc-600">
-            Credentials are relayed straight to Angel One. Nothing is written to
-            disk.
+            Relayed straight to Angel One. Nothing is written to disk. The API key
+            lives in the server&apos;s secrets, not here.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
             {busy ? (

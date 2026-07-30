@@ -50,9 +50,16 @@ class Moneyness(str, Enum):
 # Auth
 # --------------------------------------------------------------------------- #
 class LoginRequest(BaseModel):
+    """Credentials the user supplies at login.
+
+    The SmartAPI key is deliberately **not** part of this payload. It is a
+    long-lived secret tied to the deployment (and to the IP allowlist), so it
+    lives only in the server's environment — never in the browser, never on the
+    wire, never in a request log.
+    """
+
     client_code: str = Field(..., min_length=3)
     pin: str = Field(..., min_length=4)
-    api_key: str = Field(..., min_length=4)
     #: The six-digit code currently displayed on the user's authenticator app.
     #: Angel One does not accept a stored secret here — the code is transient and
     #: is never persisted by the engine.

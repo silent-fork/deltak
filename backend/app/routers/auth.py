@@ -35,12 +35,23 @@ async def login(payload: LoginRequest) -> SessionStatus:
     app.  It is forwarded to SmartAPI as-is and never persisted — the session
     that comes back stays valid until midnight IST, at which point the user
     re-enters a fresh code.
+
+    The SmartAPI key is read from the server environment (``DK_API_KEY``), so it
+    is never sent by the browser.
     """
+    if not smart_api.api_key:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Server is not configured with a SmartAPI key. Set DK_API_KEY in "
+                "the deployment's secrets."
+            ),
+        )
+
     try:
         await smart_api.login(
             client_code=payload.client_code,
             pin=payload.pin,
-            api_key=payload.api_key,
             totp=payload.totp,
             state=payload.state,
         )

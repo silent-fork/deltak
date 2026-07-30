@@ -157,7 +157,6 @@ class SmartApiClient:
         self,
         client_code: str,
         pin: str,
-        api_key: str,
         totp: str,
         state: str | None = None,
     ) -> dict:
@@ -167,10 +166,18 @@ class SmartApiClient:
         at login time.  It is single-use and transient: it is forwarded straight
         to Angel One and never stored, logged or written to disk.  ``state`` is
         the optional passthrough string SmartAPI echoes back in the response.
+
+        The API key comes from ``DK_API_KEY`` in the server environment, not from
+        the caller.
         """
         totp = (totp or "").strip()
         if not totp:
             raise SmartApiError("A six-digit TOTP from your authenticator is required.")
+        if not self.api_key:
+            raise SmartApiError(
+                "Server is missing DK_API_KEY — set the SmartAPI key in the "
+                "deployment's secrets."
+            )
 
         body: dict[str, str] = {
             "clientcode": client_code,
@@ -181,7 +188,6 @@ class SmartApiClient:
             body["state"] = state
 
         async with self._lock:
-            self.api_key = api_key
             self.client_code = client_code
             payload = await self._request(
                 "POST", LOGIN_URL, json_body=body, authorized=False, retries=1

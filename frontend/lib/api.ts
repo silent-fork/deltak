@@ -59,10 +59,11 @@ export const api = {
   initMaster: (force = false) =>
     request<Record<string, unknown>>(`/api/master/init?force=${force}`),
 
+  // No api_key: the SmartAPI key is a deployment secret held server-side, so it
+  // never reaches the browser or the request body.
   login: (payload: {
     client_code: string;
     pin: string;
-    api_key: string;
     totp: string;
     state?: string;
   }) =>

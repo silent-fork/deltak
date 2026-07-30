@@ -163,6 +163,12 @@ straight to Angel One and never stored, logged or written to disk. There is no
 auto-login for exactly this reason — sessions are established from the HUD's
 login modal and remain valid until midnight IST.
 
+The **API key is not a login field**. It is a long-lived secret bound to the
+deployment and its IP allowlist, so it lives only in the engine's environment as
+`DK_API_KEY`: the browser never sees it, it is not in the request body, and it
+cannot leak through a request log. Login returns `503` if the server has no key
+configured.
+
 ---
 
 ## Execution modes
@@ -250,21 +256,47 @@ is what opens the connection. (Simpler still for solo use: skip Vercel and run
   egress IPs; there is no static outbound IP to whitelist. (Supabase's IPv4
   add-on gives the *database* a fixed address, not function egress.)
 
-### Engine → a persistent host
+### Engine → Railway
 
-Fly.io, Railway, Render, or any VM. **Not Vercel**: the engine needs always-on
-background loops and a long-lived outbound WebSocket, which serverless functions
-cannot hold.
+`backend/railway.json` + `backend/Dockerfile` deploy as-is. Set these in the
+service's **Variables** (they are secrets — never put them in the frontend):
+
+| Variable | Notes |
+| --- | --- |
+| `DK_API_KEY` | Your SmartAPI private key. **Server-side only** — the login form does not accept it and it never crosses the wire. |
+| `DK_SUPABASE_SERVICE_KEY` | Service-role key; bypasses RLS. |
+| `DK_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `DK_CLIENT_PUBLIC_IP` | The service's static outbound IP, once assigned. |
+| `DK_CORS_ORIGINS` | Your Vercel URL. |
+
+Railway injects `PORT`; the container honours it and falls back to 8000 locally.
+
+**Static outbound IPs require the Pro plan** (Settings → Networking → Enable
+Static IPs, then redeploy). Note the shape of what you get: Railway assigns
+**three** IPv4 addresses and load-balances outbound traffic across all of them.
+Angel One's app form has two slots (Primary + Secondary), so unless you can get
+all three allowlisted, roughly a third of API calls will originate from an
+un-allowlisted address and fail intermittently — which is worse than failing
+outright, because it looks like flakiness. Confirm with Angel One support that
+they can allowlist three before relying on this.
+
+Run **one replica**. The tick store, ledger and RRG state are per-process; a
+second replica would run a second, divergent copy of the strategy.
+
+### Engine → anywhere else
+
+Fly.io with a dedicated IPv4, Render, or any VM. **Not Vercel or Supabase Edge
+Functions**: the engine needs always-on background loops and a long-lived
+outbound WebSocket, which request-scoped runtimes cannot hold, and neither offers
+a static egress IP to allowlist.
 
 ```bash
 docker build -t deltak-engine ./backend
 docker run -p 8000:8000 --env-file backend/.env deltak-engine
 ```
 
-Run **one worker**. The tick store, ledger and RRG state are per-process; a
-second worker would run a second, divergent copy of the strategy.
-
-Whichever host you pick, register its static egress IP with Angel One.
+A single-IP host (VPS, Fly dedicated IPv4) is the cleanest fit for Angel One's
+allowlist, because it gives you exactly one address to register.
 
 ---
 
