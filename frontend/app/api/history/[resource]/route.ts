@@ -6,10 +6,13 @@ import { isResource, selectFrom, supabaseConfigured } from "@/lib/supabase";
  * `GET /api/history/:resource` — read the persisted ledger straight from
  * Supabase.
  *
- * This route handler shadows the `/api/:path*` rewrite to the FastAPI engine
- * (filesystem routes win over `afterFiles` rewrites), so history is served by
- * Vercel with one hop instead of two — and keeps working when the engine is
- * offline. Live market data still comes from the engine over SSE.
+ * History is served by Vercel with one hop instead of two, and keeps working
+ * when the engine is offline. Live market data still comes from the engine
+ * over SSE.
+ *
+ * Reaching this handler depends on `next.config.mjs` excluding `/api/history/`
+ * from the engine rewrite: array-form rewrites are evaluated before *dynamic*
+ * routes, so a bare `/api/:path*` would capture this path first.
  *
  * Filters are whitelisted rather than passed through: a raw PostgREST query
  * string would let a caller pivot to any column or table the service key can
