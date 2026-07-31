@@ -68,6 +68,13 @@ export interface EngineConfig {
   rrgTailLength: number;
   /** Strikes either side of ATM plotted as active RRG nodes. */
   rrgNodeSpan: number;
+  /**
+   * Strikes either side of ATM whose session-open OI is fetched from the
+   * historical API. Every strike costs one metered request, so this is
+   * deliberately tighter than the rendered chain: the walls and everything the
+   * driver can actually trade sit inside it.
+   */
+  oiSeedSpan: number;
   /** Strike-level shift (in strike steps) that counts as a level "moving". */
   levelShiftTolerance: number;
 
@@ -91,6 +98,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   rrgMomentumLookback: 5,
   rrgTailLength: 12,
   rrgNodeSpan: 6,
+  oiSeedSpan: 5,
   levelShiftTolerance: 1,
 
   /**

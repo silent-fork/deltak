@@ -7,6 +7,7 @@ import { LoginScreen } from "@/components/LoginScreen";
 import { Header } from "@/components/Header";
 import { CoaMatrixPanel } from "@/components/hero/CoaMatrixPanel";
 import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
+import { OiBuildupPanel } from "@/components/OiBuildupPanel";
 import { OptionChainMatrix } from "@/components/OptionChainMatrix";
 import { RrgScatter } from "@/components/RrgScatter";
 import { SignalPanel } from "@/components/SignalPanel";
@@ -18,10 +19,12 @@ const SIMULATE = process.env.NEXT_PUBLIC_SIMULATE === "1";
 
 export default function TerminalPage() {
   const engine = useEngine(SIMULATE);
-  const [selected, setSelected] = useState<Underlying>("NIFTY");
+  // Selection lives in the engine: the historical fetches are scoped to it.
+  const selected = engine.focus;
+  const setSelected = engine.setFocus;
   const [, forceRefresh] = useState(0);
 
-  const { snapshot, streamStatus, simulated, demo, error } = engine;
+  const { snapshot, streamStatus, simulated, demo, error, market } = engine;
 
   // An empty terminal is worse than no terminal: without a feed there is nothing
   // to render and no circuit breaker can act, so gate on a live session.
@@ -37,6 +40,14 @@ export default function TerminalPage() {
   const signal = snapshot?.signals[selected];
   const nodes = snapshot?.rrg[selected] ?? [];
   const quote = snapshot?.spots[selected];
+
+  // The wall contracts, so the COA panel can draw each wall's OI history.
+  const rowAt = (strike: number | null | undefined) =>
+    strike === null || strike === undefined
+      ? undefined
+      : chain?.rows.find((r) => r.strike === strike);
+  const aegisToken = rowAt(chain?.levels.aegis_1)?.put?.token;
+  const zenithToken = rowAt(chain?.levels.zenith_1)?.call?.token;
 
   const degraded = streamStatus === "error" || (!!error && !snapshot?.feed_connected);
 
@@ -76,8 +87,18 @@ export default function TerminalPage() {
         <div className="dk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 xl:overflow-hidden">
           {/* Hero — levels, price, rotation */}
           <section className="grid shrink-0 grid-cols-1 gap-2 lg:grid-cols-3">
-            <CoaMatrixPanel chain={chain} />
-            <QuantumHorizon chain={chain} quote={quote} />
+            <CoaMatrixPanel
+              chain={chain}
+              aegisOi={aegisToken ? market.oiSeries[aegisToken] : undefined}
+              zenithOi={zenithToken ? market.oiSeries[zenithToken] : undefined}
+              marketPcr={market.pcr[selected] ?? null}
+            />
+            <QuantumHorizon
+              chain={chain}
+              quote={quote}
+              candles={market.candles}
+              stats={market.stats}
+            />
             <RrgScatter nodes={nodes} highlightToken={signal?.token} signal={signal} />
           </section>
 
@@ -97,17 +118,41 @@ export default function TerminalPage() {
                 ledger={snapshot?.ledger}
                 onChanged={() => forceRefresh((n) => n + 1)}
               />
+              <OiBuildupPanel
+                rows={market.buildup}
+                type={market.buildupType}
+                expiry={market.buildupExpiry}
+                updatedAt={market.buildupAt}
+                available={market.available}
+                focus={selected}
+                onType={market.setBuildupType}
+                onExpiry={market.setBuildupExpiry}
+              />
             </aside>
           </section>
         </div>
 
         <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-1 text-[9px] uppercase tracking-wider text-zinc-600">
-          <span>
-            Delta-K Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
+          <span className="flex items-center gap-3">
+            <span>
+              Delta-K Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
+            </span>
+            {/* Historical reads are an enhancement, never a dependency — say so
+                here rather than raising the degraded banner over them. */}
+            {market.error ? (
+              <span className="text-amber-500/80" title={market.error}>
+                Historical data degraded
+              </span>
+            ) : null}
           </span>
           <span className="flex items-center gap-3">
             <span>Tokens {engine.trackedTokens}</span>
             <span>Ticks {engine.tickUpdates}</span>
+            <span
+              title="Contracts whose COA 2.0 ΔOI is measured against the exchange's own session-open open interest, rather than the first frame this tab received."
+            >
+              OI base {engine.oiBaselines}
+            </span>
             <span>Risk {engine.riskPct}%</span>
             {/* The clock lives in the header, in IST — one authoritative time. */}
             <span>{snapshot?.mode === "live" ? "Live routing" : "Paper ledger"}</span>

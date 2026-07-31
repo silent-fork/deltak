@@ -76,6 +76,29 @@ export class TickStore {
     return this.prev.get(token) ?? 0;
   }
 
+  /**
+   * Replace a contract's session-open baseline with the exchange's own reading
+   * from `getOIData`.
+   *
+   * Without this the baseline is whatever the first frame after connecting
+   * happened to carry, so a terminal opened at noon reads every strike as
+   * "no change" — and COA 2.0, which is nothing but that delta, silently
+   * collapses back onto the cumulative COA 1.0 walls. Historical readings
+   * therefore win over the first print, which is exactly the value they are
+   * there to correct.
+   */
+  seedSessionOpenOi(token: string, oi: number): boolean {
+    if (!(oi > 0)) return false;
+    if (this.sessionOpenOi.get(token) === oi) return false;
+    this.sessionOpenOi.set(token, oi);
+    return true;
+  }
+
+  /** Contracts carrying a session-open baseline. */
+  get baselined(): number {
+    return this.sessionOpenOi.size;
+  }
+
   /** COA 2.0 — open interest added or unwound since the session's first print. */
   oiChange(token: string): number {
     const t = this.ticks.get(token);

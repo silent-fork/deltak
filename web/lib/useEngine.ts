@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   EngineSnapshot,
@@ -11,6 +11,7 @@ import type {
   RrgNode,
   Signal,
   SpotQuote,
+  Underlying,
 } from "@/lib/types";
 import {
   DEFAULT_CONFIG,
@@ -31,6 +32,8 @@ import { runGuards } from "@/lib/engine/risk";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
 import { SimulatedFeed } from "@/lib/stream/simFeed";
+import { useMarketData } from "@/lib/useMarketData";
+import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
 
 /**
@@ -77,6 +80,12 @@ export function useEngine(simulate: boolean) {
   const [simulated, setSimulated] = useState(false);
   const [demo, setDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The instrument the HUD is showing. It lives here rather than in the page
+   * because the historical fetches are scoped to it — one underlying's intraday
+   * detail at a time is what keeps the metered endpoints inside their limits.
+   */
+  const [focus, setFocus] = useState<Underlying>("NIFTY");
 
   // Engine internals live in refs so the 1 Hz loop never re-creates them.
   const cfgRef = useRef<EngineConfig>({ ...DEFAULT_CONFIG });
@@ -446,6 +455,70 @@ export function useEngine(simulate: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* -------------------------------------------------- historical context */
+
+  const focusChain = snapshot?.chains[focus];
+
+  const spotToken = useMemo(
+    () => masterRef.current.spotToken(focus),
+    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [focus, masterReady],
+  );
+
+  /**
+   * Contracts to baseline, nearest the money first. Order matters: the seed
+   * pass stops on the first rate-limit, and if it only ever gets part of the
+   * way through, the strikes it did reach should be the ones the walls and the
+   * driver actually sit on.
+   */
+  const seedTokens = useMemo(() => {
+    const atm = focusChain?.atm_strike ?? 0;
+    if (!focusChain || !atm) return [];
+    const span = INDEX_UNIVERSE[focus].strikeStep * cfgRef.current.oiSeedSpan;
+    return focusChain.rows
+      .filter((r) => Math.abs(r.strike - atm) <= span)
+      .sort((a, b) => Math.abs(a.strike - atm) - Math.abs(b.strike - atm))
+      .flatMap((r) => [r.call?.token, r.put?.token])
+      .filter((t): t is string => !!t);
+  }, [focusChain, focus]);
+
+  /** The put defending Aegis and the call capping Zenith. */
+  const wallTokens = useMemo(() => {
+    if (!focusChain) return [];
+    const { aegis_1: aegis, zenith_1: zenith } = focusChain.levels;
+    const at = (strike: number | null) =>
+      strike === null ? undefined : focusChain.rows.find((r) => r.strike === strike);
+    return [at(aegis)?.put?.token, at(zenith)?.call?.token].filter(
+      (t): t is string => !!t,
+    );
+  }, [focusChain]);
+
+  const onOiBaseline = useCallback((token: string, oi: number) => {
+    ticksRef.current.seedSessionOpenOi(token, oi);
+  }, []);
+
+  const market = useMarketData({
+    enabled: session.authenticated,
+    focus,
+    spotToken,
+    seedTokens,
+    wallTokens,
+    onOiBaseline,
+  });
+
+  // One line in the log when the baselines land, not one per contract.
+  const seedingRef = useRef(false);
+  useEffect(() => {
+    if (seedingRef.current && !market.seeding && market.seeded > 0) {
+      log(
+        "INFO",
+        `COA 2.0 baselines seeded from historical OI — ${market.seeded} contract(s).`,
+      );
+    }
+    seedingRef.current = market.seeding;
+  }, [market.seeding, market.seeded, log]);
+
   /* ------------------------------------------------------------ actions */
 
   const login = useCallback(
@@ -460,6 +533,8 @@ export function useEngine(simulate: boolean) {
       };
       setSession(next);
       sessionRef.current = next;
+      // Anything cached from a previous session belonged to a different JWT.
+      clearMarketCache();
       log("INFO", `SmartAPI session established for ${res.client_code}.`);
       startFeed(next);
       return res;
@@ -476,6 +551,7 @@ export function useEngine(simulate: boolean) {
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined);
+    clearMarketCache();
     demoRef.current = false;
     setDemo(false);
     setSession(NO_SESSION);
@@ -620,6 +696,11 @@ export function useEngine(simulate: boolean) {
     trackedTokens: streamRef.current?.trackedCount ?? 0,
     tickUpdates: ticksRef.current.updates,
     riskPct: cfgRef.current.riskPct,
+    /** Contracts whose COA 2.0 ΔOI is measured from a real session open. */
+    oiBaselines: ticksRef.current.baselined,
+    focus,
+    setFocus,
+    market,
     login,
     logout,
     enterDemo,

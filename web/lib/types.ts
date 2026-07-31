@@ -227,3 +227,89 @@ export interface EngineStatus {
 
 export const UNDERLYINGS = ["NIFTY", "BANKNIFTY", "FINNIFTY"] as const;
 export type Underlying = (typeof UNDERLYINGS)[number];
+
+/* ---------------------------------------------------------------- historical */
+
+/**
+ * One bar from `getCandleData`. `time` keeps the exchange's own
+ * `+05:30`-offset ISO stamp rather than being normalised to UTC — the trading
+ * day is an IST construct, and every session boundary here is read off it.
+ */
+export interface Candle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+/** A single trading session, sliced out of a multi-day candle response. */
+export interface SessionStats {
+  /** IST date the candles belong to, `YYYY-MM-DD`. */
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  /** Last traded price of the session so far. */
+  close: number;
+  /** Previous session's close, when the response reached back far enough. */
+  prev_close: number | null;
+  change: number | null;
+  change_pct: number | null;
+  candles: number;
+}
+
+/** One point from `getOIData`. */
+export interface OiPoint {
+  time: string;
+  oi: number;
+}
+
+/** One row of the market-wide `putCallRatio` response. */
+export interface PcrRow {
+  pcr: number;
+  trading_symbol: string;
+}
+
+/** One row of the `OIBuildup` response, with the numerics parsed. */
+export interface OiBuildupRow {
+  symbol_token: string;
+  trading_symbol: string;
+  ltp: number;
+  net_change: number;
+  percent_change: number;
+  open_interest: number;
+  oi_change: number;
+}
+
+/* ------------------------------------------- market-data route envelopes */
+
+export interface CandleResponse {
+  interval: string;
+  candles: Candle[];
+  /** The most recent trading session inside the requested window. */
+  session: Candle[];
+  stats: SessionStats | null;
+}
+
+export interface OiResponse {
+  token: string;
+  interval: string;
+  series: OiPoint[];
+  /** First reading of the window — the session-open baseline for COA 2.0. */
+  open_oi: number | null;
+  last_oi: number | null;
+}
+
+export interface PcrResponse {
+  rows: PcrRow[];
+  fetched_at: string;
+}
+
+export interface BuildupResponse {
+  datatype: string;
+  expirytype: string;
+  rows: OiBuildupRow[];
+  fetched_at: string;
+}

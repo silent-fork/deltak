@@ -24,7 +24,7 @@ Covers **NIFTY 50**, **BANKNIFTY** and **FINNIFTY**.
 │  · 4-quadrant matrix · RRG scatter          │
 │  · signal + ledger                          │
 └──────────────┬───────────────────────────────┘
-               │  /api/auth, /api/order, /api/persist, /api/history/*
+               │  /api/auth, /api/order, /api/market/*, /api/persist, /api/history/*
                ▼
       ┌─────────────────────────── Supabase ──────────────────────────┐
       │  trading_sessions · orders · positions · signals · risk_events │
@@ -79,6 +79,33 @@ Each strike rotates against its index spot:
 Momentum is taken on the RS line rather than on RS-Ratio deliberately: the rate
 of change of an already-normalised series saturates under a steady trend and
 parks genuinely trending nodes back at the origin.
+
+### Historical context
+
+The live feed only knows what has happened since the socket opened, which is
+enough to price a trade and wrong for nearly everything else the HUD claims to
+show. Four Angel One reads fill that in, on their own slow timers, entirely
+outside the trading loop:
+
+| API | What it fixes |
+| --- | --- |
+| `getCandleData` | The session's real shape — one-minute bars from 9:15, so the spot trace, day high/low and the previous close exist on the first paint instead of accumulating from page load |
+| `getOIData` | **The COA 2.0 baseline.** ΔOI is measured against the exchange's own session-open open interest, not against whatever the first frame this tab received happened to carry |
+| `putCallRatio` | Cumulative PCR across *every* strike, set beside the chain window's own — a window far from the cumulative reading says the weight sits outside the rendered ladder |
+| `OIBuildup` | Long Built Up / Short Built Up / Short Covering / Long Unwinding across the F&O board — the same price-versus-OI question the COA panel asks of one wall, asked of the whole market |
+
+The OI baseline is the one that matters most. Without it a terminal opened at
+noon reads every strike as "no change", Aegis-1 and Zenith-1 silently collapse
+back onto the static COA 1.0 walls, and the protocol selector is choosing
+between levels that no longer describe today.
+
+These endpoints are metered per API key at a few requests a second, so every
+call in the tab funnels through one queue that spaces requests out, shares
+in-flight requests, caches by window, and widens its spacing when Angel One
+answers with a throttle. Baselines are fetched for the strikes nearest the
+money first, and only for the instrument on screen. Nothing here can block the
+1 Hz loop or a circuit breaker: every panel renders from the live feed alone
+and simply gets sharper as these land.
 
 ### Hard invariants
 
@@ -223,6 +250,10 @@ whitelisting changes at all.
 | `POST` | `/api/auth/login` | Establish a SmartAPI session (client code, PIN, TOTP) |
 | `POST` | `/api/auth/logout` | Clear the session cookie |
 | `GET` | `/api/rms` | Available margin for pre-trade leverage checks |
+| `POST` | `/api/market/candles` | Historical candles (`getCandleData`), normalised and sliced to the last trading session |
+| `POST` | `/api/market/oi` | Historical open interest (`getOIData`) for a live F&O contract |
+| `GET` | `/api/market/pcr` | Cumulative market-wide Put-Call Ratio (`putCallRatio`) |
+| `POST` | `/api/market/buildup` | OI buildup classes (`OIBuildup`) for an expiry bucket |
 | `POST` | `/api/order` | Place a live order via Angel One `placeOrder` |
 | `POST` | `/api/persist` | Append engine records (orders, positions, signals, risk events) to Supabase |
 | `GET` | `/api/history/:resource` | Read persisted sessions, orders, positions, signals or risk events |
@@ -239,7 +270,9 @@ cd web && npm test
 ```
 
 Covers position sizing, RRG quadrant rotation, COA level derivation, DKMS
-protocol classification and the Zero-OTM rule, and signal geometry.
+protocol classification and the Zero-OTM rule, signal geometry, and the
+historical layer — candle/OI/PCR/buildup parsing, session slicing, request
+validation against the per-interval day caps, and the ΔOI baseline correction.
 
 ---
 
@@ -255,6 +288,7 @@ web/
       order/              live order placement
       persist/            Supabase write-behind
       history/[resource]/ Supabase read-back
+      market/             historical candles, OI, PCR, OI buildup
     page.tsx, layout.tsx  HUD shell
   components/            HUD panels (chain, RRG scatter, order book, signal panel)
   lib/
@@ -271,9 +305,16 @@ web/
       smartstream.ts     SmartStream 2.0 feed + binary decoding
       simFeed.ts         synthetic tick generator
       ticks.ts           in-browser tick store
+    market/
+      constants.ts       intervals, day caps, exchange and buildup vocabulary
+      request.ts         historical request validation
+      parse.ts           payload normalisers, session slicing, PCR mapping
+      clock.ts           IST request windows
+      client.ts          rate-limited, cached browser client
     server/smartapi.ts   SmartAPI v2.0 REST client (server-only)
     supabase.ts          Supabase client
     useEngine.ts         the engine loop itself — runs in the browser
+    useMarketData.ts     historical context polling and ΔOI baselining
   tests/                 engine unit tests
 supabase/migrations/     database schema
 ```

@@ -11,7 +11,7 @@ import {
   wallMerged,
 } from "@/lib/coaView";
 import { DEFAULT_CONFIG } from "@/lib/engine/config";
-import type { OptionChain } from "@/lib/types";
+import type { OiPoint, OptionChain } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
 
 /**
@@ -45,6 +45,89 @@ function Section({
 
 const MW = 600;
 const MH = 100;
+
+/**
+ * A wall's open interest through the session, from the historical OI API.
+ *
+ * The wall's *level* only says where writers stood; this says whether they are
+ * still standing there. A line still climbing into the afternoon is a bound
+ * being reinforced; one rolling over is the wall coming down a strike or two
+ * before price ever tests it.
+ */
+function OiCurve({
+  side,
+  series,
+  strike,
+}: {
+  side: "aegis" | "zenith";
+  series: OiPoint[];
+  strike: number | null;
+}) {
+  const support = side === "aegis";
+  const name = support ? "Aegis" : "Zenith";
+  const values = series.map((p) => p.oi).filter((v) => v > 0);
+
+  if (values.length < 2) {
+    return (
+      <div className="rounded border border-zinc-800/80 px-1.5 py-1">
+        <div className="flex items-baseline justify-between font-mono text-[9px] text-zinc-600">
+          <span className="uppercase tracking-wider">{name} OI</span>
+          <span>{series.length ? "1 read" : "—"}</span>
+        </div>
+        <div className="mt-1 h-[18px] text-[8px] leading-[18px] text-zinc-700">
+          awaiting history
+        </div>
+      </div>
+    );
+  }
+
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = hi - lo || 1;
+  const w = 100;
+  const h = 18;
+  const points = values
+    .map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - lo) / span) * h}`)
+    .join(" ");
+
+  const net = values[values.length - 1] - values[0];
+  const building = net >= 0;
+  // Building reads in the wall's own colour; unwinding reads amber wherever it
+  // happens, because an unwinding wall is the same warning on either side.
+  const stroke = building ? (support ? "#34d399" : "#fb7185") : "#fbbf24";
+
+  return (
+    <div
+      title={`${name}${strike ? ` ${fmt(strike, 0)}` : ""} — ${values.length} readings this session, ${
+        building ? "net build" : "net unwind"
+      } of ${compact(Math.abs(net))} contracts (historical OI API).`}
+      className="rounded border border-zinc-800/80 px-1.5 py-1"
+    >
+      <div className="flex items-baseline justify-between gap-1 font-mono text-[9px]">
+        <span className="uppercase tracking-wider text-zinc-500">{name} OI</span>
+        <span className={building ? "text-zinc-400" : "text-amber-400/90"}>
+          {signed(net / 1000, 1)}K
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        className="mt-1 h-[18px] w-full"
+        role="img"
+        aria-label={`${name} open interest through the session`}
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
+  );
+}
 
 /**
  * Wall migration.
@@ -250,7 +333,19 @@ function Wall({
   );
 }
 
-export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
+export function CoaMatrixPanel({
+  chain,
+  aegisOi = [],
+  zenithOi = [],
+  marketPcr = null,
+}: {
+  chain: OptionChain | undefined;
+  /** Session OI history for the contract defending each wall. */
+  aegisOi?: OiPoint[];
+  zenithOi?: OiPoint[];
+  /** Cumulative all-strike PCR for this underlying, from the market-data API. */
+  marketPcr?: number | null;
+}) {
   if (!chain) {
     return (
       <Card className="min-h-0">
@@ -343,6 +438,13 @@ export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
               {depth.zenithBuild >= 0 ? "building" : "unwinding"}{" "}
               {signed(depth.zenithBuild / 1000, 1)}K
             </span>
+          </div>
+
+          {/* The same two numbers as a curve — the shape is what says whether
+              a wall is being held or quietly abandoned. */}
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            <OiCurve side="aegis" series={aegisOi} strike={levels.aegis_1} />
+            <OiCurve side="zenith" series={zenithOi} strike={levels.zenith_1} />
           </div>
         </Section>
 
@@ -479,8 +581,11 @@ export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
               {
                 label: "PCR",
                 title:
-                  "Put-Call OI ratio across the rendered window. Above 1 is put-heavy, which is supportive.",
+                  marketPcr === null
+                    ? "Put-Call OI ratio across the rendered window. Above 1 is put-heavy, which is supportive."
+                    : `Put-Call OI ratio across the rendered window: ${fmt(chain.pcr)}. Cumulative across every strike, from the market-data API: ${fmt(marketPcr)}. Above 1 is put-heavy, which is supportive; a window far from the cumulative reading means the weight sits outside the strikes drawn here.`,
                 value: fmt(chain.pcr),
+                sub: marketPcr === null ? undefined : `all ${fmt(marketPcr)}`,
                 tone: chain.pcr >= 1 ? "text-emerald-300" : "text-rose-300",
               },
             ] as const

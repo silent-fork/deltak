@@ -1,4 +1,11 @@
-import type { Position, RiskEvent } from "./types";
+import type {
+  BuildupResponse,
+  CandleResponse,
+  OiResponse,
+  PcrResponse,
+  Position,
+  RiskEvent,
+} from "./types";
 
 /**
  * Client for this app's own route handlers.
@@ -94,6 +101,30 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ resource, rows }),
     }),
+
+  /**
+   * Angel One historical and market-data reads. Routed through the server for
+   * the same reason orders are: the calls carry the session JWT, which the
+   * browser is never given.
+   */
+  market: {
+    candles: (body: unknown) =>
+      request<CandleResponse>("/api/market/candles", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    oi: (body: unknown) =>
+      request<OiResponse>("/api/market/oi", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    pcr: () => request<PcrResponse>("/api/market/pcr"),
+    buildup: (body: unknown) =>
+      request<BuildupResponse>("/api/market/buildup", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
 
   history: (resource: string, params: Record<string, string> = {}) =>
     request<Position[] | RiskEvent[] | unknown[]>(

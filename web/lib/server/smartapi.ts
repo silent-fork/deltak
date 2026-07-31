@@ -20,6 +20,10 @@ export const REFRESH_URL = `${API_ROOT}/rest/auth/angelbroking/jwt/v1/generateTo
 export const PROFILE_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getProfile`;
 export const RMS_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getRMS`;
 export const PLACE_ORDER_URL = `${API_ROOT}/rest/secure/angelbroking/order/v1/placeOrder`;
+export const CANDLE_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getCandleData`;
+export const OI_DATA_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getOIData`;
+export const PCR_URL = `${API_ROOT}/rest/secure/angelbroking/marketData/v1/putCallRatio`;
+export const OI_BUILDUP_URL = `${API_ROOT}/rest/secure/angelbroking/marketData/v1/OIBuildup`;
 
 export const API_KEY = process.env.DK_API_KEY ?? "";
 export const CLIENT_LOCAL_IP = process.env.DK_CLIENT_LOCAL_IP ?? "127.0.0.1";
@@ -50,6 +54,12 @@ export function smartApiHeaders(jwt?: string): Record<string, string> {
   };
   if (jwt) headers.Authorization = `Bearer ${jwt}`;
   return headers;
+}
+
+/** Angel One's throttle reply — `AB1004`, or a message that names the rate. */
+function isRateLimit(message?: string, errorcode?: string): boolean {
+  if (errorcode === "AB1004") return true;
+  return /exceeding access rate|rate limit/i.test(message ?? "");
 }
 
 /** Normalise Angel One's `{status, message, errorcode, data}` envelope. */
@@ -92,6 +102,17 @@ export async function smartApiCall<T = Record<string, unknown>>(
 
   if (res.status === 401 || res.status === 403) {
     throw new SmartApiError(payload.message ?? "SmartAPI session expired", 401, payload.errorcode);
+  }
+  // Angel One meters the historical endpoints hard (a few requests a second per
+  // key) and answers a breach with a 200 carrying an "exceeding access rate"
+  // message. Surfacing that as 429 lets callers back off instead of treating a
+  // throttle as a dead endpoint.
+  if (res.status === 429 || isRateLimit(payload.message, payload.errorcode)) {
+    throw new SmartApiError(
+      payload.message ?? "SmartAPI rate limit exceeded",
+      429,
+      payload.errorcode,
+    );
   }
   if (!payload.status) {
     throw new SmartApiError(

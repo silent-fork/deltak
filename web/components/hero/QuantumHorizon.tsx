@@ -4,17 +4,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { coaMetrics } from "@/lib/coaView";
-import type { OptionChain, SpotQuote } from "@/lib/types";
+import type { Candle, OptionChain, SessionStats, SpotQuote } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
 import { cn, compact, fmt, signed } from "@/lib/utils";
 
 /**
- * Rolling spot trace.
+ * Live tail of the spot trace.
  *
  * The engine keeps no price history — it only ever publishes the current
- * snapshot — so the trail is accumulated here, in the one place that renders it.
- * Switching instrument starts a fresh trace rather than splicing two different
- * price scales into one line.
+ * snapshot — so ticks are accumulated here, in the one place that renders them.
+ * The buffer resets whenever the instrument changes or a fresh batch of
+ * historical candles lands: the candles already cover everything up to now, and
+ * replaying the same minute twice would put a kink in the line.
  */
 function useSpotTrace(ltp: number | undefined, resetKey: string, cap = 240) {
   const ref = useRef<{ key: string; points: number[] }>({
@@ -55,15 +56,31 @@ const TH = 100;
 export function QuantumHorizon({
   chain,
   quote,
+  candles = [],
+  stats = null,
 }: {
   chain: OptionChain | undefined;
   quote: SpotQuote | undefined;
+  /** Today's one-minute bars from `getCandleData`, oldest first. */
+  candles?: Candle[];
+  stats?: SessionStats | null;
 }) {
   const [metric, setMetric] = useState<"oi" | "volume">("oi");
   const flash = useTickFlash(quote?.ltp ?? 0);
-  const trace = useSpotTrace(
+  const underlying = quote?.underlying ?? chain?.underlying ?? "—";
+  const live = useSpotTrace(
     quote?.ltp ?? chain?.spot,
-    quote?.underlying ?? chain?.underlying ?? "—",
+    `${underlying}:${candles.length}:${candles[candles.length - 1]?.time ?? ""}`,
+  );
+
+  /**
+   * The session, then the ticks since it was last read. Without the candles
+   * the trace can only start where the page did — which on a terminal opened
+   * at noon is a line that says nothing about the day.
+   */
+  const trace = useMemo(
+    () => [...candles.map((c) => c.close), ...live],
+    [candles, live],
   );
 
   /** The trail, scaled to hold both the price range and the walls. */
@@ -169,7 +186,15 @@ export function QuantumHorizon({
     };
   }, [chain, metric]);
 
-  const up = (quote?.change ?? 0) >= 0;
+  /**
+   * The feed can only quote a change once it has sent a previous close, which
+   * it does not always do. The historical session carries one from the first
+   * paint, so it stands in — the number shown is against yesterday's close
+   * either way.
+   */
+  const change = quote?.change || stats?.change || 0;
+  const changePct = quote?.change_pct || stats?.change_pct || 0;
+  const up = change >= 0;
 
   return (
     <Card className="min-h-0 overflow-hidden">
@@ -216,11 +241,9 @@ export function QuantumHorizon({
               up ? "text-emerald-400" : "text-rose-400",
             )}
           >
-            <div className="text-[14px] font-semibold">
-              {signed(quote?.change ?? 0)}
-            </div>
+            <div className="text-[14px] font-semibold">{signed(change)}</div>
             <div className="mt-1 text-[11px] opacity-85">
-              {signed(quote?.change_pct ?? 0)}%
+              {signed(changePct)}%
             </div>
             <div className="mt-1.5 font-sans text-[9px] uppercase tracking-wider text-zinc-600">
               ATM {chain ? fmt(chain.atm_strike, 0) : "—"}
@@ -494,13 +517,40 @@ export function QuantumHorizon({
           instead of trailing off into dead space.
         */}
         <div className="relative flex min-h-[76px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800/70 bg-zinc-950/50 px-2 pb-1 pt-1.5">
-          <div className="flex shrink-0 items-baseline justify-between">
-            <span className="dk-label text-[9px] leading-none">Spot Trace</span>
+          <div className="flex shrink-0 items-baseline justify-between gap-2">
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="dk-label text-[9px] leading-none">Spot Trace</span>
+              {/* Say plainly how far back the line goes — a trail that starts
+                  at the page load is a different claim from the session. */}
+              <span
+                title={
+                  stats
+                    ? `Session ${stats.date} — open ${fmt(stats.open, 2)}, high ${fmt(stats.high, 2)}, low ${fmt(stats.low, 2)}${
+                        stats.prev_close
+                          ? `, previous close ${fmt(stats.prev_close, 2)}`
+                          : ""
+                      }. ${stats.candles} one-minute bars from the historical API, extended by live ticks.`
+                    : "Accumulated from live ticks since this page opened — no historical session loaded."
+                }
+                className={cn(
+                  "shrink-0 rounded border px-1 font-mono text-[8px] uppercase tracking-wider",
+                  stats
+                    ? "border-quantum/40 bg-quantum/10 text-quantum/80"
+                    : "border-zinc-800 text-zinc-600",
+                )}
+              >
+                {stats ? "session" : "since connect"}
+              </span>
+            </span>
             {traceView ? (
-              <span className="font-mono text-[9px] text-zinc-500">
-                <span className="text-emerald-400/80">H {fmt(traceView.hi, 0)}</span>
+              <span className="shrink-0 font-mono text-[9px] text-zinc-500">
+                <span className="text-emerald-400/80">
+                  H {fmt(stats?.high ?? traceView.hi, 0)}
+                </span>
                 <span className="mx-1 text-zinc-700">·</span>
-                <span className="text-rose-400/80">L {fmt(traceView.lo, 0)}</span>
+                <span className="text-rose-400/80">
+                  L {fmt(stats?.low ?? traceView.lo, 0)}
+                </span>
               </span>
             ) : null}
           </div>
