@@ -1,0 +1,213 @@
+import type {
+  ExecutionMode,
+  LedgerSnapshot,
+  OptionType,
+  Position,
+  Protocol,
+  Side,
+} from "@/lib/types";
+import type { TickStore } from "@/lib/stream/ticks";
+
+/**
+ * Virtual execution ledger — port of `backend/app/ledger.py`.
+ *
+ * Backs Paper Mode end-to-end (simulated fills with slippage, mark-to-market from
+ * the live feed) and doubles as the local book of record in Live Mode, so the
+ * HUD, the risk loop and panic-flatten behave identically in both.
+ */
+
+export function applySlippage(price: number, side: Side, pct: number): number {
+  if (price <= 0) return price;
+  const factor = side === "BUY" ? 1 + pct : 1 - pct;
+  return Number(Math.max(0.05, price * factor).toFixed(2));
+}
+
+const r2 = (n: number) => Number(n.toFixed(2));
+
+export class Ledger {
+  private positions = new Map<string, Position>();
+  private closed: Position[] = [];
+  private seq = 0;
+
+  capital: number;
+  startingCapital: number;
+  realised = 0;
+  charges = 0;
+
+  constructor(
+    capital: number,
+    private slippagePct: number,
+    private costPerOrder: number,
+  ) {
+    this.capital = capital;
+    this.startingCapital = capital;
+  }
+
+  private nextId(): string {
+    const t = new Date();
+    const hhmmss =
+      String(t.getHours()).padStart(2, "0") +
+      String(t.getMinutes()).padStart(2, "0") +
+      String(t.getSeconds()).padStart(2, "0");
+    this.seq += 1;
+    return `DK-${hhmmss}-${String(this.seq).padStart(3, "0")}`;
+  }
+
+  open(params: {
+    underlying: string;
+    token: string;
+    tradingSymbol: string;
+    quantity: number;
+    lots: number;
+    lotSize: number;
+    price: number;
+    side?: Side;
+    optionType?: OptionType | null;
+    strike?: number | null;
+    stopLoss?: number | null;
+    target?: number | null;
+    protocol?: Protocol | null;
+    mode: ExecutionMode;
+  }): Position {
+    const pos: Position = {
+      id: this.nextId(),
+      underlying: params.underlying,
+      token: params.token,
+      trading_symbol: params.tradingSymbol,
+      option_type: params.optionType ?? null,
+      strike: params.strike ?? null,
+      side: params.side ?? "BUY",
+      quantity: params.quantity,
+      lots: params.lots,
+      lot_size: params.lotSize,
+      avg_price: r2(params.price),
+      ltp: r2(params.price),
+      stop_loss: params.stopLoss ?? null,
+      target: params.target ?? null,
+      unrealised_pnl: 0,
+      realised_pnl: 0,
+      pnl_pct: 0,
+      protocol: params.protocol ?? null,
+      opened_at: new Date().toISOString().slice(0, 19),
+      closed_at: null,
+      exit_price: null,
+      exit_reason: null,
+      status: "OPEN",
+      mode: params.mode,
+    };
+    this.positions.set(pos.id, pos);
+    this.charges += this.costPerOrder;
+    this.capital -= this.costPerOrder;
+    return pos;
+  }
+
+  close(positionId: string, price: number, reason = "MANUAL"): Position | null {
+    const pos = this.positions.get(positionId);
+    if (!pos) return null;
+    this.positions.delete(positionId);
+
+    const exit = r2(price);
+    const direction = pos.side === "BUY" ? 1 : -1;
+    const pnl = (exit - pos.avg_price) * pos.quantity * direction;
+
+    pos.exit_price = exit;
+    pos.exit_reason = reason;
+    pos.realised_pnl = r2(pos.realised_pnl + pnl);
+    pos.unrealised_pnl = 0;
+    pos.ltp = exit;
+    pos.pnl_pct = pos.avg_price
+      ? r2(((exit - pos.avg_price) / pos.avg_price) * 100 * direction)
+      : 0;
+    pos.status = "CLOSED";
+    pos.closed_at = new Date().toISOString().slice(0, 19);
+
+    this.realised = r2(this.realised + pnl);
+    this.charges += this.costPerOrder;
+    this.capital += pnl - this.costPerOrder;
+    this.closed.push(pos);
+    return pos;
+  }
+
+  /** Scale out of part of a position (the Weakening-quadrant TP1 protocol). */
+  reduce(positionId: string, lots: number, price: number, reason = "TP1"): Position | null {
+    const pos = this.positions.get(positionId);
+    if (!pos || lots <= 0) return null;
+    if (lots >= pos.lots) return this.close(positionId, price, reason);
+
+    const qty = lots * pos.lot_size;
+    const direction = pos.side === "BUY" ? 1 : -1;
+    const pnl = (r2(price) - pos.avg_price) * qty * direction;
+
+    pos.lots -= lots;
+    pos.quantity -= qty;
+    pos.realised_pnl = r2(pos.realised_pnl + pnl);
+    this.realised = r2(this.realised + pnl);
+    this.capital += pnl;
+    return pos;
+  }
+
+  markToMarket(ticks: TickStore): void {
+    for (const pos of this.positions.values()) {
+      const ltp = ticks.ltp(pos.token, pos.ltp);
+      if (ltp <= 0) continue;
+      const direction = pos.side === "BUY" ? 1 : -1;
+      pos.ltp = r2(ltp);
+      pos.unrealised_pnl = r2((ltp - pos.avg_price) * pos.quantity * direction);
+      pos.pnl_pct = pos.avg_price
+        ? r2(((ltp - pos.avg_price) / pos.avg_price) * 100 * direction)
+        : 0;
+    }
+  }
+
+  get openPositions(): Position[] {
+    return [...this.positions.values()];
+  }
+
+  get(positionId: string): Position | undefined {
+    return this.positions.get(positionId);
+  }
+
+  positionsFor(underlying: string): Position[] {
+    return this.openPositions.filter((p) => p.underlying === underlying);
+  }
+
+  get openPnl(): number {
+    return r2(this.openPositions.reduce((a, p) => a + p.unrealised_pnl, 0));
+  }
+
+  get deployed(): number {
+    return r2(this.openPositions.reduce((a, p) => a + p.avg_price * p.quantity, 0));
+  }
+
+  get equity(): number {
+    return r2(this.capital + this.openPnl);
+  }
+
+  get slippage(): number {
+    return this.slippagePct;
+  }
+
+  snapshot(mode: ExecutionMode): LedgerSnapshot {
+    return {
+      mode,
+      capital: r2(this.capital),
+      equity: this.equity,
+      open_positions: this.openPositions,
+      closed_positions: this.closed.slice(-25),
+      open_pnl: this.openPnl,
+      realised_pnl: r2(this.realised),
+      total_pnl: r2(this.realised + this.openPnl),
+      deployed_margin: this.deployed,
+      charges: r2(this.charges),
+    };
+  }
+
+  reset(capital?: number): void {
+    this.startingCapital = capital ?? this.startingCapital;
+    this.capital = this.startingCapital;
+    this.realised = 0;
+    this.charges = 0;
+    this.positions.clear();
+    this.closed = [];
+  }
+}
