@@ -1,12 +1,46 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { coaMetrics } from "@/lib/coaView";
 import type { OptionChain, SpotQuote } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
 import { cn, compact, fmt, signed } from "@/lib/utils";
+
+/**
+ * Rolling spot trace.
+ *
+ * The engine keeps no price history — it only ever publishes the current
+ * snapshot — so the trail is accumulated here, in the one place that renders it.
+ * Switching instrument starts a fresh trace rather than splicing two different
+ * price scales into one line.
+ */
+function useSpotTrace(ltp: number | undefined, resetKey: string, cap = 240) {
+  const ref = useRef<{ key: string; points: number[] }>({
+    key: resetKey,
+    points: [],
+  });
+  const [, bump] = useState(0);
+
+  useEffect(() => {
+    const store = ref.current;
+    if (store.key !== resetKey) {
+      store.key = resetKey;
+      store.points = [];
+    }
+    if (!ltp || ltp <= 0) return;
+    if (store.points[store.points.length - 1] === ltp) return;
+    store.points.push(ltp);
+    if (store.points.length > cap) store.points.shift();
+    bump((n) => n + 1);
+  }, [ltp, resetKey, cap]);
+
+  return ref.current.points;
+}
+
+const TW = 600;
+const TH = 100;
 
 /**
  * The Quantum Horizon, drawn.
@@ -26,6 +60,54 @@ export function QuantumHorizon({
   quote: SpotQuote | undefined;
 }) {
   const flash = useTickFlash(quote?.ltp ?? 0);
+  const trace = useSpotTrace(
+    quote?.ltp ?? chain?.spot,
+    quote?.underlying ?? chain?.underlying ?? "—",
+  );
+
+  /** The trail, scaled to hold both the price range and the walls. */
+  const traceView = useMemo(() => {
+    if (trace.length < 2) return null;
+
+    const { aegis, zenith } = chain
+      ? coaMetrics(chain)
+      : { aegis: null, zenith: null };
+
+    const lo = Math.min(...trace);
+    const hi = Math.max(...trace);
+    // Pull the walls in only when they are close enough not to flatten the
+    // trail into a straight line — otherwise the trace tells you nothing.
+    const range = Math.max(hi - lo, 1);
+    const near = (v: number | null) =>
+      v !== null && v >= lo - range * 2.5 && v <= hi + range * 2.5 ? v : null;
+
+    const a = near(aegis);
+    const z = near(zenith);
+    const min = Math.min(lo, a ?? lo, z ?? lo);
+    const max = Math.max(hi, a ?? hi, z ?? hi);
+    const pad = Math.max((max - min) * 0.12, 0.5);
+    const top = max + pad;
+    const bottom = min - pad;
+    const span = top - bottom || 1;
+
+    const y = (v: number) => ((top - v) / span) * TH;
+    const x = (i: number) => (i / (trace.length - 1)) * TW;
+
+    const line = trace.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+
+    return {
+      line,
+      area: `M0,${TH} L${line.split(" ").join(" L")} L${TW},${TH} Z`,
+      y,
+      aegisY: a !== null ? y(a) : null,
+      zenithY: z !== null ? y(z) : null,
+      last: trace[trace.length - 1],
+      lastY: y(trace[trace.length - 1]),
+      hi,
+      lo,
+      rising: trace[trace.length - 1] >= trace[0],
+    };
+  }, [trace, chain]);
 
   const view = useMemo(() => {
     if (!chain || chain.rows.length < 2) return null;
@@ -352,6 +434,141 @@ export function QuantumHorizon({
             </div>
           </>
         )}
+
+        {/*
+          Spot's path against the walls. This block takes whatever height the
+          hero row has left over, so the column fills its card at any viewport
+          instead of trailing off into dead space.
+        */}
+        <div className="relative flex min-h-[76px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800/70 bg-zinc-950/50 px-2 pb-1 pt-1.5">
+          <div className="flex shrink-0 items-baseline justify-between">
+            <span className="dk-label text-[9px] leading-none">Spot Trace</span>
+            {traceView ? (
+              <span className="font-mono text-[9px] text-zinc-500">
+                <span className="text-emerald-400/80">H {fmt(traceView.hi, 0)}</span>
+                <span className="mx-1 text-zinc-700">·</span>
+                <span className="text-rose-400/80">L {fmt(traceView.lo, 0)}</span>
+              </span>
+            ) : null}
+          </div>
+
+          <div className="relative mt-1 min-h-0 flex-1">
+            {!traceView ? (
+              <div className="flex h-full items-center justify-center text-[10px] text-zinc-600">
+                Tracing spot…
+              </div>
+            ) : (
+              <svg
+                viewBox={`0 0 ${TW} ${TH}`}
+                preserveAspectRatio="none"
+                className="h-full w-full"
+                role="img"
+                aria-label="Spot price trail against the Aegis and Zenith walls"
+              >
+                <defs>
+                  <linearGradient id="dk-trace" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor={traceView.rising ? "#10b981" : "#f43f5e"}
+                      stopOpacity="0.28"
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={traceView.rising ? "#10b981" : "#f43f5e"}
+                      stopOpacity="0"
+                    />
+                  </linearGradient>
+                </defs>
+
+                {/* The corridor, as bands the price has to work between */}
+                {traceView.zenithY !== null ? (
+                  <rect
+                    x={0}
+                    y={0}
+                    width={TW}
+                    height={Math.max(0, traceView.zenithY)}
+                    fill="#f43f5e"
+                    opacity={0.05}
+                  />
+                ) : null}
+                {traceView.aegisY !== null ? (
+                  <rect
+                    x={0}
+                    y={traceView.aegisY}
+                    width={TW}
+                    height={Math.max(0, TH - traceView.aegisY)}
+                    fill="#10b981"
+                    opacity={0.05}
+                  />
+                ) : null}
+
+                <path d={traceView.area} fill="url(#dk-trace)" />
+                <polyline
+                  points={traceView.line}
+                  fill="none"
+                  stroke={traceView.rising ? "#34d399" : "#fb7185"}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+
+                {traceView.aegisY !== null ? (
+                  <line
+                    x1={0}
+                    y1={traceView.aegisY}
+                    x2={TW}
+                    y2={traceView.aegisY}
+                    stroke="#10b981"
+                    strokeWidth={1}
+                    strokeDasharray="5 4"
+                    opacity={0.75}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ) : null}
+                {traceView.zenithY !== null ? (
+                  <line
+                    x1={0}
+                    y1={traceView.zenithY}
+                    x2={TW}
+                    y2={traceView.zenithY}
+                    stroke="#f43f5e"
+                    strokeWidth={1}
+                    strokeDasharray="5 4"
+                    opacity={0.75}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ) : null}
+
+                <circle
+                  cx={TW}
+                  cy={traceView.lastY}
+                  r={2.5}
+                  fill="#00f0ff"
+                  vectorEffect="non-scaling-stroke"
+                  style={{ filter: "drop-shadow(0 0 5px rgba(0,240,255,0.95))" }}
+                />
+              </svg>
+            )}
+
+            {/* Wall tags ride outside the SVG so they stay undistorted */}
+            {traceView?.aegisY !== null && traceView ? (
+              <span
+                style={{ top: `${(traceView.aegisY! / TH) * 100}%` }}
+                className="pointer-events-none absolute left-0 -translate-y-1/2 rounded-sm bg-zinc-950/85 px-1 font-mono text-[8px] font-bold uppercase text-emerald-300"
+              >
+                Aegis
+              </span>
+            ) : null}
+            {traceView?.zenithY !== null && traceView ? (
+              <span
+                style={{ top: `${(traceView.zenithY! / TH) * 100}%` }}
+                className="pointer-events-none absolute left-0 -translate-y-1/2 rounded-sm bg-zinc-950/85 px-1 font-mono text-[8px] font-bold uppercase text-rose-300"
+              >
+                Zenith
+              </span>
+            ) : null}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

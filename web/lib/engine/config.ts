@@ -93,7 +93,13 @@ export const DEFAULT_CONFIG: EngineConfig = {
   rrgNodeSpan: 6,
   levelShiftTolerance: 1,
 
-  riskPct: 1.0,
+  /**
+   * Sized for the 25,000 paper float: at 1% the risk budget (250) is smaller
+   * than a single NIFTY lot's stop distance, so every signal resolved to zero
+   * lots and nothing could ever be placed. The premium-affordability cap in
+   * `calculateSize` remains the real backstop.
+   */
+  riskPct: 30.0,
   defaultStopPct: 0.25,
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
