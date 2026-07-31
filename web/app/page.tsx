@@ -65,14 +65,23 @@ export default function TerminalPage() {
           </div>
         ) : null}
 
-        <main className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 xl:grid-cols-3">
+        {/*
+          Below xl the terminal is one column that scrolls as a page; from xl it
+          becomes a fixed cockpit — nothing scrolls except the matrix body and
+          the two panels that opt into it, so the whole HUD stays on one screen.
+        */}
+        <main className="dk-scroll grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto p-2 xl:grid-cols-3 xl:overflow-hidden">
           {/* Columns 1 & 2 — the 4-quadrant option chain matrix */}
-          <section className="min-h-0 overflow-hidden xl:col-span-2">
+          <section className="flex min-h-[70vh] flex-col xl:col-span-2 xl:min-h-0 xl:overflow-hidden">
             <OptionChainMatrix chain={chain} signalToken={signal?.token} />
           </section>
 
-          {/* Column 3 — Intelligence & Signal HUD */}
-          <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto pr-0.5">
+          {/*
+            Column 3 — Intelligence & Signal HUD. The panels shrink to fit first,
+            so on a roomy screen this never scrolls; on a short one (1280×720 and
+            below) it scrolls rather than clipping the log out of reach.
+          */}
+          <aside className="dk-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto">
             <RrgScatter nodes={nodes} highlightToken={signal?.token} />
             <SignalPanel
               signal={signal}

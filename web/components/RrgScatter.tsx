@@ -29,7 +29,12 @@ const QUADRANT_BANDS = [
 function NodeDot(props: {
   cx?: number;
   cy?: number;
-  payload?: { node?: RrgNode; head?: boolean; highlighted?: boolean };
+  payload?: {
+    node?: RrgNode;
+    head?: boolean;
+    highlighted?: boolean;
+    labelled?: boolean;
+  };
 }) {
   const { cx, cy, payload } = props;
   if (cx === undefined || cy === undefined || !payload?.node) return null;
@@ -45,15 +50,22 @@ function NodeDot(props: {
         <circle cx={cx} cy={cy} r={9} fill="none" stroke="#00f0ff" strokeWidth={1.2} />
       ) : null}
       <circle cx={cx} cy={cy} r={4.5} fill={meta.hex} fillOpacity={0.9} />
-      <text
-        x={cx + 7}
-        y={cy + 3}
-        fill="#a1a1aa"
-        fontSize={8}
-        fontFamily="ui-monospace, monospace"
-      >
-        {payload.node.label}
-      </text>
+      {/*
+        Strikes cluster tightly around the 100/100 origin, so past a dozen nodes
+        the labels stack into an unreadable smear. Beyond that only the signal's
+        own node keeps its tag; the rest are available on hover.
+      */}
+      {payload.labelled || payload.highlighted ? (
+        <text
+          x={cx + 7}
+          y={cy + 3}
+          fill={payload.highlighted ? "#e4e4e7" : "#a1a1aa"}
+          fontSize={8}
+          fontFamily="ui-monospace, monospace"
+        >
+          {payload.node.label}
+        </text>
+      ) : null}
     </g>
   );
 }
@@ -93,6 +105,7 @@ export function RrgScatter({
 
   // Tails get noisy past a couple of dozen nodes; keep the trace readable.
   const withTails = visible.length <= 18;
+  const withLabels = visible.length <= 12;
 
   const series = useMemo(
     () =>
@@ -114,12 +127,13 @@ export function RrgScatter({
               y: node.rs_momentum,
               node,
               head: true,
+              labelled: withLabels,
               highlighted: node.token === highlightToken,
             },
           ],
         };
       }),
-    [visible, withTails, highlightToken],
+    [visible, withTails, withLabels, highlightToken],
   );
 
   const active = hovered;
@@ -147,7 +161,7 @@ export function RrgScatter({
       </CardHeader>
 
       <CardContent className="p-2">
-        <div className="h-[220px] w-full">
+        <div className="h-[200px] w-full xl:h-[172px] 2xl:h-[200px]">
           {visible.length === 0 ? (
             <div className="flex h-full items-center justify-center text-[11px] text-zinc-600">
               RRG nodes warming up…
@@ -218,7 +232,8 @@ export function RrgScatter({
           <span>↑ RS-Momentum</span>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-1">
+        {/* Quadrant census — one row so the panel keeps its vertical budget */}
+        <div className="mt-1.5 grid grid-cols-4 gap-1">
           {(Object.keys(QUADRANT_META) as (keyof typeof QUADRANT_META)[]).map(
             (q) => {
               const meta = QUADRANT_META[q];
@@ -228,28 +243,36 @@ export function RrgScatter({
                   key={q}
                   title={meta.note}
                   className={cn(
-                    "flex items-center justify-between rounded border px-1.5 py-1 text-[9px] uppercase tracking-wider",
+                    "flex min-w-0 items-center justify-center gap-1 rounded border px-1 py-1 text-[9px] uppercase tracking-wider",
                     meta.tone,
+                    count === 0 && "opacity-45",
                   )}
                 >
-                  <span className="flex items-center gap-1">
-                    <span className={cn("h-1 w-1 rounded-full", meta.dot)} />
-                    {meta.label}
-                  </span>
-                  <span className="font-mono">{count}</span>
+                  <span className={cn("h-1 w-1 shrink-0 rounded-full", meta.dot)} />
+                  <span className="truncate">{meta.label.slice(0, 4)}</span>
+                  <span className="font-mono font-semibold">{count}</span>
                 </div>
               );
             },
           )}
         </div>
 
-        {active ? (
-          <div className="mt-2 rounded border border-zinc-800 bg-zinc-950/70 px-2 py-1.5 font-mono text-[10px] text-zinc-400">
-            <span className="text-zinc-200">{active.label}</span> · RS-Ratio{" "}
-            {fmt(active.rs_ratio)} · RS-Mom {fmt(active.rs_momentum)} ·{" "}
-            <span className="uppercase">{QUADRANT_META[active.quadrant].label}</span>
-          </div>
-        ) : null}
+        {/* Reserve the readout's row so hovering does not reflow the sidebar. */}
+        <div className="mt-1.5 h-[26px] rounded border border-zinc-800 bg-zinc-950/70 px-2 py-1 font-mono text-[10px] leading-[16px] text-zinc-400">
+          {active ? (
+            <span className="block truncate">
+              <span className="text-zinc-200">{active.label}</span> · RS-Ratio{" "}
+              {fmt(active.rs_ratio)} · RS-Mom {fmt(active.rs_momentum)} ·{" "}
+              <span className="uppercase">
+                {QUADRANT_META[active.quadrant].label}
+              </span>
+            </span>
+          ) : (
+            <span className="block truncate text-[9px] uppercase tracking-wider text-zinc-600">
+              Hover a node for its RS coordinates
+            </span>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -27,14 +27,16 @@ const KIND_META: Record<
 
 export function EventLog({ events }: { events: RiskEvent[] }) {
   return (
-    <Card className="shrink-0">
-      <CardHeader>
-        <CardTitle>Risk Event Log</CardTitle>
-        <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">
-          circuit breakers
+    // basis-0 so the log, not the signal panel, absorbs the sidebar's slack.
+    <Card className="min-h-0 shrink-0 xl:flex-1 xl:basis-0 xl:min-h-[104px]">
+      <CardHeader className="shrink-0">
+        <CardTitle className="truncate">Risk Event Log</CardTitle>
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+          {events.length ? `${events.length} · ` : ""}circuit breakers
         </span>
       </CardHeader>
-      <CardContent className="max-h-[180px] overflow-y-auto p-2">
+      {/* Capped on small screens, absorbs the sidebar's slack on large ones. */}
+      <CardContent className="dk-scroll min-h-0 max-h-[180px] flex-1 overflow-y-auto p-2 xl:max-h-none">
         {events.length === 0 ? (
           <div className="py-4 text-center text-[11px] text-zinc-600">
             No events yet.

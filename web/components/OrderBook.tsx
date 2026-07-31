@@ -108,9 +108,9 @@ export function OrderBook({
             No open positions.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="dk-scroll max-h-[168px] overflow-auto">
             <table className="w-full border-collapse text-right">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur">
                 <tr className="text-[9px] uppercase tracking-wider text-zinc-600">
                   <th className="px-1 py-1 text-left font-medium">Symbol</th>
                   <th className="px-1 py-1 font-medium">Qty</th>

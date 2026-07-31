@@ -1,12 +1,12 @@
 "use client";
 
-import { Shield, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 
+import { CoaStrip } from "@/components/CoaStrip";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ChainRow, OptionChain, OptionLeg } from "@/lib/types";
+import type { ChainRow, CoaLevels, OptionChain, OptionLeg } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
 
 /** OI-change bar: green = writers adding (a wall building), red = unwinding. */
@@ -103,6 +103,61 @@ function LegCells({
   return <>{side === "call" ? cells.reverse() : cells}</>;
 }
 
+/* ----------------------------------------------------------------- COA tags */
+
+type LevelTag = {
+  key: string;
+  label: string;
+  title: string;
+  cls: string;
+  support: boolean;
+};
+
+/**
+ * Both generations of each wall are marked, because they disagree often and the
+ * disagreement is the signal: A0/Z0 are the cumulative walls carried into the
+ * session, A1/Z1 where today's writers have actually moved them.
+ */
+function levelTags(strike: number, levels: CoaLevels): LevelTag[] {
+  const at = (level: number | null) => level !== null && strike === level;
+  const tags: LevelTag[] = [];
+
+  if (at(levels.aegis_0))
+    tags.push({
+      key: "a0",
+      label: "A0",
+      support: true,
+      title: "Aegis-0 — cumulative put-OI wall (COA 1.0 support).",
+      cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400/90",
+    });
+  if (at(levels.aegis_1))
+    tags.push({
+      key: "a1",
+      label: "A1",
+      support: true,
+      title: "Aegis-1 — live intraday put-write wall (COA 2.0 support).",
+      cls: "border-emerald-400/70 bg-emerald-400/20 text-emerald-200",
+    });
+  if (at(levels.zenith_0))
+    tags.push({
+      key: "z0",
+      label: "Z0",
+      support: false,
+      title: "Zenith-0 — cumulative call-OI wall (COA 1.0 resistance).",
+      cls: "border-rose-500/40 bg-rose-500/10 text-rose-400/90",
+    });
+  if (at(levels.zenith_1))
+    tags.push({
+      key: "z1",
+      label: "Z1",
+      support: false,
+      title: "Zenith-1 — live intraday call-write wall (COA 2.0 resistance).",
+      cls: "border-rose-400/70 bg-rose-400/20 text-rose-200",
+    });
+
+  return tags;
+}
+
 export function OptionChainMatrix({
   chain,
   signalToken,
@@ -120,7 +175,7 @@ export function OptionChainMatrix({
 
   if (!chain) {
     return (
-      <Card className="h-full">
+      <Card className="h-full min-h-0">
         <CardContent className="flex items-center justify-center text-xs text-zinc-600">
           Awaiting option chain…
         </CardContent>
@@ -130,68 +185,51 @@ export function OptionChainMatrix({
 
   const { levels } = chain;
 
-  const rowTone = (row: ChainRow) => {
+  // A wall and the ATM anchor regularly land on the same strike; the wall tint
+  // wins and the ATM keeps its own ring, so neither reading is lost.
+  const rowTone = (tags: LevelTag[], row: ChainRow) => {
+    if (tags.some((t) => t.support)) return "bg-emerald-500/[0.06]";
+    if (tags.length) return "bg-rose-500/[0.06]";
     if (row.is_atm) return "bg-quantum/[0.07]";
-    if (levels.aegis_1 !== null && row.strike === levels.aegis_1)
-      return "bg-emerald-500/[0.07]";
-    if (levels.zenith_1 !== null && row.strike === levels.zenith_1)
-      return "bg-rose-500/[0.07]";
     return "";
   };
 
   return (
     <Card className="h-full min-h-0">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CardTitle>Delta-K 4-Quadrant Matrix</CardTitle>
-          <Badge className="border-zinc-700 text-zinc-400">
+      <CardHeader className="shrink-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <CardTitle className="truncate">Delta-K 4-Quadrant Matrix</CardTitle>
+          <Badge className="shrink-0 border-zinc-700 text-zinc-400">
             {chain.label} · {chain.expiry ?? "—"}
           </Badge>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge
-            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-            title="COA 2.0 support — the strike accumulating the most intraday put OI."
-          >
-            <Shield className="h-3 w-3" />
-            Aegis-1 {levels.aegis_1 !== null ? fmt(levels.aegis_1, 0) : "—"}
-            {levels.aegis_shift !== 0 ? (
-              <span className="opacity-70">
-                {" "}
-                {signed(levels.aegis_shift, 0)}
-              </span>
-            ) : null}
-          </Badge>
-          <Badge
-            className="border-rose-500/40 bg-rose-500/10 text-rose-300"
-            title="COA 2.0 resistance — the strike accumulating the most intraday call OI."
-          >
-            <TrendingUp className="h-3 w-3" />
-            Zenith-1 {levels.zenith_1 !== null ? fmt(levels.zenith_1, 0) : "—"}
-            {levels.zenith_shift !== 0 ? (
-              <span className="opacity-70">
-                {" "}
-                {signed(levels.zenith_shift, 0)}
-              </span>
-            ) : null}
-          </Badge>
-          <Badge className="border-zinc-700 text-zinc-400" title="Put-Call OI ratio">
-            PCR {fmt(chain.pcr)}
-          </Badge>
-        </div>
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+          {chain.rows.length} strikes
+        </span>
       </CardHeader>
 
-      <CardContent className="overflow-auto p-0">
+      {/* COA levels, distances and corridor position — the prose replaced */}
+      <div className="shrink-0">
+        <CoaStrip chain={chain} />
+      </div>
+
+      <CardContent className="dk-scroll min-h-0 flex-1 overflow-auto p-0">
         <table className="w-full border-collapse text-right">
           <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur">
             <tr className="text-[9px] uppercase tracking-wider text-zinc-500">
-              <th colSpan={5} className="border-b border-zinc-800 px-1.5 py-1 text-center text-emerald-500/80">
+              <th
+                colSpan={5}
+                className="border-b border-zinc-800 px-1.5 py-1 text-center text-emerald-500/80"
+              >
                 Calls
               </th>
               <th className="border-b border-zinc-800 px-1.5 py-1 text-center text-quantum/80">
                 Strike
               </th>
-              <th colSpan={5} className="border-b border-zinc-800 px-1.5 py-1 text-center text-rose-500/80">
+              <th
+                colSpan={5}
+                className="border-b border-zinc-800 px-1.5 py-1 text-center text-rose-500/80"
+              >
                 Puts
               </th>
             </tr>
@@ -215,6 +253,7 @@ export function OptionChainMatrix({
           </thead>
           <tbody>
             {chain.rows.map((row) => {
+              const tags = levelTags(row.strike, levels);
               const highlighted =
                 signalToken &&
                 (row.call?.token === signalToken || row.put?.token === signalToken);
@@ -223,7 +262,7 @@ export function OptionChainMatrix({
                   key={row.strike}
                   className={cn(
                     "border-b border-zinc-800/40 transition-colors hover:bg-zinc-800/40",
-                    rowTone(row),
+                    rowTone(tags, row),
                     row.quantum_horizon && "dk-quantum-horizon",
                     highlighted && "shadow-[inset_0_0_0_1px_rgba(0,240,255,0.5)]",
                   )}
@@ -235,7 +274,21 @@ export function OptionChainMatrix({
                       row.is_atm ? "text-quantum text-glow-quantum" : "text-zinc-300",
                     )}
                   >
-                    {fmt(row.strike, 0)}
+                    <span className="flex items-center justify-center gap-1 whitespace-nowrap">
+                      {fmt(row.strike, 0)}
+                      {tags.map((t) => (
+                        <span
+                          key={t.key}
+                          title={t.title}
+                          className={cn(
+                            "rounded border px-0.5 text-[8px] font-bold leading-[1.35] tracking-tight",
+                            t.cls,
+                          )}
+                        >
+                          {t.label}
+                        </span>
+                      ))}
+                    </span>
                   </td>
                   <LegCells leg={row.put} side="put" maxOi={maxOi} />
                 </tr>
@@ -243,15 +296,36 @@ export function OptionChainMatrix({
             })}
           </tbody>
         </table>
-
-        <div className="flex items-center justify-between gap-3 border-t border-zinc-800 px-3 py-1.5 text-[9px] uppercase tracking-wider text-zinc-600">
-          <span className="flex items-center gap-1.5">
-            <span className="h-px w-6 bg-quantum shadow-[0_0_6px_#00f0ff]" />
-            Quantum Horizon — ITM / OTM split at spot
-          </span>
-          <span>Zero-OTM rule: longs restricted to 2nd–3rd ITM</span>
-        </div>
       </CardContent>
+
+      {/* Pinned legend — stays put while the matrix scrolls under it */}
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-zinc-800 px-3 py-1.5 text-[9px] uppercase tracking-wider text-zinc-600">
+        <span className="flex items-center gap-1.5">
+          <span className="h-px w-6 bg-quantum shadow-[0_0_6px_#00f0ff]" />
+          Quantum Horizon — ITM / OTM split at spot
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1">
+            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-0.5 text-[8px] font-bold text-emerald-400/90">
+              A0
+            </span>
+            <span className="rounded border border-emerald-400/70 bg-emerald-400/20 px-0.5 text-[8px] font-bold text-emerald-200">
+              A1
+            </span>
+            support
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="rounded border border-rose-500/40 bg-rose-500/10 px-0.5 text-[8px] font-bold text-rose-400/90">
+              Z0
+            </span>
+            <span className="rounded border border-rose-400/70 bg-rose-400/20 px-0.5 text-[8px] font-bold text-rose-200">
+              Z1
+            </span>
+            resistance
+          </span>
+        </span>
+        <span>Zero-OTM rule: longs restricted to 2nd–3rd ITM</span>
+      </div>
     </Card>
   );
 }
