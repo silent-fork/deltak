@@ -1,0 +1,423 @@
+/**
+ * Parity checks for the TypeScript engine.
+ *
+ * These mirror the Python suite (backend/tests) case-for-case: if the port
+ * drifted from the strategy the server implemented, these are what catch it.
+ * Run with `npm test`.
+ */
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { calculateSize, roundToLot, resolveLotSize } from "../lib/engine/sizing";
+import { RrgEngine, classifyQuadrant, MIN_SAMPLES } from "../lib/engine/rrg";
+import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
+import { classifyProtocol, SignalEngine } from "../lib/engine/dkms";
+import { Ledger, applySlippage } from "../lib/engine/ledger";
+import { breach } from "../lib/engine/risk";
+import { decodePacket } from "../lib/stream/smartstream";
+import { TickStore, emptyTick } from "../lib/stream/ticks";
+import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
+import { DEFAULT_CONFIG, secondsToDaylightRest } from "../lib/engine/config";
+import type { CoaLevels } from "../lib/types";
+
+/* ------------------------------------------------------------------ sizing */
+
+test("sizing formula matches the specification", () => {
+  // floor(500000 * 1% / (10 * 75)) = floor(5000 / 750) = 6
+  const r = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 10, capital: 500_000, riskPct: 1, lotSize: 75,
+  });
+  assert.equal(r.lots, 6);
+  assert.equal(r.quantity, 450);
+  assert.equal(r.risk_amount, 5000);
+  assert.equal(r.risk_per_lot, 750);
+});
+
+test("capital cap applies when premium is expensive", () => {
+  const r = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 1, capital: 100_000, riskPct: 1,
+    lotSize: 75, entryPrice: 400,
+  });
+  assert.equal(r.capped_by, "CAPITAL");
+  assert.equal(r.lots, 3); // floor(100000 / (400*75))
+  assert.ok(r.entry_cost <= 100_000);
+});
+
+test("zero lots when the risk budget is too small", () => {
+  const r = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 500, capital: 10_000, riskPct: 1, lotSize: 75,
+  });
+  assert.equal(r.lots, 0);
+  assert.equal(r.capped_by, "RISK_BUDGET");
+});
+
+test("invalid stop is rejected and lot helpers behave", () => {
+  assert.equal(
+    calculateSize({ underlying: "NIFTY", stopLossPoints: 0, capital: 1e6, riskPct: 1 }).capped_by,
+    "INVALID_STOP",
+  );
+  assert.equal(roundToLot(163, 75), 150);
+  assert.equal(resolveLotSize("FINNIFTY"), 40);
+  assert.equal(resolveLotSize("BANKNIFTY"), 15);
+});
+
+/* --------------------------------------------------------------------- RRG */
+
+test("quadrant matrix", () => {
+  assert.equal(classifyQuadrant(101, 101), "LEADING");
+  assert.equal(classifyQuadrant(99, 101), "IMPROVING");
+  assert.equal(classifyQuadrant(101, 99), "WEAKENING");
+  assert.equal(classifyQuadrant(99, 99), "LAGGING");
+  assert.equal(classifyQuadrant(100, 100), "LEADING");
+});
+
+test("flat series sits at the origin", () => {
+  const e = new RrgEngine(20, 3);
+  let p = { rs_ratio: 0, rs_momentum: 0 };
+  for (let i = 0; i < 30; i++) p = e.update("T1", 100, 20_000);
+  assert.equal(p.rs_ratio, 100);
+  assert.equal(p.rs_momentum, 100);
+});
+
+test("outperformance rotates into Leading, decay into Lagging", () => {
+  const up = new RrgEngine(20, 3);
+  let price = 100;
+  for (let i = 0; i < 40; i++) { price *= 1.01; up.update("T1", price, 20_000); }
+  assert.equal(up.quadrant("T1"), "LEADING");
+
+  const down = new RrgEngine(20, 3);
+  price = 100;
+  for (let i = 0; i < 40; i++) { price *= 0.99; down.update("T1", price, 20_000); }
+  assert.equal(down.quadrant("T1"), "LAGGING");
+});
+
+test("nodes are damped until matured and tails stay bounded", () => {
+  const e = new RrgEngine(10, 2, 5);
+  let price = 100;
+  for (let i = 1; i < MIN_SAMPLES; i++) { price *= 1.05; e.update("T1", price, 20_000); assert.ok(!e.matured("T1")); }
+  e.update("T1", price * 1.05, 20_000);
+  assert.ok(e.matured("T1"));
+  for (let i = 0; i < 20; i++) e.update("T1", 100 + i, 20_000);
+  assert.equal(e.tail("T1").length, 5);
+});
+
+test("zero inputs never throw", () => {
+  assert.equal(new RrgEngine().update("T1", 0, 0).rs_ratio, 100);
+});
+
+/* --------------------------------------------------------------------- COA */
+
+test("itm depth and nearest strike", () => {
+  assert.equal(nearestStrike(24_512, [24_450, 24_500, 24_550]), 24_500);
+  assert.equal(itmDepth(24_400, 24_500, "CE", 50), 2);
+  assert.equal(itmDepth(24_600, 24_500, "PE", 50), 2);
+  assert.equal(itmDepth(24_600, 24_500, "CE", 50), -2);
+  assert.equal(itmDepth(24_500, 24_500, "CE", 50), 0);
+});
+
+const EXPIRY = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+
+function makeMaster(spot = 24_500, step = 50, depth = 20, lotSize = 75): ScripMaster {
+  const options: Instrument[] = [];
+  let token = 1000;
+  const base = Math.round(spot / step) * step;
+  for (let i = -depth; i <= depth; i++) {
+    const strike = base + i * step;
+    for (const optionType of ["CE", "PE"] as const) {
+      token += 1;
+      options.push({
+        token: String(token),
+        symbol: `NIFTY${strike}${optionType}`,
+        name: "NIFTY",
+        exchSeg: "NFO",
+        strike, lotSize, expiry: EXPIRY, optionType,
+      });
+    }
+  }
+  const payload: MasterPayload = {
+    generatedAt: new Date().toISOString(),
+    totalRecords: options.length,
+    spots: {
+      NIFTY: { token: "99926000", symbol: "NIFTY", name: "NIFTY", exchSeg: "NSE",
+               strike: 0, lotSize: 1, expiry: null, optionType: null },
+    },
+    options: { NIFTY: options },
+  };
+  return new ScripMaster(payload);
+}
+
+function fillTicks(
+  master: ScripMaster, store: TickStore, spot = 24_500,
+  oiProfile: Record<string, number> = {},
+): TickStore {
+  const s = emptyTick(master.spotToken("NIFTY"));
+  s.ltp = spot; s.close = spot;
+  store.apply(s);
+  for (const inst of master.contracts("NIFTY")) {
+    const intrinsic = inst.optionType === "CE"
+      ? Math.max(0, spot - inst.strike) : Math.max(0, inst.strike - spot);
+    const px = Number((intrinsic + 60).toFixed(2));
+    const t = emptyTick(inst.token);
+    t.ltp = px; t.close = px; t.volume = 1000;
+    t.oi = oiProfile[`${inst.strike}${inst.optionType}`] ?? 10_000;
+    t.bestBid = Number((px * 0.99).toFixed(2));
+    t.bestAsk = Number((px * 1.01).toFixed(2));
+    store.apply(t);
+  }
+  return store;
+}
+
+test("chain shape, moneyness and the Quantum Horizon", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore());
+  const chain = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG)
+    .build(master, ticks, 24_500);
+
+  assert.equal(chain.atm_strike, 24_500);
+  assert.equal(chain.rows.filter((r) => r.quantum_horizon).length, 1);
+  const deep = chain.rows.find((r) => r.strike === 24_400)!;
+  assert.equal(deep.call!.moneyness, "ITM");
+  assert.equal(deep.call!.itm_depth, 2);
+  assert.equal(deep.put!.moneyness, "OTM");
+  assert.ok(chain.pcr > 0);
+});
+
+test("COA levels track the OI walls", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore(), 24_500, {
+    "24300PE": 900_000, "24800CE": 850_000,
+  });
+  const chain = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG)
+    .build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_0, 24_300);
+  assert.equal(chain.levels.zenith_0, 24_800);
+  // With no intraday delta yet, COA 2.0 falls back to the COA 1.0 walls.
+  assert.equal(chain.levels.aegis_1, 24_300);
+  assert.equal(chain.levels.zenith_1, 24_800);
+});
+
+test("COA 2.0 follows intraday OI change", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore());
+  const builder = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG);
+  builder.build(master, ticks, 24_500); // establishes session-open OI
+
+  const put = master.find("NIFTY", 24_350, "PE")!;
+  const call = master.find("NIFTY", 24_700, "CE")!;
+  for (const [inst, oi] of [[put, 400_000], [call, 380_000]] as const) {
+    const t = emptyTick(inst.token); t.ltp = 50; t.oi = oi; ticks.apply(t);
+  }
+  const chain = builder.build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_1, 24_350);
+  assert.equal(chain.levels.zenith_1, 24_700);
+});
+
+test("selectItm honours depth and direction", () => {
+  const master = makeMaster();
+  const b = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG);
+  assert.equal(b.selectItm(master, "CE", 24_500, 2)!.strike, 24_400);
+  assert.equal(b.selectItm(master, "PE", 24_500, 3)!.strike, 24_650);
+});
+
+/* -------------------------------------------------------------------- DKMS */
+
+const levels = (a = 24_300, z = 24_800, as = 0, zs = 0): CoaLevels => ({
+  aegis_0: a, zenith_0: z, aegis_1: a, zenith_1: z, aegis_shift: as, zenith_shift: zs,
+});
+
+test("protocol classification", () => {
+  const tol = DEFAULT_CONFIG.levelShiftTolerance;
+  assert.equal(classifyProtocol(levels(), tol), "ALPHA");
+  assert.equal(classifyProtocol(levels(24_300, 24_800, 0, 3), tol), "BETA");
+  assert.equal(classifyProtocol(levels(24_300, 24_800, -3, 0), tol), "GAMMA");
+  assert.equal(classifyProtocol(levels(24_300, 24_800, -3, 3), tol), "DELTA");
+  assert.equal(
+    classifyProtocol({ aegis_0: null, zenith_0: null, aegis_1: null, zenith_1: null,
+                       aegis_shift: 0, zenith_shift: 0 }, tol),
+    "DELTA",
+  );
+});
+
+function warmEngine(spot: number, oiProfile: Record<string, number> = {}) {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore(), spot, oiProfile);
+  const rrg = new RrgEngine();
+  const builder = new ChainBuilder("NIFTY", rrg, DEFAULT_CONFIG);
+  for (let i = 0; i < 12; i++) builder.build(master, ticks, spot);
+  return { master, ticks, builder, engine: new SignalEngine("NIFTY", builder, DEFAULT_CONFIG) };
+}
+
+const WALLS = { "24300PE": 900_000, "24800CE": 850_000 };
+
+test("Alpha at support buys an ITM call under the Zero-OTM rule", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.protocol, "ALPHA");
+  assert.equal(sig.option_type, "CE");
+  assert.ok(sig.itm_depth! >= 2);
+  assert.ok(sig.strike! < chain.spot);
+  assert.ok(sig.sizing!.lots >= 1);
+});
+
+test("Alpha mid-range is blocked", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_550, WALLS);
+  const chain = builder.build(master, ticks, 24_550);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.blocked_reason, "MID_RANGE");
+});
+
+test("Delta regime mutes the auto-driver", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_500);
+  const chain = builder.build(master, ticks, 24_500);
+  chain.levels.aegis_shift = -4;
+  chain.levels.zenith_shift = 4;
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.protocol, "DELTA");
+  assert.equal(sig.blocked_reason, "VOLATILITY_TRAP");
+});
+
+test("Gamma selects an ITM put", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_500);
+  const chain = builder.build(master, ticks, 24_500);
+  chain.levels.aegis_shift = -3;
+  chain.levels.zenith_shift = 0;
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.protocol, "GAMMA");
+  assert.equal(sig.option_type, "PE");
+  assert.ok(sig.strike! > chain.spot);
+});
+
+test("signal geometry is internally consistent", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.ok(sig.stop_loss! < sig.entry_price!);
+  assert.ok(sig.entry_price! < sig.target_1!);
+  assert.ok(sig.target_1! < sig.target_2!);
+  assert.equal(Number((sig.entry_price! - sig.stop_loss!).toFixed(2)), sig.stop_loss_points);
+});
+
+test("no capital means no actionable signal", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000);
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.sizing!.lots, 0);
+});
+
+/* ------------------------------------------------------------------ ledger */
+
+function openPos(l: Ledger, price = 100, lots = 2) {
+  return l.open({
+    underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY24500CE",
+    quantity: lots * 75, lots, lotSize: 75, price,
+    optionType: "CE", strike: 24_500, stopLoss: 75, target: 150, mode: "paper",
+  });
+}
+
+test("slippage moves against the taker", () => {
+  assert.equal(applySlippage(100, "BUY", 0.01), 101);
+  assert.equal(applySlippage(100, "SELL", 0.01), 99);
+});
+
+test("unrealised PnL marks to the live feed", () => {
+  const l = new Ledger(500_000, 0.0015, 25);
+  openPos(l);
+  const ticks = new TickStore();
+  const t = emptyTick("1001"); t.ltp = 120; ticks.apply(t);
+  l.markToMarket(ticks);
+  assert.equal(l.openPositions[0].unrealised_pnl, 20 * 150);
+  assert.equal(l.openPositions[0].pnl_pct, 20);
+});
+
+test("close books realised PnL and charges", () => {
+  const l = new Ledger(500_000, 0.0015, 25);
+  const pos = openPos(l);
+  const closed = l.close(pos.id, 130, "TARGET")!;
+  assert.equal(closed.realised_pnl, 30 * 150);
+  assert.equal(closed.status, "CLOSED");
+  assert.equal(l.openPositions.length, 0);
+  assert.equal(l.realised, 4500);
+});
+
+test("scale-out keeps the residual, full scale-out closes", () => {
+  const l = new Ledger(500_000, 0.0015, 25);
+  const pos = openPos(l, 100, 4);
+  l.reduce(pos.id, 2, 120);
+  assert.equal(l.get(pos.id)!.lots, 2);
+  assert.equal(l.get(pos.id)!.quantity, 150);
+  assert.equal(l.realised, 20 * 150);
+  l.reduce(pos.id, 2, 120);
+  assert.equal(l.get(pos.id), undefined);
+});
+
+/* --------------------------------------------------------- circuit breakers */
+
+test("0.35% invalidation band", () => {
+  const pct = DEFAULT_CONFIG.invalidationPct;
+  assert.equal(breach(24_300 - 100, 24_300, "below", pct), true);
+  assert.equal(breach(24_300 - 50, 24_300, "below", pct), false);
+  assert.equal(breach(24_800 + 100, 24_800, "above", pct), true);
+  assert.equal(breach(24_800 + 50, 24_800, "above", pct), false);
+  assert.equal(breach(24_500, null, "below", pct), false);
+});
+
+test("daylight rest countdown is bounded and monotonic", () => {
+  const s = secondsToDaylightRest();
+  assert.ok(s >= 0 && s <= 15 * 3600 + 15 * 60);
+});
+
+/* ------------------------------------------ SmartStream binary decoding */
+
+function snapQuote(token = "35005", ltp = 187.25, oi = 512_000): ArrayBuffer {
+  const buf = new ArrayBuffer(379);
+  const view = new DataView(buf);
+  const bytes = new Uint8Array(buf);
+  view.setUint8(0, 3); // snap quote
+  view.setUint8(1, 2); // NSE F&O
+  bytes.set(new TextEncoder().encode(token), 2);
+  view.setBigInt64(27, 1n, true);
+  view.setBigInt64(35, 1_700_000_000_000n, true);
+  view.setBigInt64(43, BigInt(Math.round(ltp * 100)), true);
+  view.setBigInt64(67, 1_250_000n, true);
+  view.setBigInt64(91, 18_000n, true);
+  view.setBigInt64(99, 20_000n, true);
+  view.setBigInt64(107, 17_000n, true);
+  view.setBigInt64(115, 18_500n, true);
+  view.setBigInt64(131, BigInt(oi), true);
+  view.setFloat64(139, 4.5, true);
+  view.setInt16(147, 1, true);
+  view.setBigInt64(157, BigInt(Math.round(187.1 * 100)), true);
+  view.setInt16(167, 0, true);
+  view.setBigInt64(177, BigInt(Math.round(187.4 * 100)), true);
+  return buf;
+}
+
+test("decodes a mode-3 snap quote packet", () => {
+  const t = decodePacket(snapQuote())!;
+  assert.equal(t.token, "35005");
+  assert.equal(t.ltp, 187.25);
+  assert.equal(t.volume, 1_250_000);
+  assert.equal(t.oi, 512_000);
+  assert.equal(t.close, 185);
+  assert.equal(t.bestBid, 187.1);
+  assert.equal(t.bestAsk, 187.4);
+});
+
+test("rejects truncated frames", () => {
+  assert.equal(decodePacket(new ArrayBuffer(2)), null);
+});
+
+test("tick store tracks intraday OI change and carries fields forward", () => {
+  const s = new TickStore();
+  const a = emptyTick("35005"); a.ltp = 100; a.oi = 400_000; a.volume = 999; a.close = 95;
+  s.apply(a);
+  const b = emptyTick("35005"); b.ltp = 101; b.oi = 460_000;
+  s.apply(b);
+  assert.equal(s.oiChange("35005"), 60_000);
+  assert.equal(s.prevLtp("35005"), 100);
+  assert.equal(s.get("35005")!.volume, 999);
+  assert.equal(s.get("35005")!.close, 95);
+});
