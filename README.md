@@ -16,25 +16,27 @@ Covers **NIFTY 50**, **BANKNIFTY** and **FINNIFTY**.
 ## Architecture
 
 ```
-┌──────────────────────┐   SSE / WebSocket   ┌──────────────────────────┐
-│  Next.js 14 HUD      │ ◀────────────────── │  FastAPI engine          │
-│  (Vercel)            │   engine snapshot   │  (persistent host)       │
-│                      │                     │                          │
-│  · 4-quadrant matrix │ ──── REST ────────▶ │  · scrip master          │
-│  · RRG scatter       │                     │  · SmartStream 2.0 WS    │
-│  · signal + ledger   │                     │  · COA / RRG / DKMS      │
-└──────────┬───────────┘                     │  · risk cron             │
-           │                                 └────────────┬─────────────┘
-           │  /api/history/*                              │  write-behind
-           ▼                                              ▼
+┌────────────────────────────────────────────┐   direct WS   ┌───────────────┐
+│  Next.js HUD (Vercel, fully serverless)     │ ◀──────────── │  SmartStream  │
+│                                              │               │  2.0 feed     │
+│  · engine runs in the browser (1 Hz tick)   │               └───────────────┘
+│    scrip master → COA → RRG → DKMS → ledger │
+│  · 4-quadrant matrix · RRG scatter          │
+│  · signal + ledger                          │
+└──────────────┬───────────────────────────────┘
+               │  /api/auth, /api/order, /api/persist, /api/history/*
+               ▼
       ┌─────────────────────────── Supabase ──────────────────────────┐
       │  trading_sessions · orders · positions · signals · risk_events │
       └────────────────────────────────────────────────────────────────┘
 ```
 
-The engine holds long-lived state — a SmartStream WebSocket, an in-memory tick
-store, and two always-on asyncio loops. **It cannot run on serverless.** The
-HUD deploys to Vercel; the engine needs a persistent container.
+There is no separate backend to host. The signal engine (COA, RRG, DKMS,
+ledger, risk guards) runs client-side on a 1 Hz timer; a handful of Next.js
+route handlers under `web/app/api` cover what the browser can't do directly —
+the SmartAPI login exchange (keeps `DK_API_KEY` server-side) and Supabase
+persistence (keeps the service-role key server-side). Everything deploys as
+one Vercel project.
 
 ---
 
@@ -103,43 +105,24 @@ master).
 
 ### Prerequisites
 
-- Python 3.11+, Node 20+
+- Node 20+
 - An Angel One SmartAPI app (see [Angel One setup](#angel-one-setup))
 - Optional: a Supabase project for persistence
 
-### Backend
+### HUD + engine
 
 ```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example .env          # then fill it in
-uvicorn app.main:app --reload --port 8000
-```
-
-API docs at <http://localhost:8000/docs>.
-
-Set `DK_SIMULATE=1` to drive the HUD from a synthetic tick generator when you
-have no SmartAPI session — the UI shows a persistent **SIMULATED FEED** badge
-whenever it is active.
-
-### Frontend
-
-```bash
-cd frontend
+cd web
 npm install
-cp .env.example .env.local       # point NEXT_PUBLIC_API_URL at the engine
+cp .env.example .env.local       # fill in DK_API_KEY, Supabase, etc.
 npm run dev
 ```
 
 HUD at <http://localhost:3000>.
 
-### Both, via Docker
-
-```bash
-cp .env.example backend/.env     # fill in
-docker compose up --build
-```
+Set `NEXT_PUBLIC_SIMULATE=1` to drive the HUD from a synthetic tick generator
+when you have no SmartAPI session — the UI shows a persistent **SIMULATED
+FEED** badge whenever it is active.
 
 ---
 
@@ -151,8 +134,7 @@ four things:
 | Field | What to enter |
 | --- | --- |
 | **Redirect URL** | `https://<your-domain>/auth/callback`. Delta-K uses `loginByPassword`, not the OAuth publisher flow, so this is never exercised — but the form requires a valid URL, and the app serves a real page there. |
-| **Post back URL** | `https://<your-engine-host>/api/webhook/postback` — Angel One POSTs order-status updates here, which saves polling the order book. Optional; leave blank if the engine isn't publicly reachable. |
-| **Primary Static IP** | The public egress IP your **engine** calls from — your ISP IP for local runs, the server's static IP once deployed. This is the field that breaks logins when wrong. |
+| **Primary Static IP** | The public egress IP the `/api/auth/login` route calls Angel One from — your ISP IP for local runs, Vercel's outbound IP once deployed. This is the field that breaks logins when wrong. |
 | **Secondary Static IP** | Optional failover egress IP. |
 
 ### Authentication
@@ -192,7 +174,7 @@ Supabase stores sessions, orders, positions, signals and risk events. Writes go
 through a bounded write-behind queue — **the trading loop never waits on the
 database**, and if Supabase is slow or unreachable the engine keeps trading and
 drops the oldest queued rows rather than growing without bound. With
-`DK_SUPABASE_URL` unset, the repository degrades to a no-op.
+`SUPABASE_URL` unset, the repository degrades to a no-op.
 
 RLS is enabled on every table with **no policies**: anon and authenticated
 clients get nothing. The engine writes with the service-role key, which bypasses
@@ -205,98 +187,31 @@ Apply the schema with `supabase/migrations/0001_deltak_core_schema.sql`.
 
 ## Deployment
 
-### HUD → Vercel
+### Vercel
 
-The Next.js app deploys as-is. Set these environment variables in the Vercel
-project:
+The `web/` app deploys as-is — one project, no separate service to host. Set
+these environment variables (see `web/.env.example` for the full list):
 
 | Variable | Value |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | Public URL of the engine, e.g. `https://engine.example.com` |
+| `DK_API_KEY` | Your SmartAPI private key. **Server-side only** — read by `/api/auth/login`, never sent in a request body. |
+| `DK_CLIENT_LOCAL_IP` / `DK_CLIENT_PUBLIC_IP` | Client identity headers Angel One expects on REST calls. |
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key — **server-side only**, never prefixed `NEXT_PUBLIC_` |
+| `NEXT_PUBLIC_SIMULATE` | `1` to force the synthetic feed. |
 
-`next.config.mjs` rewrites `/api/*` to the engine so the browser only ever talks
-to its own origin (no CORS, and SSE works cleanly). `/api/history/*` is served by
-a Vercel route handler reading Supabase directly — one hop instead of two, and it
-keeps working when the engine is offline.
+There is no engine host, no static outbound IP to provision, and no always-on
+process to keep alive — the whole app is stateless request handlers plus a
+browser-side timer.
 
-### Keeping your whitelisted IP: run the engine locally
+### Keeping your whitelisted IP
 
-Angel One whitelists the IP that *calls its API*. Only the engine does that, so
-the simplest way to keep using the home/office IP you already registered is to
-run the engine on that machine and let the hosted HUD reach it:
-
-```
-browser ──▶ Vercel HUD ──▶ tunnel ──▶ engine on your machine ──▶ Angel One
-                                                                (sees YOUR IP)
-```
-
-Next.js rewrites run **server-side**, so Vercel forwards `/api/*` to whatever
-`NEXT_PUBLIC_API_URL` points at. Expose the local engine with a tunnel:
-
-```bash
-uvicorn app.main:app --port 8000          # terminal 1
-cloudflared tunnel --url http://localhost:8000   # terminal 2
-```
-
-Then set `NEXT_PUBLIC_API_URL` in Vercel to the tunnel URL, and add it to
-`DK_CORS_ORIGINS`. Angel One still sees your machine's IP, because your machine
-is what opens the connection. (Simpler still for solo use: skip Vercel and run
-`npm run dev` locally too.)
-
-**What does not work for this**, despite being tempting:
-
-- **Calling Angel One straight from the browser.** SmartAPI's REST endpoints are
-  built for server-side use and are not CORS-enabled for arbitrary origins —
-  Angel One's browser-facing path is the separate Publisher Login redirect flow.
-  It would also put your API key, PIN and the returned JWT/feed tokens inside
-  the page, where any XSS reaches them.
-- **Supabase Edge Functions.** They run on a global edge runtime with dynamic
-  egress IPs; there is no static outbound IP to whitelist. (Supabase's IPv4
-  add-on gives the *database* a fixed address, not function egress.)
-
-### Engine → Railway
-
-`backend/railway.json` + `backend/Dockerfile` deploy as-is. Set these in the
-service's **Variables** (they are secrets — never put them in the frontend):
-
-| Variable | Notes |
-| --- | --- |
-| `DK_API_KEY` | Your SmartAPI private key. **Server-side only** — the login form does not accept it and it never crosses the wire. |
-| `DK_SUPABASE_SERVICE_KEY` | Service-role key; bypasses RLS. |
-| `DK_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
-| `DK_CLIENT_PUBLIC_IP` | The service's static outbound IP, once assigned. |
-| `DK_CORS_ORIGINS` | Your Vercel URL. |
-
-Railway injects `PORT`; the container honours it and falls back to 8000 locally.
-
-**Static outbound IPs require the Pro plan** (Settings → Networking → Enable
-Static IPs, then redeploy). Note the shape of what you get: Railway assigns
-**three** IPv4 addresses and load-balances outbound traffic across all of them.
-Angel One's app form has two slots (Primary + Secondary), so unless you can get
-all three allowlisted, roughly a third of API calls will originate from an
-un-allowlisted address and fail intermittently — which is worse than failing
-outright, because it looks like flakiness. Confirm with Angel One support that
-they can allowlist three before relying on this.
-
-Run **one replica**. The tick store, ledger and RRG state are per-process; a
-second replica would run a second, divergent copy of the strategy.
-
-### Engine → anywhere else
-
-Fly.io with a dedicated IPv4, Render, or any VM. **Not Vercel or Supabase Edge
-Functions**: the engine needs always-on background loops and a long-lived
-outbound WebSocket, which request-scoped runtimes cannot hold, and neither offers
-a static egress IP to allowlist.
-
-```bash
-docker build -t deltak-engine ./backend
-docker run -p 8000:8000 --env-file backend/.env deltak-engine
-```
-
-A single-IP host (VPS, Fly dedicated IPv4) is the cleanest fit for Angel One's
-allowlist, because it gives you exactly one address to register.
+Angel One whitelists the IP that *calls its API*. On Vercel, that's Vercel's
+egress IP (via `/api/auth/login`), which is why the SmartAPI app's Primary
+Static IP field should point there once deployed. For local development the
+call originates from your own machine, so register your ISP IP instead — or
+run `npm run dev` and use the terminal purely locally, which needs no
+whitelisting changes at all.
 
 ---
 
@@ -304,61 +219,61 @@ allowlist, because it gives you exactly one address to register.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/master/init` | Ingest and cache the scrip master (unauthenticated) |
+| `GET` | `/api/master` | Ingest and cache the scrip master (unauthenticated, edge-cached 1h) |
 | `POST` | `/api/auth/login` | Establish a SmartAPI session (client code, PIN, TOTP) |
-| `GET` | `/api/auth/rms` | Available margin for pre-trade leverage checks |
-| `GET` | `/api/snapshot` | One-shot engine snapshot |
-| `GET` | `/api/stream` | SSE snapshot stream |
-| `GET` | `/api/ws` | WebSocket snapshot stream |
-| `GET` | `/api/chain/{index}` | 4-quadrant option chain with COA levels |
-| `GET` | `/api/rrg/{index}` | Active RRG strike nodes |
-| `GET` | `/api/signal/{index}` | Current DKMS signal |
-| `POST` | `/api/calculate-size` | Risk-adjusted lot sizing |
-| `POST` | `/api/order/execute` | Place an order (paper or live) |
-| `POST` | `/api/order/from-signal` | One-click execution of the live signal |
-| `POST` | `/api/order/exit` | Close one position |
-| `POST` | `/api/order/scale-out` | Partial TP1 exit |
-| `POST` | `/api/order/panic-exit` | **Flatten everything** |
-| `POST` | `/api/webhook/postback` | Angel One order postback receiver |
-| `GET` | `/api/history/*` | Persisted sessions, orders, positions, signals, events |
+| `POST` | `/api/auth/logout` | Clear the session cookie |
+| `GET` | `/api/rms` | Available margin for pre-trade leverage checks |
+| `POST` | `/api/order` | Place a live order via Angel One `placeOrder` |
+| `POST` | `/api/persist` | Append engine records (orders, positions, signals, risk events) to Supabase |
+| `GET` | `/api/history/:resource` | Read persisted sessions, orders, positions, signals or risk events |
+
+The chain, RRG, DKMS signal and paper-mode ledger have no routes — they run
+entirely client-side in `web/lib/useEngine.ts` and never leave the tab.
 
 ---
 
 ## Tests
 
 ```bash
-cd backend && python -m pytest -q
+cd web && npm test
 ```
 
 Covers position sizing, RRG quadrant rotation, COA level derivation, DKMS
-protocol classification and the Zero-OTM rule, ledger PnL and scale-outs, the
-0.35 % invalidation band, the Daylight Rest countdown, SmartStream binary frame
-decoding, and the persistence layer's batching and back-pressure.
+protocol classification and the Zero-OTM rule, and signal geometry.
 
 ---
 
 ## Project layout
 
 ```
-backend/
+web/
   app/
-    main.py            FastAPI app and boot sequence
-    config.py          every strategy knob, env-driven
-    scrip_master.py    unauthenticated cold bootstrapper
-    smart_api.py       SmartAPI v2.0 REST client
-    ws_manager.py      SmartStream 2.0 feed + binary decoding
+    api/
+      master/            scrip master cold bootstrap
+      auth/login,logout/ SmartAPI session exchange
+      rms/                available margin
+      order/              live order placement
+      persist/            Supabase write-behind
+      history/[resource]/ Supabase read-back
+    page.tsx, layout.tsx  HUD shell
+  components/            HUD panels (chain, RRG scatter, order book, signal panel)
+  lib/
     engine/
-      coa.py           COA 1.0/2.0 chain builder, Aegis/Zenith
-      rrg.py           RS-Ratio / RS-Momentum engine
-      dkms.py          protocol selection and signal generation
-      sizing.py        risk-adjusted lot sizing
-    ledger.py          virtual execution ledger
-    execution.py       paper/live order router
-    risk.py            circuit breakers and the cron loop
-    db.py              Supabase write-behind repository
-frontend/
-  app/                 App Router pages and route handlers
-  components/          HUD panels
-  lib/                 wire types, API client, SSE hook
-supabase/migrations/   database schema
+      coa.ts             COA 1.0/2.0 chain builder, Aegis/Zenith
+      rrg.ts             RS-Ratio / RS-Momentum engine
+      dkms.ts            protocol selection and signal generation
+      sizing.ts          risk-adjusted lot sizing
+      ledger.ts          virtual execution ledger
+      risk.ts            circuit breakers
+      scripMaster.ts     scrip master parsing
+      config.ts          every strategy knob, env-driven
+    stream/
+      smartstream.ts     SmartStream 2.0 feed + binary decoding
+      simFeed.ts         synthetic tick generator
+      ticks.ts           in-browser tick store
+    server/smartapi.ts   SmartAPI v2.0 REST client (server-only)
+    supabase.ts          Supabase client
+    useEngine.ts         the engine loop itself — runs in the browser
+  tests/                 engine unit tests
+supabase/migrations/     database schema
 ```
