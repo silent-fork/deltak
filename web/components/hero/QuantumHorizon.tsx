@@ -59,6 +59,7 @@ export function QuantumHorizon({
   chain: OptionChain | undefined;
   quote: SpotQuote | undefined;
 }) {
+  const [metric, setMetric] = useState<"oi" | "volume">("oi");
   const flash = useTickFlash(quote?.ltp ?? 0);
   const trace = useSpotTrace(
     quote?.ltp ?? chain?.spot,
@@ -115,8 +116,12 @@ export function QuantumHorizon({
     const rows = chain.rows;
     const n = rows.length;
     const strikes = rows.map((r) => r.strike);
-    const maxOi = rows.reduce(
-      (m, r) => Math.max(m, r.call?.oi ?? 0, r.put?.oi ?? 0),
+    // The profile plots whichever measure is selected; OI shows where positions
+    // stand, volume where the session's activity actually went.
+    const value = (leg: { oi: number; volume: number } | null) =>
+      leg ? (metric === "oi" ? leg.oi : leg.volume) : 0;
+    const peak = rows.reduce(
+      (m, r) => Math.max(m, value(r.call), value(r.put)),
       0,
     );
 
@@ -142,7 +147,8 @@ export function QuantumHorizon({
 
     return {
       rows,
-      maxOi,
+      peak,
+      value,
       posOf,
       spotPos: posOf(chain.spot),
       atmPos: posOf(chain.atm_strike),
@@ -158,8 +164,10 @@ export function QuantumHorizon({
       hi: strikes[n - 1],
       callOi: rows.reduce((a, r) => a + (r.call?.oi ?? 0), 0),
       putOi: rows.reduce((a, r) => a + (r.put?.oi ?? 0), 0),
+      callVol: rows.reduce((a, r) => a + (r.call?.volume ?? 0), 0),
+      putVol: rows.reduce((a, r) => a + (r.put?.volume ?? 0), 0),
     };
-  }, [chain]);
+  }, [chain, metric]);
 
   const up = (quote?.change ?? 0) >= 0;
 
@@ -248,17 +256,17 @@ export function QuantumHorizon({
                 />
               ) : null}
 
-              {/* Open-interest profile: calls above the axis, puts below */}
+              {/* Profile: calls above the axis, puts below */}
               <div className="relative flex h-[104px] items-stretch gap-[2px]">
                 {view.rows.map((row) => {
                   const call =
-                    view.maxOi > 0 ? ((row.call?.oi ?? 0) / view.maxOi) * 100 : 0;
+                    view.peak > 0 ? (view.value(row.call) / view.peak) * 100 : 0;
                   const put =
-                    view.maxOi > 0 ? ((row.put?.oi ?? 0) / view.maxOi) * 100 : 0;
+                    view.peak > 0 ? (view.value(row.put) / view.peak) * 100 : 0;
                   return (
                     <div
                       key={row.strike}
-                      title={`${fmt(row.strike, 0)} — calls ${compact(row.call?.oi ?? 0)} · puts ${compact(row.put?.oi ?? 0)}`}
+                      title={`${fmt(row.strike, 0)} — calls ${compact(view.value(row.call))} · puts ${compact(view.value(row.put))} (${metric === "oi" ? "open interest" : "day volume"})`}
                       className="group relative flex min-w-0 flex-1 flex-col"
                     >
                       <div className="flex h-1/2 items-end">
@@ -360,6 +368,49 @@ export function QuantumHorizon({
                 </span>
                 <span>itm puts · {fmt(view.hi, 0)}</span>
               </div>
+
+              {/* Which measure the profile plots, and the day's totals for it */}
+              <div className="mt-1 flex items-center justify-between gap-2 border-t border-zinc-800/70 pt-1">
+                <div className="flex items-center gap-1">
+                  {(
+                    [
+                      ["oi", "OI"],
+                      ["volume", "Vol"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setMetric(key)}
+                      title={
+                        key === "oi"
+                          ? "Open interest — where positions currently stand."
+                          : "Session volume — where the day's activity actually went."
+                      }
+                      className={cn(
+                        "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors",
+                        metric === key
+                          ? "border-quantum/60 bg-quantum/15 text-quantum"
+                          : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <span
+                  title={`Day totals — puts ${compact(metric === "oi" ? view.putOi : view.putVol)} against calls ${compact(metric === "oi" ? view.callOi : view.callVol)}.`}
+                  className="truncate font-mono text-[9px] text-zinc-500"
+                >
+                  <span className="text-emerald-400/80">
+                    {compact(metric === "oi" ? view.putOi : view.putVol)}
+                  </span>
+                  <span className="mx-1 text-zinc-700">puts / calls</span>
+                  <span className="text-rose-400/80">
+                    {compact(metric === "oi" ? view.callOi : view.callVol)}
+                  </span>
+                </span>
+              </div>
             </div>
 
             {/* Corridor rail — Aegis, spot, Zenith at a glance */}
@@ -422,12 +473,14 @@ export function QuantumHorizon({
                     </div>
                   </div>
                 ))}
-                <div className="min-w-0" title="Total put and call open interest across the window.">
-                  <div className="dk-label text-[9px] leading-none">OI P/C</div>
+                {/* The profile footer carries the split; this is the day's size. */}
+                <div
+                  className="min-w-0"
+                  title={`Session volume traded across the window — ${compact(view.putVol)} puts and ${compact(view.callVol)} calls.`}
+                >
+                  <div className="dk-label text-[9px] leading-none">Day Vol</div>
                   <div className="mt-1 truncate font-mono text-[12px] font-semibold leading-none text-zinc-200">
-                    {compact(view.putOi)}
-                    <span className="mx-0.5 text-zinc-600">/</span>
-                    {compact(view.callOi)}
+                    {compact(view.putVol + view.callVol)}
                   </div>
                 </div>
               </div>

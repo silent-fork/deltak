@@ -223,6 +223,7 @@ test("selectItm honours depth and direction", () => {
 
 const levels = (a = 24_300, z = 24_800, as = 0, zs = 0): CoaLevels => ({
   aegis_0: a, zenith_0: z, aegis_1: a, zenith_1: z, aegis_shift: as, zenith_shift: zs,
+  aegis_trail: [], zenith_trail: [],
 });
 
 test("protocol classification", () => {
@@ -233,7 +234,8 @@ test("protocol classification", () => {
   assert.equal(classifyProtocol(levels(24_300, 24_800, -3, 3), tol), "DELTA");
   assert.equal(
     classifyProtocol({ aegis_0: null, zenith_0: null, aegis_1: null, zenith_1: null,
-                       aegis_shift: 0, zenith_shift: 0 }, tol),
+                       aegis_shift: 0, zenith_shift: 0,
+                       aegis_trail: [], zenith_trail: [] }, tol),
     "DELTA",
   );
 });

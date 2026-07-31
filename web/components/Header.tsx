@@ -150,7 +150,10 @@ export function Header({
         : "text-amber-400";
 
   return (
-    <header className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+    // `backdrop-blur` gives the header its own stacking context, which later
+    // siblings would otherwise paint over — pinning it above the board keeps the
+    // logs dropdown in front of the hero cards.
+    <header className="relative z-40 shrink-0 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
       {/*
         Three zones on one baseline: identity left, instruments centre, session
         state right. Below lg the instrument rail drops to its own full-width row

@@ -31,7 +31,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+    <div className="shrink-0 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <span title={hint} className="dk-label text-[9px] leading-none">
           {label}
@@ -39,6 +39,116 @@ function Section({
         {right}
       </div>
       {children}
+    </div>
+  );
+}
+
+const MW = 600;
+const MH = 100;
+
+/**
+ * Wall migration.
+ *
+ * Both walls' strike history, stepped rather than smoothed — a wall does not
+ * drift, it jumps from one strike to the next as writers rebuild it, and the
+ * shape of those jumps is what separates a solid bound from a fleeing one.
+ */
+function WallMigration({
+  aegis,
+  zenith,
+  spot,
+}: {
+  aegis: number[];
+  zenith: number[];
+  spot: number;
+}) {
+  const series = [...aegis, ...zenith, spot].filter((v) => v > 0);
+  const enough = aegis.length > 1 || zenith.length > 1;
+
+  const lo = enough ? Math.min(...series) : 0;
+  const hi = enough ? Math.max(...series) : 0;
+  const pad = Math.max((hi - lo) * 0.18, 1);
+  const top = hi + pad;
+  const bottom = lo - pad;
+  const span = top - bottom || 1;
+
+  const y = (v: number) => ((top - v) / span) * MH;
+  const step = (points: number[]) => {
+    if (points.length < 2) return "";
+    const dx = MW / (points.length - 1);
+    // Hold each level, then jump — a staircase, not an interpolation.
+    return points
+      .map((v, i) =>
+        i === 0
+          ? `M0,${y(v)}`
+          : `L${i * dx},${y(points[i - 1])} L${i * dx},${y(v)}`,
+      )
+      .join(" ");
+  };
+
+  return (
+    <div className="relative flex min-h-[74px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800 bg-zinc-950/50 px-2 pb-1 pt-1.5">
+      <div className="flex shrink-0 items-baseline justify-between">
+        <span
+          title="Every strike each wall has occupied this session. A wall that steps repeatedly is a wall being rebuilt; a flat line is a bound holding."
+          className="dk-label text-[9px] leading-none"
+        >
+          Wall Migration
+        </span>
+        <span className="font-mono text-[9px] text-zinc-600">
+          {enough ? `${Math.max(aegis.length, zenith.length)} reads` : "warming"}
+        </span>
+      </div>
+
+      <div className="relative mt-1 min-h-0 flex-1">
+        {!enough ? (
+          <div className="flex h-full items-center justify-center text-[10px] text-zinc-600">
+            Tracking wall movement…
+          </div>
+        ) : (
+          <svg
+            viewBox={`0 0 ${MW} ${MH}`}
+            preserveAspectRatio="none"
+            className="h-full w-full"
+            role="img"
+            aria-label="Strike history of the Aegis and Zenith walls"
+          >
+            {/* Spot, for reference against the bounds */}
+            {spot > 0 ? (
+              <line
+                x1={0}
+                y1={y(spot)}
+                x2={MW}
+                y2={y(spot)}
+                stroke="#00f0ff"
+                strokeWidth={1}
+                strokeDasharray="2 5"
+                opacity={0.5}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+
+            {aegis.length > 1 ? (
+              <path
+                d={step(aegis)}
+                fill="none"
+                stroke="#34d399"
+                strokeWidth={1.6}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+            {zenith.length > 1 ? (
+              <path
+                d={step(zenith)}
+                fill="none"
+                stroke="#fb7185"
+                strokeWidth={1.6}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+          </svg>
+        )}
+      </div>
     </div>
   );
 }
@@ -174,8 +284,8 @@ export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
         </span>
       </CardHeader>
 
-      <CardContent className="dk-scroll min-h-0 space-y-1.5 overflow-y-auto p-2">
-        <div className="grid grid-cols-2 gap-1.5">
+      <CardContent className="dk-scroll flex min-h-0 flex-col gap-1.5 overflow-y-auto p-2">
+        <div className="shrink-0 grid grid-cols-2 gap-1.5">
           <Wall
             side="aegis"
             prior={levels.aegis_0}
@@ -337,8 +447,15 @@ export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
           </div>
         </Section>
 
+        {/* Where the walls have actually stood this session */}
+        <WallMigration
+          aegis={levels.aegis_trail}
+          zenith={levels.zenith_trail}
+          spot={chain.spot}
+        />
+
         {/* Corridor geometry */}
-        <div className="grid grid-cols-3 gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+        <div className="shrink-0 grid grid-cols-3 gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
           {(
             [
               {

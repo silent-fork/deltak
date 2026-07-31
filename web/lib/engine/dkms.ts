@@ -51,6 +51,8 @@ const emptyLevels = (): CoaLevels => ({
   zenith_1: null,
   aegis_shift: 0,
   zenith_shift: 0,
+  aegis_trail: [],
+  zenith_trail: [],
 });
 
 export class SignalEngine {

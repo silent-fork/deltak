@@ -51,6 +51,8 @@ export class ChainBuilder {
     zenith_1: null,
     aegis_shift: 0,
     zenith_shift: 0,
+    aegis_trail: [],
+    zenith_trail: [],
   };
 
   constructor(
@@ -201,6 +203,8 @@ export class ChainBuilder {
       zenith_1: null,
       aegis_shift: 0,
       zenith_shift: 0,
+      aegis_trail: [],
+      zenith_trail: [],
     };
 
     // --- COA 1.0: cumulative open-interest walls ---
@@ -228,6 +232,10 @@ export class ChainBuilder {
 
     levels.aegis_shift = this.shift(this.aegisHist);
     levels.zenith_shift = this.shift(this.zenithHist);
+    // Copies, not the live buffers: the HUD renders these and must not observe
+    // them mutating underneath a paint.
+    levels.aegis_trail = [...this.aegisHist];
+    levels.zenith_trail = [...this.zenithHist];
     this.levels = levels;
     return levels;
   }

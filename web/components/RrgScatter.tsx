@@ -166,8 +166,9 @@ export function RrgScatter({
         </div>
       </CardHeader>
 
-      <CardContent className="dk-scroll min-h-0 overflow-y-auto p-2">
-        <div className="h-[168px] w-full 2xl:h-[188px]">
+      <CardContent className="dk-scroll flex min-h-0 flex-col overflow-y-auto p-2">
+        {/* The plot takes the column's leftover height so the card ends flush. */}
+        <div className="min-h-[150px] w-full flex-1">
           {visible.length === 0 ? (
             <div className="flex h-full items-center justify-center text-[11px] text-zinc-600">
               RRG nodes warming up…
@@ -233,13 +234,13 @@ export function RrgScatter({
         </div>
 
         {/* Axis legend + hovered node readout */}
-        <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[9px] uppercase tracking-wider text-zinc-600">
+        <div className="shrink-0 mt-1 flex items-center justify-between gap-2 px-1 text-[9px] uppercase tracking-wider text-zinc-600">
           <span>RS-Ratio →</span>
           <span>↑ RS-Momentum</span>
         </div>
 
         {/* Quadrant census — one row so the panel keeps its vertical budget */}
-        <div className="mt-1.5 grid grid-cols-4 gap-1">
+        <div className="shrink-0 mt-1.5 grid grid-cols-4 gap-1">
           {(Object.keys(QUADRANT_META) as (keyof typeof QUADRANT_META)[]).map(
             (q) => {
               const meta = QUADRANT_META[q];
@@ -264,7 +265,7 @@ export function RrgScatter({
         </div>
 
         {/* Reserve the readout's row so hovering does not reflow the sidebar. */}
-        <div className="mt-1.5 h-[26px] rounded border border-zinc-800 bg-zinc-950/70 px-2 py-1 font-mono text-[10px] leading-[16px] text-zinc-400">
+        <div className="shrink-0 mt-1.5 h-[26px] rounded border border-zinc-800 bg-zinc-950/70 px-2 py-1 font-mono text-[10px] leading-[16px] text-zinc-400">
           {active ? (
             <span className="block truncate">
               <span className="text-zinc-200">{active.label}</span> · RS-Ratio{" "}

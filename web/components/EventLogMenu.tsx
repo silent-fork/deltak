@@ -77,12 +77,16 @@ export function EventLogMenu({ events }: { events: RiskEvent[] }) {
         </span>
       </button>
 
+      {/*
+        Fully opaque, with a ring and a deep shadow to lift it off the board —
+        a log you read through the panel behind it is a log you misread.
+      */}
       {open ? (
         <div
           role="menu"
-          className="dk-scroll absolute left-0 top-full z-50 mt-1 max-h-[60vh] w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950/98 shadow-xl shadow-black/60 backdrop-blur"
+          className="dk-scroll absolute left-0 top-full z-50 mt-1 max-h-[60vh] w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60"
         >
-          <div className="sticky top-0 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-3 py-2 backdrop-blur">
+          <div className="sticky top-0 flex items-center justify-between border-b border-zinc-800 bg-[#0b0b0e] px-3 py-2">
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
               Risk Event Log
             </span>

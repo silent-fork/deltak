@@ -59,6 +59,9 @@ export interface CoaLevels {
   zenith_1: number | null;
   aegis_shift: number;
   zenith_shift: number;
+  /** Where each live wall has stood this session, oldest first. */
+  aegis_trail: number[];
+  zenith_trail: number[];
 }
 
 export interface OptionChain {

@@ -6,7 +6,6 @@ import { useState } from "react";
 import { useEngineContext } from "@/components/EngineProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
 /**
  * Sign-in gate.
@@ -97,14 +96,11 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
         </div>
 
         <h1 className="text-lg font-medium tracking-tight text-zinc-100">
-          Connect your Angel One account
+          Sign in to Angel One
         </h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
-          The terminal streams NIFTY, BANKNIFTY and FINNIFTY option chains directly
-          from SmartAPI. Nothing renders until a session is live.
-        </p>
+        <p className="mt-1.5 text-[12px] text-zinc-500">SmartAPI session</p>
 
-        <form onSubmit={submit} className="mt-7 space-y-4">
+        <form onSubmit={submit} className="mt-6 space-y-4">
           <Field label="Client Code">
             <Input
               value={clientCode}
@@ -126,10 +122,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             />
           </Field>
 
-          <Field
-            label="TOTP"
-            hint="Six digits from your authenticator app. Single-use — never stored."
-          >
+          <Field label="TOTP">
             <Input
               inputMode="numeric"
               pattern="\d{6}"
@@ -171,31 +164,12 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
           </button>
         ) : null}
 
-        <div className="mt-7 flex items-start gap-2 border-t border-zinc-900 pt-4 text-[10px] leading-relaxed text-zinc-600">
-          <LockKeyhole className="mt-px h-3 w-3 shrink-0" />
-          <span>
-            Credentials are relayed straight to Angel One and never written to disk.
-            Your API key stays in the server&apos;s environment; the token that can
-            place orders is held in an httpOnly cookie the page cannot read.
-          </span>
-        </div>
-
-        <div className="mt-4 flex items-center gap-3 text-[9px] uppercase tracking-[0.14em] text-zinc-700">
-          <StatusDot ok={engine.masterReady} label="Contract master" />
-          <StatusDot ok={false} label="Feed idle" />
+        {/* One line, because it is the only claim a sign-in page needs to make. */}
+        <div className="mt-6 flex items-center gap-2 border-t border-zinc-900 pt-4 text-[10px] text-zinc-600">
+          <LockKeyhole className="h-3 w-3 shrink-0" />
+          <span>Credentials are relayed to Angel One and never stored.</span>
         </div>
       </div>
     </main>
-  );
-}
-
-function StatusDot({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className={cn("h-1 w-1 rounded-full", ok ? "bg-emerald-500" : "bg-zinc-700")}
-      />
-      {label}
-    </span>
   );
 }
