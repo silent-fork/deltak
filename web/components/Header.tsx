@@ -9,16 +9,40 @@ import {
   Radio,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { EventLogMenu } from "@/components/EventLogMenu";
 import { LoginModal } from "@/components/LoginModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEngineContext } from "@/components/EngineProvider";
-import type { EngineSnapshot, ExecutionMode, SpotQuote } from "@/lib/types";
+import { istParts } from "@/lib/engine/config";
+import type {
+  EngineSnapshot,
+  ExecutionMode,
+  RiskEvent,
+  SpotQuote,
+} from "@/lib/types";
 import type { StreamState } from "@/lib/useEngine";
 import { useCountdown, useTickFlash } from "@/lib/useEngine";
 import { cn, countdown, fmt, signed } from "@/lib/utils";
+
+/**
+ * Exchange wall clock.
+ *
+ * Every protocol here is keyed to IST — the 3:15 PM Daylight Rest above all — so
+ * the clock shows Mumbai's time wherever the browser happens to be, and says so.
+ */
+function useIstClock(): string {
+  const [now, setNow] = useState(() => istParts());
+  useEffect(() => {
+    const id = setInterval(() => setNow(istParts()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return [now.hour, now.minute, now.second]
+    .map((v) => String(v).padStart(2, "0"))
+    .join(":");
+}
 
 function SpotTicker({
   quote,
@@ -36,7 +60,7 @@ function SpotTicker({
     <button
       onClick={onSelect}
       className={cn(
-        "group flex min-w-[150px] items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+        "flex h-10 w-[152px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
         active
           ? "border-quantum/60 bg-quantum/10"
           : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
@@ -44,16 +68,18 @@ function SpotTicker({
     >
       <span
         className={cn(
-          "h-6 w-[3px] rounded-full",
+          "h-6 w-[3px] shrink-0 rounded-full",
           up ? "bg-emerald-500" : "bg-rose-500",
           flash && "animate-pulse-ring",
         )}
       />
-      <span className="flex-1">
-        <span className="dk-label block leading-none">{quote.label}</span>
+      <span className="min-w-0 flex-1">
+        <span className="dk-label block truncate text-[9px] leading-none">
+          {quote.label}
+        </span>
         <span
           className={cn(
-            "mt-1 block rounded px-0.5 font-mono text-sm font-semibold leading-none text-zinc-100",
+            "mt-1 block rounded font-mono text-[13px] font-semibold leading-none text-zinc-100",
             flash === "up" && "animate-tick-up",
             flash === "down" && "animate-tick-down",
           )}
@@ -63,7 +89,7 @@ function SpotTicker({
       </span>
       <span
         className={cn(
-          "text-right font-mono text-[10px] leading-tight",
+          "shrink-0 text-right font-mono text-[9px] leading-tight",
           up ? "text-emerald-400" : "text-rose-400",
         )}
       >
@@ -79,6 +105,7 @@ export function Header({
   streamState,
   simulated,
   selected,
+  events,
   onSelect,
   onRefreshStatus,
 }: {
@@ -86,6 +113,7 @@ export function Header({
   streamState: StreamState;
   simulated: boolean;
   selected: string;
+  events: RiskEvent[];
   onSelect: (underlying: string) => void;
   onRefreshStatus: () => void;
 }) {
@@ -95,6 +123,7 @@ export function Header({
 
   const engine = useEngineContext();
   const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
+  const clock = useIstClock();
   const mode: ExecutionMode = snapshot?.mode ?? "paper";
   const authed = snapshot?.authenticated ?? false;
 
@@ -122,24 +151,32 @@ export function Header({
 
   return (
     <header className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
-      <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-        {/* Brand */}
-        <div className="flex items-center gap-2 pr-1">
-          <div className="flex h-7 w-7 items-center justify-center rounded border border-quantum/50 bg-quantum/10">
-            <Zap className="h-3.5 w-3.5 text-quantum" />
-          </div>
-          <div className="leading-none">
-            <div className="text-sm font-bold tracking-[0.16em] text-zinc-100">
-              DELTA-K
+      {/*
+        Three zones on one baseline: identity left, instruments centre, session
+        state right. Below lg the instrument rail drops to its own full-width row
+        instead of wrapping mid-cluster, so nothing ever sits half-aligned.
+      */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10">
+              <Zap className="h-4 w-4 text-quantum" />
             </div>
-            <div className="mt-0.5 text-[9px] uppercase tracking-[0.22em] text-quantum/70">
-              Terminal · DKMS
+            <div className="leading-none">
+              <div className="text-[13px] font-bold tracking-[0.16em] text-zinc-100">
+                DELTA-K
+              </div>
+              <div className="mt-1 text-[8px] uppercase tracking-[0.22em] text-quantum/70">
+                Terminal · DKMS
+              </div>
             </div>
           </div>
+
+          <EventLogMenu events={events} />
         </div>
 
-        {/* Spot-option anchor */}
-        <div className="flex flex-1 flex-wrap items-center gap-2">
+        {/* Instruments — a scrolling rail, never a wrapping grid */}
+        <div className="dk-scroll order-last flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-0.5 lg:order-none lg:w-auto lg:flex-1">
           {Object.values(snapshot?.spots ?? {}).map((quote) => (
             <SpotTicker
               key={quote.underlying}
@@ -150,37 +187,48 @@ export function Header({
           ))}
         </div>
 
-        {/* Status cluster */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Session state */}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {simulated ? (
-            <Badge className="border-amber-500/50 bg-amber-500/10 text-amber-300">
+            <Badge className="h-8 border-amber-500/50 bg-amber-500/10 text-amber-300">
               <FlaskConical className="h-3 w-3" />
-              Simulated Feed
+              Simulated
             </Badge>
           ) : null}
 
           <Badge
             className={cn(
-              "border-zinc-700",
-              snapshot?.market_open
-                ? "text-emerald-300"
-                : "text-zinc-500",
+              "h-8 border-zinc-800",
+              snapshot?.market_open ? "text-emerald-300" : "text-zinc-500",
             )}
           >
             <Activity className="h-3 w-3" />
-            {snapshot?.market_open ? "Market Open" : "Market Closed"}
+            {snapshot?.market_open ? "Open" : "Closed"}
           </Badge>
 
-          <Badge className={cn("border-zinc-700", streamTone)}>
-            <Radio className={cn("h-3 w-3", streamState === "live" && "animate-pulse-ring")} />
-            {streamState === "live" ? "Stream Live" : streamState}
+          <Badge className={cn("h-8 border-zinc-800", streamTone)}>
+            <Radio
+              className={cn("h-3 w-3", streamState === "live" && "animate-pulse-ring")}
+            />
+            {streamState === "live" ? "Live" : streamState}
           </Badge>
+
+          {/* Exchange wall clock */}
+          <span
+            title="Exchange wall clock — Asia/Kolkata"
+            className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 font-mono text-[11px] font-semibold tabular-nums text-zinc-200"
+          >
+            {clock}
+            <span className="text-[8px] font-normal uppercase tracking-wider text-zinc-600">
+              IST
+            </span>
+          </span>
 
           {/* Daylight Rest countdown */}
           <Badge
-            title="3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
+            title="Time to the 3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
             className={cn(
-              "border-zinc-700 font-semibold",
+              "h-8 border-zinc-800 font-semibold",
               seconds === 0
                 ? "text-zinc-500"
                 : seconds < 600
@@ -189,10 +237,9 @@ export function Header({
             )}
           >
             <AlarmClock className="h-3 w-3" />
-            {seconds === 0 ? "Rest Elapsed" : countdown(seconds)}
+            {seconds === 0 ? "Rest" : countdown(seconds)}
           </Badge>
 
-          {/* Execution mode */}
           <button
             onClick={toggleMode}
             disabled={switching}
@@ -202,10 +249,10 @@ export function Header({
                 : "LIVE mode — orders route to NSE. Click to return to paper."
             }
             className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50",
+              "flex h-8 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50",
               mode === "live"
                 ? "border-rose-500/60 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
-                : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700",
+                : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800",
             )}
           >
             <span
@@ -217,7 +264,6 @@ export function Header({
             {mode === "live" ? "Live" : "Paper"}
           </button>
 
-          {/* Auth */}
           {authed ? (
             <Button
               variant="ghost"
@@ -226,13 +272,18 @@ export function Header({
                 await engine.logout().catch(() => undefined);
                 onRefreshStatus();
               }}
-              className="border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              className="h-8 border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
             >
               <PlugZap className="h-3 w-3" />
               Connected
             </Button>
           ) : (
-            <Button variant="quantum" size="sm" onClick={() => setLoginOpen(true)}>
+            <Button
+              variant="quantum"
+              size="sm"
+              className="h-8"
+              onClick={() => setLoginOpen(true)}
+            >
               <Plug className="h-3 w-3" />
               Connect
             </Button>

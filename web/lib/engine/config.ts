@@ -98,7 +98,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
 
-  paperCapital: 500_000,
+  paperCapital: 25_000,
   slippagePct: 0.0015,
   costPerOrder: 25,
 };

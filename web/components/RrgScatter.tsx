@@ -13,9 +13,10 @@ import {
   ZAxis,
 } from "recharts";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { RrgNode } from "@/lib/types";
-import { QUADRANT_META, cn, fmt } from "@/lib/utils";
+import type { RrgNode, Signal } from "@/lib/types";
+import { PROTOCOL_META, QUADRANT_META, cn, fmt } from "@/lib/utils";
 
 type Filter = "ALL" | "CE" | "PE";
 
@@ -73,9 +74,12 @@ function NodeDot(props: {
 export function RrgScatter({
   nodes,
   highlightToken,
+  signal,
 }: {
   nodes: RrgNode[];
   highlightToken?: string | null;
+  /** Renders the regime read-out beneath the plot when supplied. */
+  signal?: Signal;
 }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [hovered, setHovered] = useState<RrgNode | null>(null);
@@ -138,11 +142,13 @@ export function RrgScatter({
 
   const active = hovered;
 
+  const protocol = signal ? PROTOCOL_META[signal.protocol] : null;
+
   return (
-    <Card className="shrink-0">
-      <CardHeader>
-        <CardTitle>RRG Momentum</CardTitle>
-        <div className="flex items-center gap-1">
+    <Card className="min-h-0">
+      <CardHeader className="shrink-0">
+        <CardTitle className="truncate">RRG Momentum</CardTitle>
+        <div className="flex shrink-0 items-center gap-1">
           {(["ALL", "CE", "PE"] as Filter[]).map((f) => (
             <button
               key={f}
@@ -160,8 +166,8 @@ export function RrgScatter({
         </div>
       </CardHeader>
 
-      <CardContent className="p-2">
-        <div className="h-[200px] w-full xl:h-[172px] 2xl:h-[200px]">
+      <CardContent className="dk-scroll min-h-0 overflow-y-auto p-2">
+        <div className="h-[168px] w-full 2xl:h-[188px]">
           {visible.length === 0 ? (
             <div className="flex h-full items-center justify-center text-[11px] text-zinc-600">
               RRG nodes warming up…
@@ -273,6 +279,36 @@ export function RrgScatter({
             </span>
           )}
         </div>
+
+        {/* Regime read-out — which protocol the quadrant picture has selected */}
+        {signal && protocol ? (
+          <div className="mt-1.5 rounded-md border border-zinc-800 bg-zinc-950/50 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-[10px] font-semibold text-zinc-200">
+                {protocol.title}
+              </span>
+              <Badge className={cn("shrink-0 font-semibold", protocol.tone)}>
+                {protocol.name}
+              </Badge>
+            </div>
+            <p className="mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-500">
+              {protocol.blurb}
+            </p>
+            <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-zinc-800/70 pt-1.5">
+              <span className="truncate font-mono text-[10px] text-zinc-300">
+                {signal.trading_symbol ?? "No target node"}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 font-mono text-[9px] font-semibold uppercase tracking-wider",
+                  signal.actionable ? "text-emerald-300" : "text-zinc-500",
+                )}
+              >
+                {signal.actionable ? "armed" : "standby"}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

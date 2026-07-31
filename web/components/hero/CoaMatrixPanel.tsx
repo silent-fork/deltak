@@ -1,0 +1,392 @@
+"use client";
+
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  coaMetrics,
+  marketPressure,
+  triggerBands,
+  wallDepth,
+  wallMerged,
+} from "@/lib/coaView";
+import { DEFAULT_CONFIG } from "@/lib/engine/config";
+import type { OptionChain } from "@/lib/types";
+import { cn, compact, fmt, signed } from "@/lib/utils";
+
+/**
+ * COA (Chart of Accuracy) — the two walls, how thick they are, how far spot sits
+ * from each, and which side the session's writing is landing on.
+ */
+
+function Section({
+  label,
+  hint,
+  children,
+  right,
+}: {
+  label: string;
+  hint: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span title={hint} className="dk-label text-[9px] leading-none">
+          {label}
+        </span>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Wall({
+  side,
+  prior,
+  live,
+  shift,
+  distance,
+  spot,
+}: {
+  side: "aegis" | "zenith";
+  prior: number | null;
+  live: number | null;
+  shift: number;
+  distance: number | null;
+  spot: number;
+}) {
+  const support = side === "aegis";
+  const name = support ? "Aegis" : "Zenith";
+  const merged = prior !== null && prior === live;
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border px-2 py-1.5",
+        support
+          ? "border-emerald-500/25 bg-emerald-500/[0.05]"
+          : "border-rose-500/25 bg-rose-500/[0.05]",
+      )}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={cn(
+            "text-[9px] font-semibold uppercase tracking-[0.18em]",
+            support ? "text-emerald-400" : "text-rose-400",
+          )}
+        >
+          {name}
+        </span>
+        <span
+          title={
+            shift === 0
+              ? `${name} has held its strike this session.`
+              : `${name} has migrated ${Math.abs(shift)} strike step${Math.abs(shift) === 1 ? "" : "s"} ${shift > 0 ? "up" : "down"}.`
+          }
+          className={cn(
+            "flex items-center gap-0.5 rounded px-1 py-px font-mono text-[9px] font-semibold",
+            shift === 0
+              ? "bg-zinc-800/70 text-zinc-500"
+              : shift > 0
+                ? "bg-emerald-500/15 text-emerald-300"
+                : "bg-rose-500/15 text-rose-300",
+          )}
+        >
+          {shift === 0 ? (
+            <Minus className="h-2.5 w-2.5" />
+          ) : shift > 0 ? (
+            <ArrowUp className="h-2.5 w-2.5" />
+          ) : (
+            <ArrowDown className="h-2.5 w-2.5" />
+          )}
+          {shift === 0 ? "held" : Math.abs(shift)}
+        </span>
+      </div>
+
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            "font-mono text-[17px] font-semibold leading-none tracking-tight",
+            support ? "text-emerald-200" : "text-rose-200",
+          )}
+        >
+          {live !== null ? fmt(live, 0) : "—"}
+        </span>
+        {/* Only name the older wall when it actually disagrees. */}
+        {!merged && prior !== null ? (
+          <span
+            title={`${name} prior — the cumulative wall carried into the session, now superseded.`}
+            className="font-mono text-[10px] leading-none text-zinc-500"
+          >
+            prior {fmt(prior, 0)}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+        {distance === null
+          ? "—"
+          : `${fmt(Math.abs(distance), 0)} pts ${support ? "below" : "above"}`}
+        {distance !== null && spot > 0 ? (
+          <span className="ml-1 opacity-70">
+            {fmt((Math.abs(distance) / spot) * 100, 2)}%
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function CoaMatrixPanel({ chain }: { chain: OptionChain | undefined }) {
+  if (!chain) {
+    return (
+      <Card className="min-h-0">
+        <CardContent className="flex items-center justify-center text-[11px] text-zinc-600">
+          Awaiting COA levels…
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { levels } = chain;
+  const { toSupport, toResistance, band, position } = coaMetrics(chain);
+  const pressure = marketPressure(chain);
+  const depth = wallDepth(chain);
+  const bands = triggerBands(chain, DEFAULT_CONFIG.invalidationPct);
+  const settled = wallMerged("aegis", levels) && wallMerged("zenith", levels);
+
+  return (
+    <Card className="min-h-0">
+      <CardHeader className="shrink-0">
+        <CardTitle className="truncate">COA Matrix</CardTitle>
+        <span
+          title={
+            settled
+              ? "Both walls agree with the levels carried into the session."
+              : "At least one wall has been rebuilt by today's writers."
+          }
+          className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-zinc-600"
+        >
+          {settled ? "walls settled" : "walls rebuilt"}
+        </span>
+      </CardHeader>
+
+      <CardContent className="dk-scroll min-h-0 space-y-1.5 overflow-y-auto p-2">
+        <div className="grid grid-cols-2 gap-1.5">
+          <Wall
+            side="aegis"
+            prior={levels.aegis_0}
+            live={levels.aegis_1}
+            shift={levels.aegis_shift}
+            distance={toSupport}
+            spot={chain.spot}
+          />
+          <Wall
+            side="zenith"
+            prior={levels.zenith_0}
+            live={levels.zenith_1}
+            shift={levels.zenith_shift}
+            distance={toResistance}
+            spot={chain.spot}
+          />
+        </div>
+
+        {/* How much OI actually stands at each wall */}
+        <Section
+          label="Wall Depth"
+          hint="Open interest defending each wall. A level with thin or unwinding OI is a level about to break."
+          right={
+            <span className="font-mono text-[9px] text-zinc-500">
+              {compact(depth.aegisOi)} · {compact(depth.zenithOi)}
+            </span>
+          }
+        >
+          <div
+            className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-zinc-900"
+            title={`Aegis holds ${compact(depth.aegisOi)} put OI; Zenith holds ${compact(depth.zenithOi)} call OI.`}
+          >
+            <span
+              className="bg-emerald-500/60 transition-[width] duration-500"
+              style={{ width: `${depth.aegisShare}%` }}
+            />
+            <span className="flex-1 bg-rose-500/60" />
+          </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[9px]">
+            <span
+              className={cn(
+                depth.aegisBuild >= 0 ? "text-emerald-400/80" : "text-amber-400/80",
+              )}
+              title="Intraday OI change at the Aegis strike."
+            >
+              {signed(depth.aegisBuild / 1000, 1)}K{" "}
+              {depth.aegisBuild >= 0 ? "building" : "unwinding"}
+            </span>
+            <span
+              className={cn(
+                depth.zenithBuild >= 0 ? "text-rose-400/80" : "text-amber-400/80",
+              )}
+              title="Intraday OI change at the Zenith strike."
+            >
+              {depth.zenithBuild >= 0 ? "building" : "unwinding"}{" "}
+              {signed(depth.zenithBuild / 1000, 1)}K
+            </span>
+          </div>
+        </Section>
+
+        {/* The proximity bands the signal engine actually tests */}
+        <Section
+          label="Engage Bands"
+          hint={`Protocol Alpha engages only within ${DEFAULT_CONFIG.invalidationPct}% of a wall. These are the live trigger zones.`}
+          right={
+            <span
+              className={cn(
+                "font-mono text-[9px] font-semibold uppercase tracking-wider",
+                bands.aegis?.armed || bands.zenith?.armed
+                  ? "text-quantum"
+                  : "text-zinc-600",
+              )}
+            >
+              {bands.aegis?.armed
+                ? "at aegis"
+                : bands.zenith?.armed
+                  ? "at zenith"
+                  : "mid-range"}
+            </span>
+          }
+        >
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            {(
+              [
+                ["aegis", bands.aegis] as const,
+                ["zenith", bands.zenith] as const,
+              ]
+            ).map(([side, b]) => {
+              const support = side === "aegis";
+              return (
+                <div
+                  key={side}
+                  className={cn(
+                    "rounded border px-1.5 py-1 font-mono text-[9px]",
+                    b?.armed
+                      ? support
+                        ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-200"
+                        : "border-rose-400/60 bg-rose-500/10 text-rose-200"
+                      : "border-zinc-800 text-zinc-500",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="uppercase tracking-wider">
+                      {support ? "Aegis" : "Zenith"}
+                    </span>
+                    <span
+                      className={cn(
+                        "h-1 w-1 rounded-full",
+                        b?.armed
+                          ? support
+                            ? "bg-emerald-400 animate-pulse-ring"
+                            : "bg-rose-400 animate-pulse-ring"
+                          : "bg-zinc-700",
+                      )}
+                    />
+                  </div>
+                  <div className="mt-1 truncate">
+                    {b ? `${fmt(b.lo, 0)}–${fmt(b.hi, 0)}` : "—"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* Where the session's writing is going */}
+        <Section
+          label="Writing Pressure"
+          hint="Puts written below spot versus calls written above. The wider side is where writers are taking their stand — it moves well before price does."
+          right={
+            <span
+              className={cn(
+                "font-mono text-[9px] font-semibold uppercase tracking-wider",
+                pressure.direction > 0
+                  ? "text-emerald-300"
+                  : pressure.direction < 0
+                    ? "text-rose-300"
+                    : "text-zinc-500",
+              )}
+            >
+              {pressure.label}
+            </span>
+          }
+        >
+          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-zinc-900">
+            <span
+              className="bg-emerald-500/70 transition-[width] duration-500"
+              style={{ width: `${pressure.supportShare}%` }}
+            />
+            <span className="flex-1 bg-rose-500/70" />
+          </div>
+          <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+            <span className="text-emerald-400/80">
+              {compact(pressure.supportBuild)} puts ↓
+            </span>
+            <span className="text-rose-400/80">
+              ↑ {compact(pressure.resistanceBuild)} calls
+            </span>
+          </div>
+        </Section>
+
+        {/* Corridor geometry */}
+        <div className="grid grid-cols-3 gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+          {(
+            [
+              {
+                label: "Corridor",
+                title:
+                  "Distance between Aegis and Zenith — the range the engine expects to trade inside.",
+                value: band === null ? "—" : fmt(band, 0),
+                sub:
+                  band !== null && chain.spot > 0
+                    ? `${fmt((band / chain.spot) * 100, 2)}%`
+                    : undefined,
+                tone: "text-zinc-100",
+              },
+              {
+                label: "Position",
+                title:
+                  "Where spot sits inside the corridor: 0% on Aegis, 100% on Zenith.",
+                value: position === null ? "—" : `${fmt(position, 0)}%`,
+                tone: "text-quantum",
+              },
+              {
+                label: "PCR",
+                title:
+                  "Put-Call OI ratio across the rendered window. Above 1 is put-heavy, which is supportive.",
+                value: fmt(chain.pcr),
+                tone: chain.pcr >= 1 ? "text-emerald-300" : "text-rose-300",
+              },
+            ] as const
+          ).map((s) => (
+            <div key={s.label} title={s.title} className="min-w-0">
+              <div className="dk-label text-[9px] leading-none">{s.label}</div>
+              <div
+                className={cn(
+                  "mt-1 truncate font-mono text-[12px] font-semibold leading-none",
+                  s.tone,
+                )}
+              >
+                {s.value}
+                {"sub" in s && s.sub ? (
+                  <span className="ml-1 text-[9px] font-normal opacity-60">
+                    {s.sub}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

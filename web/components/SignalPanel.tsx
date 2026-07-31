@@ -116,7 +116,7 @@ export function SignalPanel({
     // is tight, but never grows — slack belongs to the event log, and growing
     // here would just open a gap above the execution button. The floor keeps
     // flex from crushing the panel into its own header on a short screen.
-    <Card className="min-h-0 shrink-0 xl:min-h-[248px] xl:flex-[0_1_auto]">
+    <Card className="min-h-0 shrink-0 xl:min-h-[190px] xl:flex-[0_1_auto]">
       <CardHeader className="shrink-0">
         <CardTitle className="truncate">Delta-K Signal Engine</CardTitle>
         <Badge className={cn("shrink-0 font-semibold", meta.tone)}>

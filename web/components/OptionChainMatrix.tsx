@@ -2,33 +2,24 @@
 
 import { useMemo } from "react";
 
-import { CoaStrip } from "@/components/CoaStrip";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ChainRow, CoaLevels, OptionChain, OptionLeg } from "@/lib/types";
+import { wallTags, type WallTag } from "@/lib/coaView";
+import type { ChainRow, OptionChain, OptionLeg } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
 
-/** OI-change bar: green = writers adding (a wall building), red = unwinding. */
-function OiChangeCell({ leg }: { leg: OptionLeg | null }) {
-  if (!leg) return <td className="px-1.5 py-1 text-zinc-700">—</td>;
-  const positive = leg.oi_change >= 0;
-  return (
-    <td className="px-1.5 py-1">
-      <span
-        className={cn(
-          "font-mono text-[10px]",
-          leg.oi_change === 0
-            ? "text-zinc-600"
-            : positive
-              ? "text-emerald-400"
-              : "text-rose-400",
-        )}
-      >
-        {leg.oi_change === 0 ? "—" : signed(leg.oi_change / 1000, 1) + "K"}
-      </span>
-    </td>
-  );
+/** Tag styling: colour carries the wall, weight carries the generation. */
+function tagClass(tag: WallTag): string {
+  const support = tag.side === "aegis";
+  if (tag.generation === "prior") {
+    return support
+      ? "border-emerald-500/35 text-emerald-400/80"
+      : "border-rose-500/35 text-rose-400/80";
+  }
+  return support
+    ? "border-emerald-400/70 bg-emerald-400/20 text-emerald-200"
+    : "border-rose-400/70 bg-rose-400/20 text-rose-200";
 }
 
 function LegCells({
@@ -43,35 +34,63 @@ function LegCells({
   if (!leg) {
     return (
       <>
-        <td className="px-1.5 py-1 text-zinc-700">—</td>
-        <td className="px-1.5 py-1 text-zinc-700">—</td>
-        <td className="px-1.5 py-1 text-zinc-700">—</td>
-        <td className="px-1.5 py-1 text-zinc-700">—</td>
-        <td className="px-1.5 py-1 text-zinc-700">—</td>
+        {Array.from({ length: 7 }, (_, i) => (
+          <td key={i} className="px-1.5 py-1 text-zinc-700">
+            —
+          </td>
+        ))}
       </>
     );
   }
 
   const oiPct = maxOi > 0 ? Math.min(100, (leg.oi / maxOi) * 100) : 0;
   const itm = leg.moneyness === "ITM";
+  const spread =
+    leg.best_ask > 0 && leg.best_bid > 0 ? leg.best_ask - leg.best_bid : null;
 
   const cells = [
-    <td key="q" className="px-1.5 py-1">
+    <td key="rrg" className="px-1.5 py-1">
       <QuadrantPill quadrant={leg.quadrant} compact />
     </td>,
-    <td key="v" className="px-1.5 py-1 font-mono text-[10px] text-zinc-500">
+
+    <td
+      key="rs"
+      className="px-1.5 py-1 font-mono text-[9px] text-zinc-600"
+      title={
+        leg.rs_ratio !== null
+          ? `RS-Ratio ${fmt(leg.rs_ratio)} · RS-Momentum ${fmt(leg.rs_momentum)}`
+          : "RRG node not yet seeded"
+      }
+    >
+      {leg.rs_ratio !== null ? fmt(leg.rs_ratio, 1) : "—"}
+    </td>,
+
+    <td key="vol" className="px-1.5 py-1 font-mono text-[10px] text-zinc-500">
       {compact(leg.volume)}
     </td>,
-    <OiChangeCell key="oic" leg={leg} />,
+
+    <td key="doi" className="px-1.5 py-1" title={`${signed(leg.oi_change_pct, 1)}% of prior OI`}>
+      <span
+        className={cn(
+          "font-mono text-[10px]",
+          leg.oi_change === 0
+            ? "text-zinc-600"
+            : leg.oi_change > 0
+              ? "text-emerald-400"
+              : "text-rose-400",
+        )}
+      >
+        {leg.oi_change === 0 ? "—" : signed(leg.oi_change / 1000, 1) + "K"}
+      </span>
+    </td>,
+
     <td key="oi" className="relative px-1.5 py-1">
-      {/* OI depth bar — the COA 1.0 wall, rendered behind the number */}
+      {/* OI depth bar — the wall itself, rendered behind the number */}
       <span
         aria-hidden
         className={cn(
           "absolute inset-y-0.5 opacity-25",
-          side === "call"
-            ? "right-0 rounded-l bg-rose-500"
-            : "left-0 rounded-r bg-emerald-500",
+          side === "call" ? "right-0 rounded-l bg-rose-500" : "left-0 rounded-r bg-emerald-500",
         )}
         style={{ width: `${oiPct}%` }}
       />
@@ -79,13 +98,26 @@ function LegCells({
         {compact(leg.oi)}
       </span>
     </td>,
+
+    <td
+      key="ba"
+      className="px-1.5 py-1 font-mono text-[9px] text-zinc-500"
+      title={
+        spread !== null
+          ? `Bid ${fmt(leg.best_bid)} / Ask ${fmt(leg.best_ask)} — spread ${fmt(spread)}`
+          : "No two-sided quote"
+      }
+    >
+      {leg.best_bid > 0 ? `${fmt(leg.best_bid, 1)}·${fmt(leg.best_ask, 1)}` : "—"}
+    </td>,
+
     <td
       key="ltp"
       className={cn(
         "px-1.5 py-1 font-mono text-xs font-semibold",
         itm ? "text-zinc-100" : "text-zinc-400",
       )}
-      title={`${leg.trading_symbol} · bid ${fmt(leg.best_bid)} / ask ${fmt(leg.best_ask)}`}
+      title={`${leg.trading_symbol} · ${leg.moneyness}${leg.itm_depth > 0 ? ` depth ${leg.itm_depth}` : ""}`}
     >
       {fmt(leg.ltp)}
       <span
@@ -103,60 +135,17 @@ function LegCells({
   return <>{side === "call" ? cells.reverse() : cells}</>;
 }
 
-/* ----------------------------------------------------------------- COA tags */
+const HEAD = ["RRG", "RS", "Vol", "ΔOI", "OI", "Bid·Ask", "LTP"] as const;
 
-type LevelTag = {
-  key: string;
-  label: string;
-  title: string;
-  cls: string;
-  support: boolean;
+const HEAD_TITLE: Record<string, string> = {
+  RRG: "Relative-rotation quadrant for this contract.",
+  RS: "RS-Ratio — relative strength against the index.",
+  Vol: "Session volume.",
+  "ΔOI": "Intraday change in open interest — where writers are building.",
+  OI: "Cumulative open interest.",
+  "Bid·Ask": "Best bid and ask.",
+  LTP: "Last traded premium and its change on the day.",
 };
-
-/**
- * Both generations of each wall are marked, because they disagree often and the
- * disagreement is the signal: A0/Z0 are the cumulative walls carried into the
- * session, A1/Z1 where today's writers have actually moved them.
- */
-function levelTags(strike: number, levels: CoaLevels): LevelTag[] {
-  const at = (level: number | null) => level !== null && strike === level;
-  const tags: LevelTag[] = [];
-
-  if (at(levels.aegis_0))
-    tags.push({
-      key: "a0",
-      label: "A0",
-      support: true,
-      title: "Aegis-0 — cumulative put-OI wall (COA 1.0 support).",
-      cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400/90",
-    });
-  if (at(levels.aegis_1))
-    tags.push({
-      key: "a1",
-      label: "A1",
-      support: true,
-      title: "Aegis-1 — live intraday put-write wall (COA 2.0 support).",
-      cls: "border-emerald-400/70 bg-emerald-400/20 text-emerald-200",
-    });
-  if (at(levels.zenith_0))
-    tags.push({
-      key: "z0",
-      label: "Z0",
-      support: false,
-      title: "Zenith-0 — cumulative call-OI wall (COA 1.0 resistance).",
-      cls: "border-rose-500/40 bg-rose-500/10 text-rose-400/90",
-    });
-  if (at(levels.zenith_1))
-    tags.push({
-      key: "z1",
-      label: "Z1",
-      support: false,
-      title: "Zenith-1 — live intraday call-write wall (COA 2.0 resistance).",
-      cls: "border-rose-400/70 bg-rose-400/20 text-rose-200",
-    });
-
-  return tags;
-}
 
 export function OptionChainMatrix({
   chain,
@@ -186,9 +175,9 @@ export function OptionChainMatrix({
   const { levels } = chain;
 
   // A wall and the ATM anchor regularly land on the same strike; the wall tint
-  // wins and the ATM keeps its own ring, so neither reading is lost.
-  const rowTone = (tags: LevelTag[], row: ChainRow) => {
-    if (tags.some((t) => t.support)) return "bg-emerald-500/[0.06]";
+  // wins and the ATM keeps its own glow, so neither reading is lost.
+  const rowTone = (tags: WallTag[], row: ChainRow) => {
+    if (tags.some((t) => t.side === "aegis")) return "bg-emerald-500/[0.06]";
     if (tags.length) return "bg-rose-500/[0.06]";
     if (row.is_atm) return "bg-quantum/[0.07]";
     return "";
@@ -198,27 +187,22 @@ export function OptionChainMatrix({
     <Card className="h-full min-h-0">
       <CardHeader className="shrink-0">
         <div className="flex min-w-0 items-center gap-2">
-          <CardTitle className="truncate">Delta-K 4-Quadrant Matrix</CardTitle>
+          <CardTitle className="truncate">4-Quadrant Option Chain</CardTitle>
           <Badge className="shrink-0 border-zinc-700 text-zinc-400">
             {chain.label} · {chain.expiry ?? "—"}
           </Badge>
         </div>
         <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
-          {chain.rows.length} strikes
+          {chain.rows.length} strikes · PCR {fmt(chain.pcr)}
         </span>
       </CardHeader>
-
-      {/* COA levels, distances and corridor position — the prose replaced */}
-      <div className="shrink-0">
-        <CoaStrip chain={chain} />
-      </div>
 
       <CardContent className="dk-scroll min-h-0 flex-1 overflow-auto p-0">
         <table className="w-full border-collapse text-right">
           <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur">
             <tr className="text-[9px] uppercase tracking-wider text-zinc-500">
               <th
-                colSpan={5}
+                colSpan={7}
                 className="border-b border-zinc-800 px-1.5 py-1 text-center text-emerald-500/80"
               >
                 Calls
@@ -227,33 +211,29 @@ export function OptionChainMatrix({
                 Strike
               </th>
               <th
-                colSpan={5}
+                colSpan={7}
                 className="border-b border-zinc-800 px-1.5 py-1 text-center text-rose-500/80"
               >
                 Puts
               </th>
             </tr>
             <tr className="text-[9px] uppercase tracking-wider text-zinc-600">
-              <th className="px-1.5 py-1 font-medium">LTP</th>
-              <th className="px-1.5 py-1 font-medium">OI</th>
-              <th className="px-1.5 py-1 font-medium" title="COA 2.0 intraday OI change">
-                ΔOI
-              </th>
-              <th className="px-1.5 py-1 font-medium">Vol</th>
-              <th className="px-1.5 py-1 font-medium">RRG</th>
+              {[...HEAD].reverse().map((h) => (
+                <th key={`c-${h}`} className="px-1.5 py-1 font-medium" title={HEAD_TITLE[h]}>
+                  {h}
+                </th>
+              ))}
               <th className="px-1.5 py-1 text-center font-medium">—</th>
-              <th className="px-1.5 py-1 font-medium">RRG</th>
-              <th className="px-1.5 py-1 font-medium">Vol</th>
-              <th className="px-1.5 py-1 font-medium" title="COA 2.0 intraday OI change">
-                ΔOI
-              </th>
-              <th className="px-1.5 py-1 font-medium">OI</th>
-              <th className="px-1.5 py-1 font-medium">LTP</th>
+              {HEAD.map((h) => (
+                <th key={`p-${h}`} className="px-1.5 py-1 font-medium" title={HEAD_TITLE[h]}>
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {chain.rows.map((row) => {
-              const tags = levelTags(row.strike, levels);
+              const tags = wallTags(row.strike, levels);
               const highlighted =
                 signalToken &&
                 (row.call?.token === signalToken || row.put?.token === signalToken);
@@ -270,19 +250,19 @@ export function OptionChainMatrix({
                   <LegCells leg={row.call} side="call" maxOi={maxOi} />
                   <td
                     className={cn(
-                      "border-x border-zinc-800/60 px-2 py-1 text-center font-mono text-[11px] font-bold",
+                      "whitespace-nowrap border-x border-zinc-800/60 px-2 py-1 text-center font-mono text-[11px] font-bold",
                       row.is_atm ? "text-quantum text-glow-quantum" : "text-zinc-300",
                     )}
                   >
-                    <span className="flex items-center justify-center gap-1 whitespace-nowrap">
+                    <span className="flex items-center justify-center gap-1">
                       {fmt(row.strike, 0)}
                       {tags.map((t) => (
                         <span
                           key={t.key}
                           title={t.title}
                           className={cn(
-                            "rounded border px-0.5 text-[8px] font-bold leading-[1.35] tracking-tight",
-                            t.cls,
+                            "rounded border px-1 text-[8px] font-bold leading-[1.4] tracking-tight",
+                            tagClass(t),
                           )}
                         >
                           {t.label}
@@ -305,23 +285,17 @@ export function OptionChainMatrix({
           Quantum Horizon — ITM / OTM split at spot
         </span>
         <span className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-0.5 text-[8px] font-bold text-emerald-400/90">
-              A0
-            </span>
-            <span className="rounded border border-emerald-400/70 bg-emerald-400/20 px-0.5 text-[8px] font-bold text-emerald-200">
-              A1
-            </span>
-            support
+          <span className="rounded border border-emerald-400/70 bg-emerald-400/20 px-1 text-[8px] font-bold text-emerald-200">
+            Aegis
           </span>
-          <span className="flex items-center gap-1">
-            <span className="rounded border border-rose-500/40 bg-rose-500/10 px-0.5 text-[8px] font-bold text-rose-400/90">
-              Z0
-            </span>
-            <span className="rounded border border-rose-400/70 bg-rose-400/20 px-0.5 text-[8px] font-bold text-rose-200">
-              Z1
-            </span>
-            resistance
+          <span className="rounded border border-rose-400/70 bg-rose-400/20 px-1 text-[8px] font-bold text-rose-200">
+            Zenith
+          </span>
+          <span
+            title="The cumulative wall carried into the session, shown only when today's writers have moved the live wall elsewhere."
+            className="rounded border border-zinc-600/60 px-1 text-[8px] font-bold text-zinc-400"
+          >
+            Prior
           </span>
         </span>
         <span>Zero-OTM rule: longs restricted to 2nd–3rd ITM</span>

@@ -3,13 +3,14 @@
 import { useState } from "react";
 
 import { EngineProvider } from "@/components/EngineProvider";
-import { EventLog } from "@/components/EventLog";
 import { LoginScreen } from "@/components/LoginScreen";
 import { Header } from "@/components/Header";
+import { CoaMatrixPanel } from "@/components/hero/CoaMatrixPanel";
+import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
 import { OptionChainMatrix } from "@/components/OptionChainMatrix";
-import { OrderBook } from "@/components/OrderBook";
 import { RrgScatter } from "@/components/RrgScatter";
 import { SignalPanel } from "@/components/SignalPanel";
+import { TradeBook } from "@/components/TradeBook";
 import type { Underlying } from "@/lib/types";
 import { useEngine } from "@/lib/useEngine";
 
@@ -35,6 +36,7 @@ export default function TerminalPage() {
   const chain = snapshot?.chains[selected];
   const signal = snapshot?.signals[selected];
   const nodes = snapshot?.rrg[selected] ?? [];
+  const quote = snapshot?.spots[selected];
 
   const degraded = streamStatus === "error" || (!!error && !snapshot?.feed_connected);
 
@@ -46,6 +48,7 @@ export default function TerminalPage() {
           streamState={streamStatus}
           simulated={simulated}
           selected={selected}
+          events={snapshot?.events ?? []}
           onSelect={(u) => setSelected(u as Underlying)}
           onRefreshStatus={() => forceRefresh((n) => n + 1)}
         />
@@ -66,35 +69,37 @@ export default function TerminalPage() {
         ) : null}
 
         {/*
-          Below xl the terminal is one column that scrolls as a page; from xl it
-          becomes a fixed cockpit — nothing scrolls except the matrix body and
-          the two panels that opt into it, so the whole HUD stays on one screen.
+          Below xl the terminal is one column that scrolls as a page. From xl it
+          becomes a fixed cockpit: a three-column hero over the chain and the
+          trade book, with only the panels that opt in scrolling internally.
         */}
-        <main className="dk-scroll grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto p-2 xl:grid-cols-3 xl:overflow-hidden">
-          {/* Columns 1 & 2 — the 4-quadrant option chain matrix */}
-          <section className="flex min-h-[70vh] flex-col xl:col-span-2 xl:min-h-0 xl:overflow-hidden">
-            <OptionChainMatrix chain={chain} signalToken={signal?.token} />
+        <div className="dk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 xl:overflow-hidden">
+          {/* Hero — levels, price, rotation */}
+          <section className="grid shrink-0 grid-cols-1 gap-2 lg:grid-cols-3">
+            <CoaMatrixPanel chain={chain} />
+            <QuantumHorizon chain={chain} quote={quote} />
+            <RrgScatter nodes={nodes} highlightToken={signal?.token} signal={signal} />
           </section>
 
-          {/*
-            Column 3 — Intelligence & Signal HUD. The panels shrink to fit first,
-            so on a roomy screen this never scrolls; on a short one (1280×720 and
-            below) it scrolls rather than clipping the log out of reach.
-          */}
-          <aside className="dk-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto">
-            <RrgScatter nodes={nodes} highlightToken={signal?.token} />
-            <SignalPanel
-              signal={signal}
-              mode={snapshot?.mode ?? "paper"}
-              onExecuted={() => forceRefresh((n) => n + 1)}
-            />
-            <OrderBook
-              ledger={snapshot?.ledger}
-              onChanged={() => forceRefresh((n) => n + 1)}
-            />
-            <EventLog events={snapshot?.events ?? []} />
-          </aside>
-        </main>
+          {/* Board — the chain, and everything that acts on it */}
+          <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-3 xl:overflow-hidden">
+            <div className="flex min-h-[60vh] flex-col xl:col-span-2 xl:min-h-0 xl:overflow-hidden">
+              <OptionChainMatrix chain={chain} signalToken={signal?.token} />
+            </div>
+
+            <aside className="dk-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto">
+              <SignalPanel
+                signal={signal}
+                mode={snapshot?.mode ?? "paper"}
+                onExecuted={() => forceRefresh((n) => n + 1)}
+              />
+              <TradeBook
+                ledger={snapshot?.ledger}
+                onChanged={() => forceRefresh((n) => n + 1)}
+              />
+            </aside>
+          </section>
+        </div>
 
         <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-1 text-[9px] uppercase tracking-wider text-zinc-600">
           <span>
@@ -104,7 +109,8 @@ export default function TerminalPage() {
             <span>Tokens {engine.trackedTokens}</span>
             <span>Ticks {engine.tickUpdates}</span>
             <span>Risk {engine.riskPct}%</span>
-            <span>{snapshot?.ts?.slice(11, 19) ?? "--:--:--"}</span>
+            {/* The clock lives in the header, in IST — one authoritative time. */}
+            <span>{snapshot?.mode === "live" ? "Live routing" : "Paper ledger"}</span>
           </span>
         </footer>
       </div>
