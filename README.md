@@ -133,7 +133,13 @@ between levels that no longer describe today.
 These endpoints are metered per API key at a few requests a second, so every
 call in the tab funnels through one queue that spaces requests out, shares
 in-flight requests, caches by window, and widens its spacing when Angel One
-answers with a throttle. Baselines are fetched for the strikes nearest the
+answers with a throttle. A ladder is asked for as a *batch*: 22 strikes were 44
+round trips through this deployment before anything could be drawn, each one's
+latency sitting in series with the limiter, so `/api/market/batch` takes the
+chunk and fans out from a machine already next to the broker. Every contract in
+a batch is pinned to one session — asking each token for "its own last session"
+let an illiquid strike answer with a different day from its neighbours, and put
+a stale premium in the ladder beside live ones. Baselines are fetched for the strikes nearest the
 money first, and only for the instrument on screen. Nothing here can block the
 1 Hz loop or a circuit breaker: every panel renders from the live feed alone
 and simply gets sharper as these land.
@@ -283,6 +289,7 @@ whitelisting changes at all.
 | `GET` | `/api/rms` | Available margin for pre-trade leverage checks |
 | `POST` | `/api/market/candles` | Historical candles (`getCandleData`), normalised and sliced to the last trading session |
 | `POST` | `/api/market/oi` | Historical open interest (`getOIData`) for a live F&O contract |
+| `POST` | `/api/market/batch` | A whole ladder's session — candles and OI for up to 25 contracts, fanned out server-side |
 | `GET` | `/api/market/pcr` | Cumulative market-wide Put-Call Ratio (`putCallRatio`) |
 | `POST` | `/api/market/buildup` | OI buildup classes (`OIBuildup`) for an expiry bucket |
 | `POST` | `/api/order` | Place a live order via Angel One `placeOrder` |

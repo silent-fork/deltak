@@ -116,13 +116,26 @@ export function RrgScatter({
 
   // Tails get noisy past a couple of dozen nodes; keep the trace readable.
   const withTails = visible.length <= 18;
+  /**
+   * How much trail to draw.
+   *
+   * A live tail is a minute of one-second samples — a short comma behind the
+   * node. A replayed one is a whole session in twelve five-minute jumps, which
+   * sprawls right across the plot and turns four nodes into four pieces of
+   * spaghetti: the lines stop reading as history and start reading as the
+   * chart. Frozen on a finished session, the position is the point, so the
+   * trail is cut to the last few steps into it.
+   */
+  const tailPoints = settled ? 3 : Infinity;
   const withLabels = visible.length <= 12;
 
   const series = useMemo(
     () =>
       visible.map((node) => {
+        const trail =
+          tailPoints === Infinity ? node.tail : node.tail.slice(-tailPoints);
         const tail = withTails
-          ? node.tail.slice(0, -1).map((p) => ({
+          ? trail.slice(0, -1).map((p) => ({
               x: p.rs_ratio,
               y: p.rs_momentum,
               node,
@@ -144,7 +157,7 @@ export function RrgScatter({
           ],
         };
       }),
-    [visible, withTails, withLabels, highlightToken],
+    [visible, withTails, tailPoints, withLabels, highlightToken],
   );
 
   const active = hovered;

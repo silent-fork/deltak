@@ -1,4 +1,5 @@
 import type {
+  BatchResponse,
   BuildupResponse,
   CandleResponse,
   MarginResponse,
@@ -140,6 +141,12 @@ export const api = {
         body: JSON.stringify(body),
       }),
     pcr: () => request<PcrResponse>("/api/market/pcr"),
+    /** A whole ladder's session in one request, fanned out server-side. */
+    batch: (body: unknown) =>
+      request<BatchResponse>("/api/market/batch", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     /** Batch margin calculator — what the broker blocks, not what it costs. */
     margin: (body: unknown) =>
       request<MarginResponse>("/api/margin", {

@@ -331,6 +331,24 @@ export interface PcrResponse {
   fetched_at: string;
 }
 
+/** One contract's session, as the batch route returns it. */
+export interface BatchContract {
+  token: string;
+  bars?: Candle[];
+  series?: OiPoint[];
+  open_oi?: number | null;
+  last_oi?: number | null;
+  error?: string;
+}
+
+export interface BatchResponse {
+  date: string;
+  interval: string;
+  /** The broker throttled part-way; the remaining contracts were skipped. */
+  rate_limited: boolean;
+  contracts: BatchContract[];
+}
+
 export interface MarginResponse {
   margin: MarginEstimate;
   positions: number;

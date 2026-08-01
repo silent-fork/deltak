@@ -67,7 +67,7 @@ function LegCells({
     </td>,
 
     <td key="vol" className="px-1.5 py-1 font-mono text-[10px] text-zinc-500">
-      {compact(leg.volume)}
+      {leg.volume > 0 ? compact(leg.volume) : "—"}
     </td>,
 
     <td key="oi" className="relative px-1.5 py-1">
@@ -81,7 +81,7 @@ function LegCells({
         style={{ width: `${oiPct}%` }}
       />
       <span className="relative font-mono text-[10px] text-zinc-400">
-        {compact(leg.oi)}
+        {leg.oi > 0 ? compact(leg.oi) : "—"}
       </span>
     </td>,
 
@@ -105,15 +105,19 @@ function LegCells({
       )}
       title={`${leg.trading_symbol} · ${leg.moneyness}${leg.itm_depth > 0 ? ` depth ${leg.itm_depth}` : ""}`}
     >
-      {fmt(leg.ltp)}
-      <span
-        className={cn(
-          "ml-1 text-[9px] font-normal",
-          leg.change_pct >= 0 ? "text-emerald-500" : "text-rose-500",
-        )}
-      >
-        {signed(leg.change_pct, 1)}%
-      </span>
+      {/* A contract that has not traded has no price. Quoting 0.00 for it
+          reads as "worthless", which is a very different claim. */}
+      {leg.ltp > 0 ? fmt(leg.ltp) : <span className="text-zinc-700">—</span>}
+      {leg.ltp > 0 && leg.change_pct !== 0 ? (
+        <span
+          className={cn(
+            "ml-1 text-[9px] font-normal",
+            leg.change_pct >= 0 ? "text-emerald-500" : "text-rose-500",
+          )}
+        >
+          {signed(leg.change_pct, 1)}%
+        </span>
+      ) : null}
     </td>,
   ];
 

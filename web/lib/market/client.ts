@@ -1,5 +1,6 @@
 import { ApiError, api } from "@/lib/api";
 import type {
+  BatchResponse,
   BuildupResponse,
   CandleResponse,
   MarginPosition,
@@ -129,6 +130,22 @@ export function fetchCandles(req: CandleRequest, ttlMs = 45_000) {
 export function fetchOi(req: CandleRequest, ttlMs = 120_000) {
   return cached<OiResponse>(`oi:${JSON.stringify(req)}`, ttlMs, () =>
     api.market.oi(req),
+  );
+}
+
+/**
+ * A ladder's session in one call.
+ *
+ * Cached on the exact request, and long: a finished session does not change,
+ * and a live one is re-asked by the poll that owns it rather than by whoever
+ * happens to re-render.
+ */
+export function fetchBatch(
+  body: { date: string; tokens: string[]; oi?: boolean; candles?: boolean },
+  ttlMs = 120_000,
+) {
+  return cached<BatchResponse>(`batch:${JSON.stringify(body)}`, ttlMs, () =>
+    api.market.batch(body),
   );
 }
 

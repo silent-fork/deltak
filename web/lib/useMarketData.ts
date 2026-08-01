@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isMarketOpen } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
-import { fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
+import { fetchBatch, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
 import { pcrForUnderlying } from "@/lib/market/parse";
 import type { Candle, OiPoint, SessionStats } from "@/lib/types";
@@ -42,12 +42,18 @@ const OI_SESSION_TTL_MS = 12 * 60 * 60_000;
 const REPLAY_INTERVAL = "FIVE_MINUTE" as const;
 /** How long per-contract results are pooled before one render. */
 const FLUSH_MS = 250;
+/** Contracts per batch request — the route's own ceiling is 25. */
+const BATCH_TOKENS = 12;
 
 const POLL_OPEN = {
   candles: 60_000,
   walls: 180_000,
   pcr: 300_000,
+  /** The unfocused indices only need to be roughly right. */
+  backgroundSpots: 120_000,
 };
+/** A background quote may be two minutes stale without anyone minding. */
+const BACKGROUND_SPOT_TTL_MS = 110_000;
 /** Out of hours nothing is moving; keep the loops alive, ten times slower. */
 const CLOSED_MULTIPLIER = 10;
 
@@ -64,6 +70,8 @@ export interface MarketData {
   seeding: boolean;
   /** Contracts replayed from history because the market is shut. */
   replayed: number;
+  /** Session stats for every index, focused or not — the header reads these. */
+  spotStats: Record<string, SessionStats>;
   /** Cumulative market-wide PCR, by underlying. */
   pcr: Record<string, number>;
   pcrAt: string | null;
@@ -77,6 +85,12 @@ export interface MarketDataInput {
   focus: string;
   /** NSE token of that underlying's index spot. */
   spotToken: string;
+  /**
+   * Every index's spot token, focused or not. The header quotes all three, so
+   * all three need a close — the two the operator is not looking at are worth
+   * one slow request each rather than a blank ticker.
+   */
+  spotTokens: Record<string, string>;
   /** NFO tokens whose session-open OI should be baselined, nearest ATM first. */
   seedTokens: string[];
   /** The two wall contracts, whose OI curve is drawn. */
@@ -105,6 +119,7 @@ const EMPTY: MarketData = {
   seeded: 0,
   seeding: false,
   replayed: 0,
+  spotStats: {},
   pcr: {},
   pcrAt: null,
   loading: false,
@@ -160,6 +175,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     enabled,
     focus,
     spotToken,
+    spotTokens,
     seedTokens,
     wallTokens,
     onOiBaseline,
@@ -284,6 +300,9 @@ export function useMarketData(input: MarketDataInput): MarketData {
           ...s,
           candles: res.session,
           stats: res.stats,
+          spotStats: res.stats
+            ? { ...s.spotStats, [focus]: res.stats }
+            : s.spotStats,
           loading: false,
         }));
         ok();
@@ -291,7 +310,53 @@ export function useMarketData(input: MarketDataInput): MarketData {
         setState((s) => ({ ...s, loading: false }));
         fail(err);
       }
-    }, [spotToken, fail, ok]),
+    }, [spotToken, focus, fail, ok]),
+  );
+
+  /* ------------------------------------------------ the other two indices */
+
+  /**
+   * The instruments the operator is not looking at.
+   *
+   * Only the focused index gets a trace and a ladder, but the header quotes all
+   * three, and a ticker reading 0.00 is worse than no ticker. One candle
+   * request each, on a slow loop, is enough to price them — and out of hours it
+   * is the only thing that will.
+   */
+  const backgroundKey = Object.entries(spotTokens)
+    .filter(([, token]) => token && token !== spotToken)
+    .map(([u, token]) => `${u}:${token}`)
+    .join(",");
+
+  usePoll(
+    enabled && !!backgroundKey,
+    `spots:${backgroundKey}`,
+    POLL_OPEN.backgroundSpots,
+    useCallback(async () => {
+      for (const pair of backgroundKey.split(",").filter(Boolean)) {
+        const [underlying, token] = pair.split(":");
+        try {
+          const res = await fetchCandles(
+            {
+              exchange: "NSE",
+              symboltoken: token,
+              interval: "ONE_MINUTE",
+              ...sessionWindow(CANDLE_LOOKBACK_DAYS),
+            },
+            BACKGROUND_SPOT_TTL_MS,
+          );
+          if (!res.stats) continue;
+          const stats = res.stats;
+          setState((s) => ({
+            ...s,
+            spotStats: { ...s.spotStats, [underlying]: stats },
+          }));
+        } catch {
+          // A background quote is the most expendable thing here; the focused
+          // instrument's own failures are what the error banner is for.
+        }
+      }
+    }, [backgroundKey]),
   );
 
   /* ------------------------------ session seeding: open interest and replay */
@@ -299,107 +364,42 @@ export function useMarketData(input: MarketDataInput): MarketData {
   const seedKey = seedTokens.join(",");
 
   /**
-   * Everything the focused ladder needs from history, in one pass.
+   * Everything the focused ladder needs from history, in one request per chunk.
    *
-   * Two independent reads per contract — `getOIData` for the session's open
-   * interest, `getCandleData` for its bars — fired as a pool and paced by the
-   * shared rate limiter rather than by the loop. Awaiting each reply before
-   * sending the next request cost a full round trip per contract on top of the
-   * gap, which is what made the board fill one strike at a time.
+   * This used to be two calls per contract from the browser — 44 round trips
+   * for a 22-strike ladder, each one's latency sitting in series with the rate
+   * limiter, which is why the board filled a strike at a time. The batch route
+   * takes the whole chunk and fans out server-side, next to the broker, so the
+   * page waits on one request rather than forty-four.
    *
-   * The open-interest half runs whatever the hour: it is the COA 2.0 baseline,
-   * and a session joined at noon needs it as much as a Saturday does. The
-   * replay half runs only when the market is shut — in session the feed is the
-   * better source and stale bars would drag every node backwards.
+   * Chunks are fired together and land together. Every contract in a batch is
+   * sliced to the same session, which is a correctness fix as much as a speed
+   * one: asking each token for "its own last session" let an illiquid strike
+   * answer with a different day from its neighbours, and put a stale premium in
+   * the ladder next to live ones.
+   *
+   * The open-interest half runs whatever the hour — it is the COA 2.0 baseline.
+   * The bars are only wanted when the market is shut; in session the feed is
+   * the better source and stale bars would drag every rotation node backwards.
    */
   useEffect(() => {
     if (!enabled || !seedKey) return;
     let cancelled = false;
-    let throttled = false;
     const date = sessionDate;
-    const tokens = seedKey.split(",").filter(Boolean);
     const closed = !isMarketOpen();
+    const wantBars = closed && benchmarkReady;
 
-    const guard = (err: unknown) => {
-      if (cancelled) return;
-      // A throttle hits every remaining contract the same way, so it stops the
-      // pool. Anything else is one contract's problem — an illiquid strike, a
-      // token the master and the exchange disagree on — and abandoning the rest
-      // of the ladder over it leaves a rotation graph with four nodes and no
-      // explanation.
-      if (err instanceof ApiError && err.status === 429) throttled = true;
-      fail(err);
-    };
+    const tokens = seedKey
+      .split(",")
+      .filter((t) => t && !(seenRef.current.has(`${date}:${t}`) && (!wantBars || replayedRef.current.has(`${date}:${t}`))));
+    if (!tokens.length) return;
 
-    const seedOi = async (token: string) => {
-      if (cancelled || throttled || seenRef.current.has(`${date}:${token}`)) return;
-      try {
-        // The window is fixed to the whole session rather than tracking the
-        // clock, so the request is identical all day and answers from cache on
-        // every later pass. Both ends are wanted: the first reading is the ΔOI
-        // baseline, the last is what the ladder shows once the feed stops.
-        const res = await fetchOi(
-          {
-            exchange: "NFO",
-            symboltoken: token,
-            interval: "FIFTEEN_MINUTE",
-            fromdate: `${date} ${MARKET_OPEN_STAMP}`,
-            todate: `${date} 15:30`,
-          },
-          OI_SESSION_TTL_MS,
-        );
-        if (cancelled || !res.open_oi || res.open_oi <= 0) return;
-        seenRef.current.add(`${date}:${token}`);
-        baselineRef.current(token, res.open_oi, res.last_oi ?? 0);
-        // The series is kept, not just its ends: the wall migration is
-        // reconstructed from these same readings, at no extra request.
-        pendingSeriesRef.current[token] = res.series;
-        flush();
-      } catch (err) {
-        guard(err);
-      }
-    };
-
-    const replay = async (token: string, benchmark: Map<string, number>) => {
-      if (cancelled || throttled || replayedRef.current.has(`${date}:${token}`)) return;
-      try {
-        const res = await fetchCandles(
-          {
-            exchange: "NFO",
-            symboltoken: token,
-            interval: REPLAY_INTERVAL,
-            ...sessionWindow(CANDLE_LOOKBACK_DAYS),
-          },
-          OI_SESSION_TTL_MS,
-        );
-        if (cancelled) return;
-
-        const bars = res.session;
-        // An untraded strike has no session; do not ask again today.
-        replayedRef.current.add(`${date}:${token}`);
-        if (!bars.length) return;
-
-        const pairs: [number, number][] = [];
-        let volume = 0;
-        for (const bar of bars) {
-          volume += bar.volume;
-          const spotClose = benchmark.get(bar.time.slice(0, 16));
-          if (spotClose && spotClose > 0 && bar.close > 0) {
-            pairs.push([bar.close, spotClose]);
-          }
-        }
-
-        replayRef.current(token, {
-          pairs,
-          lastClose: bars[bars.length - 1].close,
-          volume,
-        });
-        flush();
-        ok();
-      } catch (err) {
-        guard(err);
-      }
-    };
+    // Chunked so one slow contract cannot hold the whole ladder, and so the
+    // route stays inside its own per-request ceiling.
+    const chunks: string[][] = [];
+    for (let i = 0; i < tokens.length; i += BATCH_TOKENS) {
+      chunks.push(tokens.slice(i, i + BATCH_TOKENS));
+    }
 
     void (async () => {
       setState((s) => ({ ...s, seeding: true }));
@@ -407,13 +407,71 @@ export function useMarketData(input: MarketDataInput): MarketData {
       // Spot closes by bar time, so an option bar pairs with the index at the
       // same instant rather than by position — the two series skip different
       // minutes when a strike goes untraded.
-      const spot = spotCandlesRef.current;
-      const benchmark = new Map(spot.map((c) => [c.time.slice(0, 16), c.close]));
+      const benchmark = new Map(
+        spotCandlesRef.current.map((c) => [c.time.slice(0, 16), c.close]),
+      );
 
-      await Promise.all([
-        ...tokens.map((t) => seedOi(t)),
-        ...(closed && benchmarkReady ? tokens.map((t) => replay(t, benchmark)) : []),
-      ]);
+      await Promise.all(
+        chunks.map(async (chunk) => {
+          let res;
+          try {
+            res = await fetchBatch({
+              date,
+              tokens: chunk,
+              oi: true,
+              candles: wantBars,
+            });
+          } catch (err) {
+            if (!cancelled) fail(err);
+            return;
+          }
+          if (cancelled) return;
+
+          for (const contract of res.contracts) {
+            const { token } = contract;
+
+            if (contract.open_oi && contract.open_oi > 0) {
+              seenRef.current.add(`${date}:${token}`);
+              baselineRef.current(token, contract.open_oi, contract.last_oi ?? 0);
+              // The series is kept, not just its ends: the wall migration is
+              // reconstructed from these readings, at no extra request.
+              if (contract.series?.length) {
+                pendingSeriesRef.current[token] = contract.series;
+              }
+            }
+
+            if (wantBars) {
+              // Recorded either way: a strike that did not trade has no session
+              // and should not be asked for again today.
+              replayedRef.current.add(`${date}:${token}`);
+              const bars = contract.bars ?? [];
+              if (bars.length) {
+                const pairs: [number, number][] = [];
+                let volume = 0;
+                for (const bar of bars) {
+                  volume += bar.volume;
+                  const spotClose = benchmark.get(bar.time.slice(0, 16));
+                  if (spotClose && spotClose > 0 && bar.close > 0) {
+                    pairs.push([bar.close, spotClose]);
+                  }
+                }
+                replayRef.current(token, {
+                  pairs,
+                  lastClose: bars[bars.length - 1].close,
+                  volume,
+                });
+              }
+            }
+          }
+
+          flush();
+          if (res.rate_limited) {
+            fail(new Error("Broker throttled the history fetch — retrying shortly."));
+          } else {
+            ok();
+          }
+        }),
+      );
 
       if (!cancelled) setState((s) => ({ ...s, seeding: false }));
     })();

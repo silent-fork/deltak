@@ -497,6 +497,17 @@ export function useEngine(simulate: boolean) {
 
   const focusChain = snapshot?.chains[focus];
 
+  /** Every index's spot token — the header quotes all three. */
+  const spotTokens = useMemo(
+    () =>
+      Object.fromEntries(
+        UNDERLYINGS.map((u) => [u, masterRef.current.spotToken(u)]),
+      ) as Record<string, string>,
+    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [masterReady],
+  );
+
   const spotToken = useMemo(
     () => masterRef.current.spotToken(focus),
     // The master is a ref; `masterReady` is the state edge that says it landed.
@@ -573,6 +584,7 @@ export function useEngine(simulate: boolean) {
     enabled: session.authenticated,
     focus,
     spotToken,
+    spotTokens,
     seedTokens,
     wallTokens,
     onOiBaseline,
@@ -587,15 +599,18 @@ export function useEngine(simulate: boolean) {
    * loaded. The candle session carries both the close and the one before it, so
    * the change on the day survives the market being shut.
    */
-  const sessionClose = market.stats?.close ?? 0;
-  const sessionPrevClose = market.stats?.prev_close ?? 0;
+  const spotStats = market.spotStats;
   useEffect(() => {
-    if (isMarketOpen() || !spotToken || sessionClose <= 0) return;
-    ticksRef.current.seedQuote(spotToken, {
-      ltp: sessionClose,
-      close: sessionPrevClose,
-    });
-  }, [spotToken, sessionClose, sessionPrevClose]);
+    if (isMarketOpen()) return;
+    for (const [underlying, stats] of Object.entries(spotStats)) {
+      const token = spotTokens[underlying];
+      if (!token || !stats || stats.close <= 0) continue;
+      ticksRef.current.seedQuote(token, {
+        ltp: stats.close,
+        close: stats.prev_close ?? 0,
+      });
+    }
+  }, [spotStats, spotTokens]);
 
   // One line in the log when the baselines land, not one per contract.
   const seedingRef = useRef(false);
