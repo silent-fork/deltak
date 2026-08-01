@@ -25,37 +25,58 @@ import type {
  * whenever it wants, without any component knowing about the limit.
  */
 
-const BASE_GAP_MS = 350;
+const BASE_GAP_MS = 340;
 const MAX_GAP_MS = 4_000;
+/**
+ * Requests allowed in flight at once.
+ *
+ * The limit that matters is Angel One's *rate*, not its concurrency, and the
+ * two are only the same thing if you wait for each reply before sending the
+ * next — which is what the original strictly-serial queue did. That capped
+ * throughput at 1/(gap + round trip): with a half-second round trip, barely one
+ * request a second however small the gap, so seeding a 22-contract ladder
+ * crawled in one strike at a time. Dispatching on the clock and letting three
+ * overlap fills the pipe up to the documented rate instead.
+ */
+const MAX_IN_FLIGHT = 3;
 
 let gapMs = BASE_GAP_MS;
 let lastDispatch = 0;
-let tail: Promise<unknown> = Promise.resolve();
+let inFlight = 0;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Serialise upstream calls, holding `gapMs` between dispatches. */
-function schedule<T>(job: () => Promise<T>): Promise<T> {
-  const run = tail.then(async () => {
-    const wait = gapMs - (Date.now() - lastDispatch);
-    if (wait > 0) await sleep(wait);
-    lastDispatch = Date.now();
-    try {
-      const value = await job();
-      // Ease back towards the base spacing once calls are landing again.
-      gapMs = Math.max(BASE_GAP_MS, gapMs * 0.8);
-      return value;
-    } catch (err) {
-      // A throttle is the one error worth changing behaviour over: widen the
-      // spacing so the next caller does not walk into the same wall.
-      if (err instanceof ApiError && err.status === 429) {
-        gapMs = Math.min(MAX_GAP_MS, Math.max(BASE_GAP_MS * 2, gapMs * 2));
-      }
-      throw err;
+/** Wait for a dispatch slot: under the concurrency cap, and past the gap. */
+async function acquire(): Promise<void> {
+  for (;;) {
+    const since = Date.now() - lastDispatch;
+    if (inFlight < MAX_IN_FLIGHT && since >= gapMs) {
+      inFlight += 1;
+      lastDispatch = Date.now();
+      return;
     }
-  });
-  tail = run.catch(() => undefined);
-  return run;
+    await sleep(since < gapMs ? Math.max(5, gapMs - since) : 20);
+  }
+}
+
+/** Pace upstream calls: `gapMs` between dispatches, `MAX_IN_FLIGHT` at once. */
+async function schedule<T>(job: () => Promise<T>): Promise<T> {
+  await acquire();
+  try {
+    const value = await job();
+    // Ease back towards the base spacing once calls are landing again.
+    gapMs = Math.max(BASE_GAP_MS, gapMs * 0.8);
+    return value;
+  } catch (err) {
+    // A throttle is the one error worth changing behaviour over: widen the
+    // spacing so the next caller does not walk into the same wall.
+    if (err instanceof ApiError && err.status === 429) {
+      gapMs = Math.min(MAX_GAP_MS, Math.max(BASE_GAP_MS * 2, gapMs * 2));
+    }
+    throw err;
+  } finally {
+    inFlight -= 1;
+  }
 }
 
 interface Entry {
