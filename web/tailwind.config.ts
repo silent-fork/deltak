@@ -57,12 +57,27 @@ const config: Config = {
           "0%": { transform: "translateY(-100%)" },
           "100%": { transform: "translateY(100%)" },
         },
+        drift: {
+          "0%, 100%": { transform: "translate(-50%, -50%) scale(1)", opacity: "0.7" },
+          "50%": { transform: "translate(-50%, -50%) scale(1.2)", opacity: "1" },
+        },
+        "spin-slow": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(6px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "tick-up": "tick-up 620ms ease-out",
         "tick-down": "tick-down 620ms ease-out",
         "pulse-ring": "pulse-ring 2s ease-in-out infinite",
         scan: "scan 5s linear infinite",
+        drift: "drift 6s ease-in-out infinite",
+        "spin-slow": "spin-slow 4s linear infinite",
+        "fade-up": "fade-up 500ms ease-out both",
       },
     },
   },

@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCircle2, Loader2, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -12,8 +13,9 @@ import { cn } from "@/lib/utils";
  * "not authenticated yet" and "not authenticated" were the same `false`), and
  * once past that gate the board painted as a patchwork of independent panel
  * skeletons filling in over a second or two, rather than reading as one
- * terminal coming online. This is one full-screen screen for both — session
- * check, then the first live data landing — instead of either.
+ * terminal coming online. This is one continuous sequence for both — a
+ * breathing core, a filling arc, and rotating on-brand status copy — rather
+ * than either.
  *
  * Never a hard, indefinite gate: the caller is expected to dismiss this on a
  * timeout even if a stage never reports done, so a slow or failed network
@@ -22,54 +24,119 @@ import { cn } from "@/lib/utils";
  */
 
 export interface BootStage {
-  label: string;
   done: boolean;
 }
 
+/**
+ * A few lines per stage rather than one, cycled on a timer — the same
+ * information ("still checking your session") reads as alive rather than
+ * frozen when it's not the same six words sitting still. Written in the
+ * terminal's own vocabulary (Aegis/Zenith, RRG, Quantum Horizon, Autopilot)
+ * rather than generic loading copy.
+ */
+const STAGE_COPY: string[][] = [
+  ["Authenticating operator…", "Confirming SmartAPI session…", "Unlocking the terminal…"],
+  [
+    "Loading the scrip master…",
+    "Indexing NIFTY · BANKNIFTY · FINNIFTY…",
+    "Mapping strikes to tokens…",
+  ],
+  [
+    "Calibrating Aegis & Zenith walls…",
+    "Spinning up the RRG quadrants…",
+    "Charting the Quantum Horizon…",
+    "Warming the Autopilot…",
+  ],
+];
+const DONE_COPY = "All systems engaged.";
+const LINE_MS = 1500;
+
 export function BootScreen({ stages }: { stages: BootStage[] }) {
+  const activeIndex = stages.findIndex((s) => !s.done);
+  const complete = activeIndex === -1;
+  const stageIndex = complete ? stages.length - 1 : activeIndex;
+  const lines = STAGE_COPY[stageIndex] ?? STAGE_COPY[STAGE_COPY.length - 1];
+
+  const [lineIndex, setLineIndex] = useState(0);
+  useEffect(() => {
+    setLineIndex(0);
+    if (complete) return;
+    const id = setInterval(() => setLineIndex((i) => (i + 1) % lines.length), LINE_MS);
+    return () => clearInterval(id);
+    // Cycling resets on a stage change and stops once complete; the lines
+    // array is stable per stage index and doesn't need to retrigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageIndex, complete]);
+
+  const doneCount = stages.filter((s) => s.done).length;
+  const progress = Math.min(100, Math.max(8, (doneCount / (stages.length || 1)) * 100));
+  const text = complete ? DONE_COPY : lines[lineIndex];
+
   return (
     <main className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-zinc-950">
-      <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-60" />
-
-      {/* A radar sweep down the screen — the same scan the RRG/COA panels run
-          on the market itself, just full-screen while the terminal boots. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 h-32 animate-scan bg-gradient-to-b from-transparent via-quantum/[0.07] to-transparent" />
+      {/* A soft, breathing core — light rather than a hard scan line, the
+          quietly living thing a modern loading screen should feel like. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute left-1/2 top-1/2 h-[620px] w-[620px] animate-drift rounded-full bg-quantum/[0.09] blur-[140px]" />
       </div>
+      <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-30" />
 
-      <div className="relative flex flex-col items-center gap-7">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10 shadow-quantum">
-            <Zap className="h-6 w-6 animate-pulse-ring text-quantum" />
+      <div className="relative flex animate-in flex-col items-center gap-9 fade-in zoom-in-95 duration-700">
+        {/* Core emblem — a slow conic ring orbiting the mark, not a static
+            bordered box. */}
+        <div className="relative flex h-[88px] w-[88px] items-center justify-center">
+          <div
+            className="absolute inset-0 animate-spin-slow rounded-full"
+            style={{
+              background:
+                "conic-gradient(from 0deg, transparent 0%, rgba(0,240,255,0.65) 18%, transparent 40%)",
+            }}
+          />
+          <div className="absolute inset-[3px] rounded-full bg-zinc-950" />
+          <div className="absolute inset-0 rounded-full border border-quantum/15" />
+          <div className="absolute h-14 w-14 rounded-full bg-quantum/10 blur-xl" />
+          <Zap
+            className="relative h-8 w-8 animate-pulse-ring text-quantum"
+            style={{ filter: "drop-shadow(0 0 12px rgba(0,240,255,0.65))" }}
+          />
+        </div>
+
+        <div className="text-center leading-none">
+          <div className="text-[24px] font-bold tracking-[0.22em] text-zinc-100">
+            DELTA-K
           </div>
-          <div className="text-left leading-none">
-            <div className="text-[20px] font-bold tracking-[0.18em] text-zinc-100">
-              DELTA-K
-            </div>
-            <div className="mt-1.5 text-[9px] uppercase tracking-[0.26em] text-quantum/70">
-              Terminal · DKMS
-            </div>
+          <div className="mt-2.5 text-[9px] uppercase tracking-[0.34em] text-quantum/60">
+            Terminal · DKMS
           </div>
         </div>
 
-        <div className="flex w-72 flex-col gap-2 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-4 py-3 backdrop-blur-sm">
-          {stages.map((s) => (
-            <div key={s.label} className="flex items-center gap-2.5 font-mono text-[11px]">
-              {s.done ? (
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-              ) : (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-quantum" />
+        {/* Fluid progress — a filling arc, and rotating status copy that
+            crossfades on every line change, not a checklist accumulating
+            underneath it. */}
+        <div className="flex w-80 flex-col items-center gap-4">
+          <div className="h-[3px] w-full overflow-hidden rounded-full bg-zinc-800/70">
+            <div
+              className={cn(
+                "h-full rounded-full bg-gradient-to-r from-quantum/30 via-quantum to-quantum/60 transition-[width] duration-700 ease-out",
+                complete && "from-quantum via-quantum to-quantum",
               )}
-              <span className={cn(s.done ? "text-zinc-500 line-through decoration-zinc-700" : "text-zinc-200")}>
-                {s.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+              style={{ width: `${progress}%`, boxShadow: "0 0 10px rgba(0,240,255,0.5)" }}
+            />
+          </div>
 
-      <div className="absolute bottom-7 font-mono text-[9px] uppercase tracking-[0.22em] text-zinc-700">
-        Delta-K Matrix Strategy
+          <div
+            key={text}
+            className="flex animate-fade-up items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400"
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                complete ? "bg-emerald-400" : "bg-quantum animate-pulse-ring",
+              )}
+            />
+            {text}
+          </div>
+        </div>
       </div>
     </main>
   );

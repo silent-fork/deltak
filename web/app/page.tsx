@@ -76,9 +76,9 @@ export default function TerminalPage() {
 
   const dataReady = !!chain?.rows.length;
   const bootStages = [
-    { label: "Verifying session…", done: engine.sessionChecked },
-    { label: "Loading scrip master…", done: engine.masterReady },
-    { label: "Engaging DKMS engine…", done: dataReady },
+    { done: engine.sessionChecked },
+    { done: engine.masterReady },
+    { done: dataReady },
   ];
 
   // Before the session check settles, "not authenticated" and "haven't
