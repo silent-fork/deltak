@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import type {
 } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
 
-type Tab = "open" | "history" | "archive";
+type Tab = "open" | "history";
 
 /**
  * A `positions` row, as PostgREST hands it back — Supabase's own record, not
@@ -58,7 +58,12 @@ function archiveDateLabel(openedAt: string): string {
  */
 function archiveRowToPosition(row: ArchiveRow): Position {
   return {
-    id: asStr(row.id ?? row.trade_key ?? row.ledger_id),
+    // `ledger_id` first, not the Postgres row id: the live ledger's own
+    // `Position.id` is the ledger id, and the merge below dedupes a DB
+    // checkpoint against its live counterpart by matching this field. Falling
+    // back to the bigint PK here would make every open position's own
+    // persisted copy look like a second, unrelated position.
+    id: asStr(row.ledger_id ?? row.trade_key ?? row.id),
     underlying: asStr(row.underlying),
     token: asStr(row.token),
     trading_symbol: asStr(row.trading_symbol),
@@ -288,9 +293,12 @@ export function TradeBook({
   const [error, setError] = useState<string | null>(null);
   const engine = useEngineContext();
 
-  // Persisted trades, across every session that has ever written this account's
-  // book — not just the one running in this tab. Null until asked for: it is a
-  // Supabase read behind a session check, not something to fire on every mount.
+  /**
+   * What Supabase holds for this account — every session that ever wrote to
+   * it, not just this tab's. `null` before the first read resolves; the tabs
+   * render from the live ledger alone until then, so a slow or failing fetch
+   * never blanks a screen that already has something to show.
+   */
   const [archive, setArchive] = useState<Position[] | null>(null);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
@@ -301,25 +309,22 @@ export function TradeBook({
     try {
       const rows = await api.history("positions", { limit: "100" });
       const list = Array.isArray(rows) ? (rows as ArchiveRow[]) : [];
-      setArchive(
-        list
-          .map(archiveRowToPosition)
-          // Newest first, same convention as the in-session history tab.
-          .sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1)),
-      );
+      setArchive(list.map(archiveRowToPosition));
     } catch (err) {
       setArchiveError(
-        err instanceof Error ? err.message : "Could not read trade history.",
+        err instanceof Error ? err.message : "Could not sync trade history.",
       );
     } finally {
       setArchiveLoading(false);
     }
   }
 
-  function selectTab(next: Tab) {
-    setTab(next);
-    if (next === "archive" && archive === null && !archiveLoading) void loadArchive();
-  }
+  // Both tabs are Supabase-backed now, so the read happens once up front
+  // rather than waiting on a click into a tab that used it to be optional.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void loadArchive();
+  }, []);
 
   if (!ledger) {
     return (
@@ -355,7 +360,32 @@ export function TradeBook({
   const open = ledger.open_positions;
   // Newest first: the trade you just closed is the one you want to see.
   const closed = [...ledger.closed_positions].reverse();
-  const rows = tab === "open" ? open : tab === "history" ? closed : (archive ?? []);
+
+  /**
+   * Both tabs merge the live engine with Supabase: the engine wins wherever it
+   * still holds a position, because it is more current than any checkpoint and
+   * is the only thing left `PositionCard` can actually act on. A Supabase row
+   * with no live counterpart is one no object in this tab knows about anymore
+   * — closed in a different browser, or open in a session this reload just
+   * lost — and is shown, but read-only. Positions with no live match to fall
+   * back on would otherwise vanish the moment a tab refreshes.
+   */
+  const openIds = new Set(open.map((p) => p.id));
+  const closedIds = new Set(closed.map((p) => p.id));
+  const dbOpen = (archive ?? []).filter((p) => p.status === "OPEN" && !openIds.has(p.id));
+  const dbClosed = (archive ?? [])
+    .filter((p) => p.status === "CLOSED" && !closedIds.has(p.id))
+    .sort((a, b) => (b.closed_at ?? b.opened_at).localeCompare(a.closed_at ?? a.opened_at));
+
+  const openRows = [
+    ...open.map((p) => ({ position: p, readOnly: false })),
+    ...dbOpen.map((p) => ({ position: p, readOnly: true })),
+  ];
+  const closedRows = [
+    ...closed.map((p) => ({ position: p, readOnly: false })),
+    ...dbClosed.map((p) => ({ position: p, readOnly: true })),
+  ];
+  const rows = tab === "open" ? openRows : closedRows;
 
   return (
     // Body only: the deck owns the card, the title and the tab strip. The book
@@ -382,21 +412,20 @@ export function TradeBook({
           />
         </div>
 
-        {/* Open / history / trade history — a segmented control, not three
-            chips. Which book you are looking at changes what every row below
-            means: the first two are this tab's own ledger, the third is
-            Supabase — every trade this account has ever booked, in any tab. */}
+        {/* Open / history — a segmented control, not two chips. Which book
+            you are looking at changes what every row below means. Both tabs
+            now merge in Supabase, so the count includes rows this tab did not
+            open itself. */}
         <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5">
           {(
             [
-              ["open", "Open", open.length],
-              ["history", "History", closed.length],
-              ["archive", "Trade History", archive?.length ?? null],
+              ["open", "Open", openRows.length],
+              ["history", "History", closedRows.length],
             ] as const
           ).map(([key, label, count]) => (
             <button
               key={key}
-              onClick={() => selectTab(key)}
+              onClick={() => setTab(key)}
               aria-pressed={tab === key}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
@@ -406,77 +435,60 @@ export function TradeBook({
               )}
             >
               {label}
-              {count !== null ? (
-                <span
-                  className={cn(
-                    "rounded px-1 font-mono text-[9px]",
-                    tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
-                  )}
-                >
-                  {count}
-                </span>
-              ) : null}
+              <span
+                className={cn(
+                  "rounded px-1 font-mono text-[9px]",
+                  tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
+                )}
+              >
+                {count}
+              </span>
             </button>
           ))}
         </div>
 
-        {tab === "archive" ? (
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] text-zinc-600">
-              Persisted to Supabase — survives a reload, spans every session.
-            </span>
-            <button
-              onClick={() => void loadArchive()}
-              disabled={archiveLoading}
-              title="Refresh"
-              className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
-            >
-              <RefreshCw className={cn("h-3 w-3", archiveLoading && "animate-spin")} />
-            </button>
-          </div>
-        ) : null}
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-zinc-600">
+            {archiveError
+              ? archiveError
+              : "Synced with Supabase — survives a reload, spans every session."}
+          </span>
+          <button
+            onClick={() => void loadArchive()}
+            disabled={archiveLoading}
+            title="Refresh from Supabase"
+            className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
+          >
+            <RefreshCw className={cn("h-3 w-3", archiveLoading && "animate-spin")} />
+          </button>
+        </div>
 
-        {tab === "archive" && archiveLoading && archive === null ? (
-          <div className="space-y-1">
-            {Array.from({ length: 3 }, (_, i) => (
-              <Skeleton key={i} className="h-[64px]" />
-            ))}
-          </div>
-        ) : tab === "archive" && archiveError ? (
-          <div className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] text-rose-300">
-            {archiveError}
-          </div>
-        ) : rows.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="py-5 text-center text-[11px] text-zinc-600">
-            {tab === "open"
-              ? "No open positions."
-              : tab === "history"
-                ? "No closed trades yet."
-                : "No persisted trades yet."}
+            {tab === "open" ? "No open positions." : "No closed trades yet."}
           </div>
         ) : (
           <div className="space-y-1">
-            {rows.map((p) =>
-              tab === "archive" ? (
-                <PositionCard
-                  key={p.id}
-                  position={p}
-                  closed={p.status === "CLOSED"}
-                  busy={null}
+            {rows.map(({ position: p, readOnly }) => (
+              <PositionCard
+                key={p.id}
+                position={p}
+                closed={tab !== "open"}
+                busy={busy}
+                readOnly={readOnly}
+                dateLabel={archiveDateLabel(p.opened_at)}
+                onScaleOut={
                   readOnly
-                  dateLabel={archiveDateLabel(p.opened_at)}
-                />
-              ) : (
-                <PositionCard
-                  key={p.id}
-                  position={p}
-                  closed={tab !== "open"}
-                  busy={busy}
-                  onScaleOut={() => run(`s-${p.id}`, () => engine.scaleOutPosition(p.id))}
-                  onExit={() => run(`x-${p.id}`, () => engine.exitPosition(p.id))}
-                />
-              ),
-            )}
+                    ? undefined
+                    : () => run(`s-${p.id}`, () => engine.scaleOutPosition(p.id))
+                }
+                onExit={
+                  readOnly
+                    ? undefined
+                    : () => run(`x-${p.id}`, () => engine.exitPosition(p.id))
+                }
+              />
+            ))}
           </div>
         )}
 
