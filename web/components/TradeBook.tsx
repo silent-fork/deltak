@@ -1,16 +1,89 @@
 "use client";
 
-import { AlertOctagon, Loader2, Scissors, X } from "lucide-react";
+import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { useEngineContext } from "@/components/EngineProvider";
-import type { LedgerSnapshot, Position } from "@/lib/types";
+import { api } from "@/lib/api";
+import { istParts } from "@/lib/engine/config";
+import type {
+  ExecutionMode,
+  LedgerSnapshot,
+  OptionType,
+  Position,
+  Protocol,
+  Side,
+} from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
 
-type Tab = "open" | "history";
+type Tab = "open" | "history" | "archive";
+
+/**
+ * A `positions` row, as PostgREST hands it back — Supabase's own record, not
+ * the in-browser ledger's. Numeric columns can arrive as JSON numbers or as
+ * strings depending on precision, so every field is read defensively rather
+ * than trusted to already be the right type.
+ */
+type ArchiveRow = Record<string, unknown>;
+
+const asStr = (v: unknown): string => (typeof v === "string" ? v : String(v ?? ""));
+const asStrOrNull = (v: unknown): string | null =>
+  v === null || v === undefined ? null : String(v);
+const asNum = (v: unknown, fallback = 0): number => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+const asNumOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** A stored `opened_at`, as the day and IST time a trade-history card needs. */
+function archiveDateLabel(openedAt: string): string {
+  const at = new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(openedAt) ? openedAt : `${openedAt}Z`);
+  if (Number.isNaN(at.getTime())) return "";
+  const p = istParts(at);
+  const hhmm = [p.hour, p.minute].map((v) => String(v).padStart(2, "0")).join(":");
+  return `${p.date} · ${hhmm}`;
+}
+
+/**
+ * A persisted row as the same `Position` shape the live ledger renders — so
+ * the archive tab draws through the exact card the open/history tabs do,
+ * rather than a second implementation that could drift from it.
+ */
+function archiveRowToPosition(row: ArchiveRow): Position {
+  return {
+    id: asStr(row.id ?? row.trade_key ?? row.ledger_id),
+    underlying: asStr(row.underlying),
+    token: asStr(row.token),
+    trading_symbol: asStr(row.trading_symbol),
+    option_type: (row.option_type as OptionType | null) ?? null,
+    strike: asNumOrNull(row.strike),
+    side: (row.side as Side) ?? "BUY",
+    quantity: asNum(row.quantity),
+    lots: asNum(row.lots),
+    lot_size: asNum(row.lot_size),
+    avg_price: asNum(row.avg_price),
+    ltp: asNum(row.ltp, asNum(row.avg_price)),
+    stop_loss: asNumOrNull(row.stop_loss),
+    target: asNumOrNull(row.target),
+    unrealised_pnl: asNum(row.unrealised_pnl),
+    realised_pnl: asNum(row.realised_pnl),
+    pnl_pct: asNum(row.pnl_pct),
+    protocol: (row.protocol as Protocol | null) ?? null,
+    opened_at: asStr(row.opened_at),
+    closed_at: asStrOrNull(row.closed_at),
+    exit_price: asNumOrNull(row.exit_price),
+    exit_reason: asStrOrNull(row.exit_reason),
+    status: row.status === "CLOSED" ? "CLOSED" : "OPEN",
+    mode: (row.mode as ExecutionMode) ?? "paper",
+  };
+}
 
 /** Why a position left the book, in the operator's language. */
 const EXIT_REASON: Record<string, string> = {
@@ -60,14 +133,20 @@ function PositionCard({
   position: p,
   closed,
   busy,
+  readOnly = false,
+  dateLabel,
   onScaleOut,
   onExit,
 }: {
   position: Position;
   closed: boolean;
   busy: string | null;
-  onScaleOut: () => void;
-  onExit: () => void;
+  /** A persisted row from another (or a since-reloaded) session — nothing here can act on it. */
+  readOnly?: boolean;
+  /** When trades can span more than one day, the day has to be on the card. */
+  dateLabel?: string;
+  onScaleOut?: () => void;
+  onExit?: () => void;
 }) {
   const pnl = closed ? p.realised_pnl : p.unrealised_pnl;
   const up = pnl >= 0;
@@ -111,6 +190,7 @@ function PositionCard({
                 {EXIT_REASON[p.exit_reason] ?? p.exit_reason}
               </span>
             ) : null}
+            {dateLabel ? <span className="text-zinc-600">{dateLabel}</span> : null}
           </div>
         </div>
 
@@ -123,7 +203,7 @@ function PositionCard({
             </div>
           </div>
 
-          {!closed ? (
+          {!closed && !readOnly ? (
             <div className="flex items-center gap-0.5">
               <button
                 title="Scale out 50% (TP1)"
@@ -208,6 +288,39 @@ export function TradeBook({
   const [error, setError] = useState<string | null>(null);
   const engine = useEngineContext();
 
+  // Persisted trades, across every session that has ever written this account's
+  // book — not just the one running in this tab. Null until asked for: it is a
+  // Supabase read behind a session check, not something to fire on every mount.
+  const [archive, setArchive] = useState<Position[] | null>(null);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  async function loadArchive() {
+    setArchiveLoading(true);
+    setArchiveError(null);
+    try {
+      const rows = await api.history("positions", { limit: "100" });
+      const list = Array.isArray(rows) ? (rows as ArchiveRow[]) : [];
+      setArchive(
+        list
+          .map(archiveRowToPosition)
+          // Newest first, same convention as the in-session history tab.
+          .sort((a, b) => (a.opened_at < b.opened_at ? 1 : -1)),
+      );
+    } catch (err) {
+      setArchiveError(
+        err instanceof Error ? err.message : "Could not read trade history.",
+      );
+    } finally {
+      setArchiveLoading(false);
+    }
+  }
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    if (next === "archive" && archive === null && !archiveLoading) void loadArchive();
+  }
+
   if (!ledger) {
     return (
       <CardContent className="min-h-0 p-2">
@@ -242,7 +355,7 @@ export function TradeBook({
   const open = ledger.open_positions;
   // Newest first: the trade you just closed is the one you want to see.
   const closed = [...ledger.closed_positions].reverse();
-  const rows = tab === "open" ? open : closed;
+  const rows = tab === "open" ? open : tab === "history" ? closed : (archive ?? []);
 
   return (
     // Body only: the deck owns the card, the title and the tab strip. The book
@@ -269,18 +382,21 @@ export function TradeBook({
           />
         </div>
 
-        {/* Open / history — a segmented control, not two chips. Which book
-            you are looking at changes what every row below means. */}
+        {/* Open / history / trade history — a segmented control, not three
+            chips. Which book you are looking at changes what every row below
+            means: the first two are this tab's own ledger, the third is
+            Supabase — every trade this account has ever booked, in any tab. */}
         <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5">
           {(
             [
               ["open", "Open", open.length],
               ["history", "History", closed.length],
+              ["archive", "Trade History", archive?.length ?? null],
             ] as const
           ).map(([key, label, count]) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => selectTab(key)}
               aria-pressed={tab === key}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
@@ -290,34 +406,77 @@ export function TradeBook({
               )}
             >
               {label}
-              <span
-                className={cn(
-                  "rounded px-1 font-mono text-[9px]",
-                  tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
-                )}
-              >
-                {count}
-              </span>
+              {count !== null ? (
+                <span
+                  className={cn(
+                    "rounded px-1 font-mono text-[9px]",
+                    tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
+                  )}
+                >
+                  {count}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
 
-        {rows.length === 0 ? (
+        {tab === "archive" ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-zinc-600">
+              Persisted to Supabase — survives a reload, spans every session.
+            </span>
+            <button
+              onClick={() => void loadArchive()}
+              disabled={archiveLoading}
+              title="Refresh"
+              className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
+            >
+              <RefreshCw className={cn("h-3 w-3", archiveLoading && "animate-spin")} />
+            </button>
+          </div>
+        ) : null}
+
+        {tab === "archive" && archiveLoading && archive === null ? (
+          <div className="space-y-1">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="h-[64px]" />
+            ))}
+          </div>
+        ) : tab === "archive" && archiveError ? (
+          <div className="rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] text-rose-300">
+            {archiveError}
+          </div>
+        ) : rows.length === 0 ? (
           <div className="py-5 text-center text-[11px] text-zinc-600">
-            {tab === "open" ? "No open positions." : "No closed trades yet."}
+            {tab === "open"
+              ? "No open positions."
+              : tab === "history"
+                ? "No closed trades yet."
+                : "No persisted trades yet."}
           </div>
         ) : (
           <div className="space-y-1">
-            {rows.map((p) => (
-              <PositionCard
-                key={p.id}
-                position={p}
-                closed={tab !== "open"}
-                busy={busy}
-                onScaleOut={() => run(`s-${p.id}`, () => engine.scaleOutPosition(p.id))}
-                onExit={() => run(`x-${p.id}`, () => engine.exitPosition(p.id))}
-              />
-            ))}
+            {rows.map((p) =>
+              tab === "archive" ? (
+                <PositionCard
+                  key={p.id}
+                  position={p}
+                  closed={p.status === "CLOSED"}
+                  busy={null}
+                  readOnly
+                  dateLabel={archiveDateLabel(p.opened_at)}
+                />
+              ) : (
+                <PositionCard
+                  key={p.id}
+                  position={p}
+                  closed={tab !== "open"}
+                  busy={busy}
+                  onScaleOut={() => run(`s-${p.id}`, () => engine.scaleOutPosition(p.id))}
+                  onExit={() => run(`x-${p.id}`, () => engine.exitPosition(p.id))}
+                />
+              ),
+            )}
           </div>
         )}
 
