@@ -275,7 +275,40 @@ RLS, and reads go back through this app's own routes.
 Apply `supabase/migrations/` in order. `0002` adds the profile table and trade
 attribution; `0003` drops `trading_sessions`, `signals`, `engine_settings` and
 the `session_performance` view — schema carried over from the retired FastAPI
-engine that nothing in the serverless build ever read or wrote.
+engine that nothing in the serverless build ever read or wrote. `0004` adds
+`broker_sessions` (the watchdog's encrypted credential store, below); `0005`
+adds `positions.entry_spot`.
+
+## Watchdog
+
+The trading loop above only runs in the browser: close the tab, and every
+guard in `lib/engine/risk.ts` stops with it. `/api/watchdog/tick` is a second,
+much narrower copy of two of those guards — stop/target and the 3:15 PM IST
+Daylight Rest flatten — that Vercel Cron invokes once a minute independently
+of any open tab.
+
+**Paper positions only.** `mode = 'live'` rows are never queried, and nothing
+in this path can place a broker order — `lib/server/watchdogMarket.ts`
+imports only Angel One's read endpoints (candles, OI, PCR, buildup, LTP), never
+`placeOrder`. Live-mode automation is a deliberately separate, unbuilt
+capability.
+
+**Not covered yet:** Invalidation (needs the COA walls) and the
+Weakening-quadrant scale-out (needs live RRG rotation) both need market state
+that only exists inside a running browser tab's engine today. Closing that
+gap needs a server-side home for that state, which is future work, not a
+missing wire-up.
+
+**Credentials.** The route needs a live price per open position, and every
+SmartAPI call — even a read — requires a session JWT. That JWT is stored
+**encrypted** (`broker_sessions`, AES-256-GCM, keyed by `DK_SESSION_ENC_KEY`)
+whenever the browser's own httpOnly-cookie session is established or
+revalidated (login, and every session check — not only when a token is
+actually refreshed). Without `DK_SESSION_ENC_KEY` set, every function that
+would write to this table is a no-op: the feature is off by construction, not
+by a flag someone has to remember to check. The cron route itself is gated by
+`CRON_SECRET`, which Vercel attaches to its own scheduled invocations
+automatically once the env var exists — unset, the route refuses everything.
 
 ## Human verification
 
@@ -351,6 +384,7 @@ whitelisting changes at all.
 | `POST` | `/api/order` | Place a live order via Angel One `placeOrder` |
 | `POST` | `/api/persist` | Append positions, orders and risk events to Supabase, attributed from the session cookie |
 | `GET` | `/api/history/:resource` | Read back this account's persisted positions, orders or risk events |
+| `GET` | `/api/watchdog/tick` | Cron-only (`CRON_SECRET`-gated). Enforces stop/target and the 3:15 PM Daylight Rest flatten on every account's open **paper** positions, using each account's stored session — the guard that runs with no browser tab open |
 
 The chain, RRG, DKMS signal and paper-mode ledger have no routes — they run
 entirely client-side in `web/lib/useEngine.ts` and never leave the tab.

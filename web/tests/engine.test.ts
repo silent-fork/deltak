@@ -24,7 +24,12 @@ import {
   estimateCharges,
   roundTripCharges,
 } from "../lib/engine/charges";
-import { breach, checkWeakeningRotation, weakeningCorroborated } from "../lib/engine/risk";
+import {
+  breach,
+  checkWeakeningRotation,
+  decideExit,
+  weakeningCorroborated,
+} from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
@@ -522,6 +527,53 @@ test("weakening scale-out is suppressed on a flat tape and fires on a real pullb
 
   assert.equal(await scenario(24_000), false); // premium drifted, spot did not
   assert.equal(await scenario(23_950), true); // spot actually pulled back
+});
+
+test("decideExit prioritises stop and target over the daylight clock, for both sides", () => {
+  const long = { side: "BUY" as const, stopLoss: 100, target: 150 };
+  assert.deepEqual(
+    decideExit({ ...long, ltp: 99, daylightRestDue: false }),
+    { action: "STOP_LOSS" },
+  );
+  assert.deepEqual(
+    decideExit({ ...long, ltp: 151, daylightRestDue: false }),
+    { action: "TARGET" },
+  );
+  assert.deepEqual(
+    decideExit({ ...long, ltp: 125, daylightRestDue: false }),
+    { action: "HOLD" },
+  );
+  assert.deepEqual(
+    decideExit({ ...long, ltp: 125, daylightRestDue: true }),
+    { action: "DAYLIGHT_REST" },
+  );
+  // A stop hit exactly at 3:15 PM is still a stop, not a daylight-rest exit —
+  // matches runGuards' order (checkStops before checkDaylightRest).
+  assert.deepEqual(
+    decideExit({ ...long, ltp: 99, daylightRestDue: true }),
+    { action: "STOP_LOSS" },
+  );
+
+  const short = { side: "SELL" as const, stopLoss: 150, target: 100 };
+  assert.deepEqual(
+    decideExit({ ...short, ltp: 151, daylightRestDue: false }),
+    { action: "STOP_LOSS" },
+  );
+  assert.deepEqual(
+    decideExit({ ...short, ltp: 99, daylightRestDue: false }),
+    { action: "TARGET" },
+  );
+});
+
+test("decideExit holds with no stop or target set, unless the daylight clock is due", () => {
+  assert.deepEqual(
+    decideExit({ side: "BUY", stopLoss: null, target: null, ltp: 100, daylightRestDue: false }),
+    { action: "HOLD" },
+  );
+  assert.deepEqual(
+    decideExit({ side: "BUY", stopLoss: null, target: null, ltp: 100, daylightRestDue: true }),
+    { action: "DAYLIGHT_REST" },
+  );
 });
 
 test("daylight rest countdown is bounded and monotonic", () => {

@@ -81,6 +81,21 @@ export async function GET() {
       normaliseProfile(session.clientCode, raw),
       false,
     );
+    // The JWT just proved itself alive against the broker — this is the
+    // *common* path (most restores don't need SmartAPI's own refresh), so
+    // storing here too, not only on login and on refresh, is what keeps
+    // broker_sessions from going stale for as long as a tab keeps checking in.
+    //
+    // `at` is deliberately "now", not `session.loginAt`: this call is
+    // confirming the token is alive at this instant, so the stored expiry
+    // should be the next midnight IST from *now* — anchoring it to a login
+    // that may have been hours ago could compute a boundary already in the
+    // past and mark a token that just proved itself good as expired.
+    await rememberBrokerSession({
+      clientCode: session.clientCode,
+      jwtToken: session.jwtToken,
+      refreshToken: session.refreshToken,
+    });
     return NextResponse.json({
       ...body(session.feedToken ?? "", session.loginAt ?? null),
       profile,

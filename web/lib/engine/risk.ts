@@ -1,4 +1,4 @@
-import type { OptionChain, Position, RiskEvent } from "@/lib/types";
+import type { OptionChain, Position, RiskEvent, Side } from "@/lib/types";
 import type { Ledger } from "./ledger";
 import type { RrgEngine } from "./rrg";
 import type { EngineConfig } from "./config";
@@ -30,6 +30,43 @@ export function breach(
   if (!level || level <= 0 || spot <= 0) return false;
   const band = level * (invalidationPct / 100);
   return direction === "below" ? spot < level - band : spot > level + band;
+}
+
+export type ExitReason = "STOP_LOSS" | "TARGET" | "DAYLIGHT_REST";
+export type ExitDecision = { action: ExitReason } | { action: "HOLD" };
+
+/**
+ * What a single position's own numbers say to do, given a fresh LTP — the
+ * same stop/target priority `checkStops` uses, plus the Daylight Rest clock
+ * event, folded into one pure decision.
+ *
+ * This is what lets a background job reach the same verdict `runGuards`
+ * would without needing a live `Ledger`, an option chain, or an RRG window —
+ * a position's own stop, target and side, plus one price, is the whole input.
+ * Invalidation (needs the COA walls) and the Weakening-quadrant scale-out
+ * (needs live rotation) are not decidable this way — they stay browser-only
+ * until there is a server-side home for that state.
+ */
+export function decideExit(params: {
+  side: Side;
+  stopLoss: number | null;
+  target: number | null;
+  ltp: number;
+  /** Past 3:15 PM IST, within today's session — `secondsToDaylightRest() <= 0` and the session hasn't closed. */
+  daylightRestDue: boolean;
+}): ExitDecision {
+  const long = params.side === "BUY";
+
+  if (params.stopLoss !== null) {
+    const hit = long ? params.ltp <= params.stopLoss : params.ltp >= params.stopLoss;
+    if (hit) return { action: "STOP_LOSS" };
+  }
+  if (params.target !== null) {
+    const hit = long ? params.ltp >= params.target : params.ltp <= params.target;
+    if (hit) return { action: "TARGET" };
+  }
+  if (params.daylightRestDue) return { action: "DAYLIGHT_REST" };
+  return { action: "HOLD" };
 }
 
 export interface GuardDeps {

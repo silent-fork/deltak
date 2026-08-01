@@ -165,6 +165,39 @@ export async function insertRows(
   return owned.length;
 }
 
+/**
+ * Patch a position by its stored `trade_key`, rather than reconstructing one.
+ *
+ * `insertRows`'s upsert recomputes `trade_key` from `(clientCode, ledgerId,
+ * openedAt)` — correct when the caller built `openedAt` itself, but a row read
+ * back from Postgres carries `opened_at` in Postgres's own serialisation
+ * (`2026-08-01 22:01:48+00`), not the ISO-with-milliseconds string the row was
+ * originally written with. Recomputing from that would produce a *different*
+ * trade_key and silently insert a second row instead of updating the first.
+ * Filtering by the trade_key already on the row sidesteps the mismatch
+ * entirely — used by the watchdog, which only ever has rows it read back.
+ */
+export async function updatePositionByTradeKey(
+  tradeKey: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (!supabaseConfigured || !tradeKey) return;
+  const res = await fetch(
+    `${base()}/positions?trade_key=eq.${encodeURIComponent(tradeKey)}`,
+    {
+      method: "PATCH",
+      headers: headers("return=minimal"),
+      body: JSON.stringify(patch),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Supabase position update failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
 /* ------------------------------------------------------------ user profile */
 
 export interface ProfileRow {
