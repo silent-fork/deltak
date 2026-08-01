@@ -284,8 +284,18 @@ adds `positions.entry_spot`.
 The trading loop above only runs in the browser: close the tab, and every
 guard in `lib/engine/risk.ts` stops with it. `/api/watchdog/tick` is a second,
 much narrower copy of two of those guards — stop/target and the 3:15 PM IST
-Daylight Rest flatten — that Vercel Cron invokes once a minute independently
-of any open tab.
+Daylight Rest flatten — invoked once a minute independently of any open tab.
+
+The trigger is **Supabase's `pg_cron` + `pg_net`**, not Vercel Cron: Vercel's
+Hobby plan only allows once-a-day schedules (Pro allows once a minute), while
+`pg_cron`/`pg_net` are plain Postgres extensions with the same once-a-minute
+floor on every Supabase plan, free included. `supabase/migrations/0006-0008`
+enable the extensions and schedule `cron.schedule('watchdog-tick', '* * * * *', …)`
+to call the route via `net.http_get`. The bearer token it sends is read from
+**Supabase Vault** by name (`watchdog_cron_secret`) at execution time — the
+migration that schedules the job contains no secret, only a name; the secret
+itself is created once, out of band, via `vault.create_secret(...)`, and must
+hold the exact same value as `CRON_SECRET` below.
 
 **Paper positions only.** `mode = 'live'` rows are never queried, and nothing
 in this path can place a broker order — `lib/server/watchdogMarket.ts`
@@ -307,8 +317,9 @@ revalidated (login, and every session check — not only when a token is
 actually refreshed). Without `DK_SESSION_ENC_KEY` set, every function that
 would write to this table is a no-op: the feature is off by construction, not
 by a flag someone has to remember to check. The cron route itself is gated by
-`CRON_SECRET`, which Vercel attaches to its own scheduled invocations
-automatically once the env var exists — unset, the route refuses everything.
+`CRON_SECRET` — checked against whatever `pg_net` sends as the bearer token,
+which is the Vault secret above. Unset, or mismatched, the route refuses
+everything.
 
 ## Human verification
 
