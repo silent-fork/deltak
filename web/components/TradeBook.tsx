@@ -1,46 +1,18 @@
 "use client";
 
 import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { useEngineContext } from "@/components/EngineProvider";
-import { api } from "@/lib/api";
+import { mergeBook } from "@/lib/engine/book";
 import { istParts } from "@/lib/engine/config";
-import type {
-  ExecutionMode,
-  LedgerSnapshot,
-  OptionType,
-  Position,
-  Protocol,
-  Side,
-} from "@/lib/types";
+import type { LedgerSnapshot, Position } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
 
 type Tab = "open" | "history";
-
-/**
- * A `positions` row, as PostgREST hands it back — Supabase's own record, not
- * the in-browser ledger's. Numeric columns can arrive as JSON numbers or as
- * strings depending on precision, so every field is read defensively rather
- * than trusted to already be the right type.
- */
-type ArchiveRow = Record<string, unknown>;
-
-const asStr = (v: unknown): string => (typeof v === "string" ? v : String(v ?? ""));
-const asStrOrNull = (v: unknown): string | null =>
-  v === null || v === undefined ? null : String(v);
-const asNum = (v: unknown, fallback = 0): number => {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : fallback;
-};
-const asNumOrNull = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
 
 /** A stored `opened_at`, as the day and IST time a trade-history card needs. */
 function archiveDateLabel(openedAt: string): string {
@@ -49,46 +21,6 @@ function archiveDateLabel(openedAt: string): string {
   const p = istParts(at);
   const hhmm = [p.hour, p.minute].map((v) => String(v).padStart(2, "0")).join(":");
   return `${p.date} · ${hhmm}`;
-}
-
-/**
- * A persisted row as the same `Position` shape the live ledger renders — so
- * the archive tab draws through the exact card the open/history tabs do,
- * rather than a second implementation that could drift from it.
- */
-function archiveRowToPosition(row: ArchiveRow): Position {
-  return {
-    // `ledger_id` first, not the Postgres row id: the live ledger's own
-    // `Position.id` is the ledger id, and the merge below dedupes a DB
-    // checkpoint against its live counterpart by matching this field. Falling
-    // back to the bigint PK here would make every open position's own
-    // persisted copy look like a second, unrelated position.
-    id: asStr(row.ledger_id ?? row.trade_key ?? row.id),
-    underlying: asStr(row.underlying),
-    token: asStr(row.token),
-    trading_symbol: asStr(row.trading_symbol),
-    option_type: (row.option_type as OptionType | null) ?? null,
-    strike: asNumOrNull(row.strike),
-    side: (row.side as Side) ?? "BUY",
-    quantity: asNum(row.quantity),
-    lots: asNum(row.lots),
-    lot_size: asNum(row.lot_size),
-    avg_price: asNum(row.avg_price),
-    ltp: asNum(row.ltp, asNum(row.avg_price)),
-    entry_spot: asNumOrNull(row.entry_spot),
-    stop_loss: asNumOrNull(row.stop_loss),
-    target: asNumOrNull(row.target),
-    unrealised_pnl: asNum(row.unrealised_pnl),
-    realised_pnl: asNum(row.realised_pnl),
-    pnl_pct: asNum(row.pnl_pct),
-    protocol: (row.protocol as Protocol | null) ?? null,
-    opened_at: asStr(row.opened_at),
-    closed_at: asStrOrNull(row.closed_at),
-    exit_price: asNumOrNull(row.exit_price),
-    exit_reason: asStrOrNull(row.exit_reason),
-    status: row.status === "CLOSED" ? "CLOSED" : "OPEN",
-    mode: (row.mode as ExecutionMode) ?? "paper",
-  };
 }
 
 /** Why a position left the book, in the operator's language. */
@@ -284,48 +216,31 @@ function PositionCard({
 export function TradeBook({
   ledger,
   onChanged,
+  archive,
+  archiveLoading,
+  archiveError,
+  onRefreshArchive,
 }: {
   ledger: LedgerSnapshot | undefined;
   onChanged: () => void;
+  /**
+   * What Supabase holds for this account — every session that ever wrote to
+   * it, not just this tab's. Owned by the deck, which mounts once for the
+   * life of the page, so switching between the signal panel and the trade
+   * book never re-fetches it. `null` before the first read resolves; the
+   * tabs render from the live ledger alone until then, so a slow or failing
+   * fetch never blanks a screen that already has something to show.
+   */
+  archive: Position[] | null;
+  archiveLoading: boolean;
+  archiveError: string | null;
+  onRefreshArchive: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("open");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmPanic, setConfirmPanic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const engine = useEngineContext();
-
-  /**
-   * What Supabase holds for this account — every session that ever wrote to
-   * it, not just this tab's. `null` before the first read resolves; the tabs
-   * render from the live ledger alone until then, so a slow or failing fetch
-   * never blanks a screen that already has something to show.
-   */
-  const [archive, setArchive] = useState<Position[] | null>(null);
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-
-  async function loadArchive() {
-    setArchiveLoading(true);
-    setArchiveError(null);
-    try {
-      const rows = await api.history("positions", { limit: "100" });
-      const list = Array.isArray(rows) ? (rows as ArchiveRow[]) : [];
-      setArchive(list.map(archiveRowToPosition));
-    } catch (err) {
-      setArchiveError(
-        err instanceof Error ? err.message : "Could not sync trade history.",
-      );
-    } finally {
-      setArchiveLoading(false);
-    }
-  }
-
-  // Both tabs are Supabase-backed now, so the read happens once up front
-  // rather than waiting on a click into a tab that used it to be optional.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    void loadArchive();
-  }, []);
 
   if (!ledger) {
     return (
@@ -359,8 +274,6 @@ export function TradeBook({
   }
 
   const open = ledger.open_positions;
-  // Newest first: the trade you just closed is the one you want to see.
-  const closed = [...ledger.closed_positions].reverse();
 
   /**
    * Both tabs merge the live engine with Supabase: the engine wins wherever it
@@ -371,22 +284,15 @@ export function TradeBook({
    * lost — and is shown, but read-only. Positions with no live match to fall
    * back on would otherwise vanish the moment a tab refreshes.
    */
-  const openIds = new Set(open.map((p) => p.id));
-  const closedIds = new Set(closed.map((p) => p.id));
-  const dbOpen = (archive ?? []).filter((p) => p.status === "OPEN" && !openIds.has(p.id));
-  const dbClosed = (archive ?? [])
-    .filter((p) => p.status === "CLOSED" && !closedIds.has(p.id))
-    .sort((a, b) => (b.closed_at ?? b.opened_at).localeCompare(a.closed_at ?? a.opened_at));
-
-  const openRows = [
-    ...open.map((p) => ({ position: p, readOnly: false })),
-    ...dbOpen.map((p) => ({ position: p, readOnly: true })),
-  ];
-  const closedRows = [
-    ...closed.map((p) => ({ position: p, readOnly: false })),
-    ...dbClosed.map((p) => ({ position: p, readOnly: true })),
-  ];
+  const { openRows, closedRows, openPnl, bookedPnl, deployedMargin } = mergeBook(
+    ledger,
+    archive,
+  );
   const rows = tab === "open" ? openRows : closedRows;
+  // Equity tracks the same open P&L the "Open" tile shows — capital already
+  // carries this tab's own realised trades, so only the unrealised leg needs
+  // folding in from the merge.
+  const equity = ledger.capital + openPnl;
 
   return (
     // Body only: the deck owns the card, the title and the tab strip. The book
@@ -395,20 +301,20 @@ export function TradeBook({
     <>
       <CardContent className="dk-scroll min-h-0 space-y-2 overflow-y-auto p-2">
         <div className="grid grid-cols-4 gap-1">
-          <Metric label="Equity" value={money(ledger.equity, 0)} />
+          <Metric label="Equity" value={money(equity, 0)} />
           <Metric
             label="Open"
-            value={signedMoney(ledger.open_pnl, 0)}
-            tone={pnlTone(ledger.open_pnl)}
+            value={signedMoney(openPnl, 0)}
+            tone={pnlTone(openPnl)}
           />
           <Metric
             label="Booked"
-            value={signedMoney(ledger.realised_pnl, 0)}
-            tone={pnlTone(ledger.realised_pnl)}
+            value={signedMoney(bookedPnl, 0)}
+            tone={pnlTone(bookedPnl)}
           />
           <Metric
             label="Deployed"
-            value={money(ledger.deployed_margin, 0)}
+            value={money(deployedMargin, 0)}
             tone="text-zinc-300"
           />
         </div>
@@ -455,7 +361,7 @@ export function TradeBook({
               : "Synced with Supabase — survives a reload, spans every session."}
           </span>
           <button
-            onClick={() => void loadArchive()}
+            onClick={onRefreshArchive}
             disabled={archiveLoading}
             title="Refresh from Supabase"
             className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"

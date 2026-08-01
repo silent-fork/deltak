@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { SignalPanel } from "@/components/SignalPanel";
 import { TradeBook } from "@/components/TradeBook";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
+import { mergeBook } from "@/lib/engine/book";
 import type {
   ExecutionMode,
   LedgerSnapshot,
   OptionChain,
   Signal,
 } from "@/lib/types";
+import { useTradeArchive } from "@/lib/useTradeArchive";
 import { PROTOCOL_META, cn, pnlTone, signedMoney } from "@/lib/utils";
 
 /**
@@ -44,13 +46,26 @@ export function SignalDeck({
   const [deck, setDeck] = useState<Deck>("signal");
   const meta = signal ? PROTOCOL_META[signal.protocol] : null;
 
-  const openCount = ledger?.open_positions.length ?? 0;
-  const totalPnl = ledger?.total_pnl ?? 0;
+  /**
+   * Fetched here rather than inside `TradeBook`: this component mounts once
+   * for the life of the page and only toggles which half of the deck is
+   * showing, so the read happens on page load and never again just because
+   * the operator clicked back into the book tab.
+   */
+  const { archive, loading: archiveLoading, error: archiveError, reload: reloadArchive } =
+    useTradeArchive();
+
+  // The badge and the header total read the same merged book the trade tab
+  // itself renders — live ledger plus whatever Supabase still holds from a
+  // session this tab never saw — so a reload never drops them back to zero.
+  const merged = useMemo(() => mergeBook(ledger, archive), [ledger, archive]);
+  const openCount = merged.openRows.length;
+  const totalPnl = merged.openPnl + merged.bookedPnl;
 
   // A fill turns the deck to the book: the moment a position exists, managing
   // it is the live question, and the panic control must not be behind a tab
   // nobody thought to open.
-  const hasOpen = openCount > 0;
+  const hasOpen = (ledger?.open_positions.length ?? 0) > 0;
   useEffect(() => {
     if (hasOpen) setDeck("book");
   }, [hasOpen]);
@@ -114,7 +129,14 @@ export function SignalDeck({
           onExecuted={onExecuted}
         />
       ) : (
-        <TradeBook ledger={ledger} onChanged={onLedgerChanged} />
+        <TradeBook
+          ledger={ledger}
+          onChanged={onLedgerChanged}
+          archive={archive}
+          archiveLoading={archiveLoading}
+          archiveError={archiveError}
+          onRefreshArchive={() => void reloadArchive()}
+        />
       )}
     </Card>
   );
