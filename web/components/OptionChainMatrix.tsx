@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { wallTags, type WallTag } from "@/lib/coaView";
 import type { OptionChain, OptionLeg } from "@/lib/types";
-import { cn, compact, fmt, signed } from "@/lib/utils";
+import { cn, compact, fmt } from "@/lib/utils";
 
 /** Tag styling: colour carries the wall, weight carries the generation. */
 function tagClass(tag: WallTag): string {
@@ -87,37 +87,62 @@ function LegCells({
 
     <td
       key="ba"
-      className="px-1.5 py-1 font-mono text-[9px] text-zinc-500"
+      className="px-1.5 py-1 font-mono text-[9.5px] tabular-nums"
       title={
         spread !== null
           ? `Bid ${fmt(leg.best_bid)} / Ask ${fmt(leg.best_ask)} — spread ${fmt(spread)}`
           : "No two-sided quote"
       }
     >
-      {leg.best_bid > 0 ? `${fmt(leg.best_bid, 1)}·${fmt(leg.best_ask, 1)}` : "—"}
+      {/* Bid and ask read as two distinct numbers, not one string — a seller's
+          price tinted toward the calls/puts colour of that side's floor, a
+          buyer's price toward its ceiling, with the slash between them doing
+          the separating instead of a cramped, same-colour middle dot. */}
+      {leg.best_bid > 0 ? (
+        <span className="whitespace-nowrap">
+          <span className="text-emerald-500/70">{fmt(leg.best_bid, 1)}</span>
+          <span className="mx-0.5 text-zinc-700">/</span>
+          <span className="text-rose-500/70">{fmt(leg.best_ask, 1)}</span>
+        </span>
+      ) : (
+        <span className="text-zinc-700">—</span>
+      )}
     </td>,
 
     <td
       key="ltp"
-      className={cn(
-        "px-1.5 py-1 font-mono text-xs font-semibold",
-        itm ? "text-zinc-100" : "text-zinc-400",
-      )}
+      className="px-1.5 py-1"
       title={`${leg.trading_symbol} · ${leg.moneyness}${leg.itm_depth > 0 ? ` depth ${leg.itm_depth}` : ""}`}
     >
       {/* A contract that has not traded has no price. Quoting 0.00 for it
           reads as "worthless", which is a very different claim. */}
-      {leg.ltp > 0 ? fmt(leg.ltp) : <span className="text-zinc-700">—</span>}
-      {leg.ltp > 0 && leg.change_pct !== 0 ? (
-        <span
-          className={cn(
-            "ml-1 text-[9px] font-normal",
-            leg.change_pct >= 0 ? "text-emerald-500" : "text-rose-500",
-          )}
-        >
-          {signed(leg.change_pct, 1)}%
+      {leg.ltp > 0 ? (
+        <span className="flex items-baseline justify-end gap-1 whitespace-nowrap">
+          <span
+            className={cn(
+              "font-mono text-[13px] font-bold tabular-nums",
+              itm ? "text-zinc-100" : "text-zinc-400",
+            )}
+          >
+            {fmt(leg.ltp)}
+          </span>
+          {leg.change_pct !== 0 ? (
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center rounded-sm px-1 py-px font-mono text-[8px] font-semibold leading-none tabular-nums",
+                leg.change_pct >= 0
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "bg-rose-500/15 text-rose-400",
+              )}
+            >
+              {leg.change_pct >= 0 ? "▲" : "▼"}
+              {fmt(Math.abs(leg.change_pct), 1)}%
+            </span>
+          ) : null}
         </span>
-      ) : null}
+      ) : (
+        <span className="font-mono text-xs text-zinc-700">—</span>
+      )}
     </td>,
   ];
 
