@@ -3,15 +3,19 @@ import type { CoaLevels, OptionChain } from "@/lib/types";
 /**
  * View-model helpers over the COA levels.
  *
- * The engine speaks in generations — COA 1.0 is the cumulative wall carried into
- * the session, COA 2.0 the one today's writers have actually built. The HUD
- * speaks in names: a wall is "Aegis" or "Zenith", and only when the two
- * generations disagree does the older one get called out as PRIOR. A strike
- * where they agree is one wall, labelled once.
+ * The engine speaks in generations — COA 1.0 is the cumulative open-interest
+ * wall, COA 2.0 the one today's writers are actually building. The HUD speaks
+ * in names: a wall is "Aegis" or "Zenith", and when the two generations sit on
+ * different strikes the cumulative one is the VANGUARD.
+ *
+ * Vanguard, not "prior": the cumulative wall is not a spent level, it is the
+ * standing mass of open interest across sessions. When today's writing fades or
+ * rolls, that is the strike the bound settles onto — the position held out
+ * ahead of the live wall, waiting for it.
  */
 
 export type WallSide = "aegis" | "zenith";
-export type WallGeneration = "live" | "prior" | "merged";
+export type WallGeneration = "live" | "vanguard" | "merged";
 
 export interface WallTag {
   key: string;
@@ -38,19 +42,19 @@ function tag(
 ): WallTag {
   const name = NAME[side];
   const merged = generation === "merged";
-  const prior = generation === "prior";
+  const vanguard = generation === "vanguard";
 
   return {
     key: `${side}-${generation}`,
-    label: prior ? "PRIOR" : name.toUpperCase(),
-    long: prior ? `${name} prior` : name,
+    label: vanguard ? "VANGUARD" : name.toUpperCase(),
+    long: vanguard ? `${name} Vanguard` : name,
     side,
     generation,
     title: merged
-      ? `${name} ${strike.toLocaleString("en-IN")} — ${ROLE[side]}. The cumulative and intraday walls agree here, so this is simply ${name}.`
-      : prior
-        ? `${name} prior ${strike.toLocaleString("en-IN")} — the cumulative wall carried into the session. Today's writers have moved ${name} elsewhere.`
-        : `${name} ${strike.toLocaleString("en-IN")} — where today's writers have built the wall. This is the level the engine trades.`,
+      ? `${name} ${strike.toLocaleString("en-IN")} — ${ROLE[side]}. The cumulative and intraday walls stand on the same strike, so this is simply ${name}.`
+      : vanguard
+        ? `${name} Vanguard ${strike.toLocaleString("en-IN")} — the cumulative open-interest wall, held out ahead of the live one. Today's writing is building ${name} elsewhere; this is the strike the bound settles onto when that writing fades or rolls.`
+        : `${name} ${strike.toLocaleString("en-IN")} — where today's writers are building the wall. This is the level the engine trades.`,
   };
 }
 
@@ -60,15 +64,15 @@ export function wallTagsForSide(
   side: WallSide,
   levels: CoaLevels,
 ): WallTag[] {
-  const prior = side === "aegis" ? levels.aegis_0 : levels.zenith_0;
+  const vanguard = side === "aegis" ? levels.aegis_0 : levels.zenith_0;
   const live = side === "aegis" ? levels.aegis_1 : levels.zenith_1;
 
-  const atPrior = prior !== null && strike === prior;
+  const atVanguard = vanguard !== null && strike === vanguard;
   const atLive = live !== null && strike === live;
 
-  if (atPrior && atLive) return [tag(side, "merged", strike)];
+  if (atVanguard && atLive) return [tag(side, "merged", strike)];
   if (atLive) return [tag(side, "live", strike)];
-  if (atPrior) return [tag(side, "prior", strike)];
+  if (atVanguard) return [tag(side, "vanguard", strike)];
   return [];
 }
 
@@ -81,9 +85,9 @@ export function wallTags(strike: number, levels: CoaLevels): WallTag[] {
 
 /** True when a wall's two generations sit on the same strike. */
 export function wallMerged(side: WallSide, levels: CoaLevels): boolean {
-  const prior = side === "aegis" ? levels.aegis_0 : levels.zenith_0;
+  const vanguard = side === "aegis" ? levels.aegis_0 : levels.zenith_0;
   const live = side === "aegis" ? levels.aegis_1 : levels.zenith_1;
-  return prior !== null && prior === live;
+  return vanguard !== null && vanguard === live;
 }
 
 /* ------------------------------------------------------------- distances */

@@ -46,8 +46,11 @@ one Vercel project.
 
 | Level | Source | Meaning |
 | --- | --- | --- |
-| **Aegis-0 / Zenith-0** | COA 1.0 — cumulative OI walls | Static support / resistance carried into the session |
+| **Aegis-0 / Zenith-0** — the *Vanguard* | COA 1.0 — cumulative OI walls | The standing mass of open interest across sessions: the strike the bound settles onto when today's writing fades or rolls |
 | **Aegis-1 / Zenith-1** | COA 2.0 — *intraday* ΔOI | The live bounds the engine actually trades |
+
+The HUD names the cumulative wall **Vanguard** rather than "prior": it is not a
+spent level but the position held out ahead of the live one.
 
 Put writers stacking below spot lift Aegis-1; call writers above spot pin
 Zenith-1. Migration of these levels is what selects the protocol.
@@ -104,10 +107,14 @@ endpoint, its closing open interest from `getOIData`, and — the part that cann
 be faked from a snapshot — each contract's *series* replayed bar by bar into its
 RRG window, which is exactly what the feed would have fed it live.
 
-Two guards keep that from being mistaken for a live terminal. Seeded quotes do
+Three guards keep that from being mistaken for a live terminal. Seeded quotes do
 not advance the tick counter, so the Live-mode switch still refuses to route
-without a real feed; and the rotation windows only advance on genuine prints, so
-the 1 Hz loop cannot bury a replayed session under a minute of repeated closes.
+without a real feed. The rotation windows only advance on genuine prints. And
+once the replayed data has settled the pipeline stops entirely — rebuilding a
+frozen chain once a second recomputes the same answer forever while grinding
+down the very history the replay installed, so the loop idles until the feed or
+the bell brings something new. Risk guards are idle too: against a frozen board
+they could only fire on yesterday's prices.
 
 The OI baseline is the one that matters most. Without it a terminal opened at
 noon reads every strike as "no change", Aegis-1 and Zenith-1 silently collapse

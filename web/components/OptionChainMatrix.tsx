@@ -12,7 +12,7 @@ import { cn, compact, fmt, signed } from "@/lib/utils";
 /** Tag styling: colour carries the wall, weight carries the generation. */
 function tagClass(tag: WallTag): string {
   const support = tag.side === "aegis";
-  if (tag.generation === "prior") {
+  if (tag.generation === "vanguard") {
     return support
       ? "border-emerald-500/35 text-emerald-400/80"
       : "border-rose-500/35 text-rose-400/80";
@@ -290,10 +290,10 @@ export function OptionChainMatrix({
             Zenith
           </span>
           <span
-            title="The cumulative wall carried into the session, shown only when today's writers have moved the live wall elsewhere."
+            title="Vanguard — the cumulative open-interest wall, standing ahead of the live one. Shown only when today's writing has built the wall on a different strike."
             className="rounded border border-zinc-600/60 px-1 text-[8px] font-bold text-zinc-400"
           >
-            Prior
+            Vanguard
           </span>
         </span>
         <span>Zero-OTM rule: longs restricted to 2nd–3rd ITM</span>

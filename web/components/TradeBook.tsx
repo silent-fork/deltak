@@ -46,17 +46,151 @@ function Metric({
   );
 }
 
-function Symbol({ position }: { position: Position }) {
+/**
+ * One position, as a card rather than a table row.
+ *
+ * The column is narrow and a seven-column table left every number clipped to
+ * three characters. A card gives the contract its own line, puts the money on
+ * the right where the eye lands, and — while a position is open — draws where
+ * the last price sits between the stop and the target, which is the only
+ * question being asked of an open trade.
+ */
+function PositionCard({
+  position: p,
+  closed,
+  busy,
+  onScaleOut,
+  onExit,
+}: {
+  position: Position;
+  closed: boolean;
+  busy: string | null;
+  onScaleOut: () => void;
+  onExit: () => void;
+}) {
+  const pnl = closed ? p.realised_pnl : p.unrealised_pnl;
+  const up = pnl >= 0;
+
+  // Where price stands between the stop and the target, when both are known.
+  const sl = p.stop_loss;
+  const tp = p.target;
+  const span = sl !== null && tp !== null && tp > sl ? tp - sl : null;
+  const travel =
+    span !== null && sl !== null
+      ? Math.min(100, Math.max(0, ((p.ltp - sl) / span) * 100))
+      : null;
+
   return (
-    <td className="px-1 py-1 text-left">
-      <div className="truncate font-mono text-[10px] font-semibold text-zinc-200">
-        {position.trading_symbol}
+    <div
+      className={cn(
+        "rounded-md border bg-zinc-950/50 px-2 py-1.5",
+        closed
+          ? "border-zinc-800/70"
+          : up
+            ? "border-emerald-500/25"
+            : "border-rose-500/25",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-mono text-[11px] font-semibold text-zinc-100">
+            {p.trading_symbol}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <span>
+              {p.lots} lot{p.lots === 1 ? "" : "s"} · {p.quantity} qty
+            </span>
+            {p.protocol ? (
+              <span className="rounded border border-zinc-800 px-1 text-zinc-400">
+                {p.protocol}
+              </span>
+            ) : null}
+            {closed && p.exit_reason ? (
+              <span className="rounded border border-zinc-800 px-1 text-zinc-400">
+                {EXIT_REASON[p.exit_reason] ?? p.exit_reason}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-start gap-1">
+          <div className={cn("text-right font-mono leading-tight", pnlTone(pnl))}>
+            <div className="text-[12px] font-bold">{signedMoney(pnl, 0)}</div>
+            <div className="text-[9px] opacity-75">
+              {p.pnl_pct > 0 ? "+" : ""}
+              {fmt(p.pnl_pct, 1)}%
+            </div>
+          </div>
+
+          {!closed ? (
+            <div className="flex items-center gap-0.5">
+              <button
+                title="Scale out 50% (TP1)"
+                aria-label={`Scale out ${p.trading_symbol}`}
+                disabled={busy !== null || p.lots < 2}
+                onClick={onScaleOut}
+                className="rounded p-1 text-amber-400/80 transition-colors hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-30"
+              >
+                {busy === `s-${p.id}` ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Scissors className="h-3 w-3" />
+                )}
+              </button>
+              <button
+                title="Close position"
+                aria-label={`Close ${p.trading_symbol}`}
+                disabled={busy !== null}
+                onClick={onExit}
+                className="rounded p-1 text-rose-400/80 transition-colors hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30"
+              >
+                {busy === `x-${p.id}` ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <X className="h-3 w-3" />
+                )}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-      <div className="font-mono text-[9px] text-zinc-600">
-        {position.lots} lot{position.lots === 1 ? "" : "s"}
-        {position.protocol ? ` · ${position.protocol.charAt(0)}` : ""}
+
+      <div className="mt-1 grid grid-cols-3 gap-2 font-mono text-[10px]">
+        <div>
+          <span className="dk-label text-[8px]">Avg</span>{" "}
+          <span className="text-zinc-300">{fmt(p.avg_price)}</span>
+        </div>
+        <div>
+          <span className="dk-label text-[8px]">{closed ? "Exit" : "LTP"}</span>{" "}
+          <span className="text-zinc-100">
+            {closed ? (p.exit_price !== null ? fmt(p.exit_price) : "—") : fmt(p.ltp)}
+          </span>
+        </div>
+        <div className="text-right">
+          <span className="dk-label text-[8px]">{closed ? "Booked" : "Stop"}</span>{" "}
+          <span className={closed ? "text-zinc-400" : "text-rose-400/90"}>
+            {closed
+              ? money(p.realised_pnl, 0)
+              : sl !== null
+                ? fmt(sl)
+                : "—"}
+          </span>
+        </div>
       </div>
-    </td>
+
+      {/* Stop → target, and where price has actually got to. */}
+      {!closed && travel !== null ? (
+        <div
+          title={`Stop ${fmt(sl)} · last ${fmt(p.ltp)} · target ${fmt(tp)}`}
+          className="relative mt-1.5 h-1 rounded-full bg-gradient-to-r from-rose-500/40 via-zinc-800 to-emerald-500/40"
+        >
+          <span
+            className="absolute top-1/2 h-2.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum"
+            style={{ left: `${travel}%`, boxShadow: "0 0 6px rgba(0,240,255,0.8)" }}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -125,8 +259,9 @@ export function TradeBook({
           />
         </div>
 
-        {/* Open / history */}
-        <div className="flex items-center gap-1">
+        {/* Open / history — a segmented control, not two chips. Which book
+            you are looking at changes what every row below means. */}
+        <div className="flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5">
           {(
             [
               ["open", "Open", open.length],
@@ -136,15 +271,23 @@ export function TradeBook({
             <button
               key={key}
               onClick={() => setTab(key)}
+              aria-pressed={tab === key}
               className={cn(
-                "flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors",
+                "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
                 tab === key
-                  ? "border-quantum/60 bg-quantum/15 text-quantum"
-                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
+                  ? "bg-quantum/15 text-quantum shadow-[inset_0_0_0_1px_rgba(0,240,255,0.35)]"
+                  : "text-zinc-500 hover:text-zinc-300",
               )}
             >
               {label}
-              <span className="opacity-70">{count}</span>
+              <span
+                className={cn(
+                  "rounded px-1 font-mono text-[9px]",
+                  tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
+                )}
+              >
+                {count}
+              </span>
             </button>
           ))}
         </div>
@@ -154,117 +297,17 @@ export function TradeBook({
             {tab === "open" ? "No open positions." : "No closed trades yet."}
           </div>
         ) : (
-          <div className="dk-scroll overflow-x-auto">
-            <table className="w-full border-collapse text-right">
-              <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur">
-                <tr className="text-[9px] uppercase tracking-wider text-zinc-600">
-                  <th className="px-1 py-1 text-left font-medium">Symbol</th>
-                  <th className="px-1 py-1 font-medium">Qty</th>
-                  <th className="px-1 py-1 font-medium">Avg</th>
-                  <th className="px-1 py-1 font-medium">
-                    {tab === "open" ? "LTP" : "Exit"}
-                  </th>
-                  <th className="px-1 py-1 font-medium">
-                    {tab === "open" ? "SL" : "Why"}
-                  </th>
-                  <th className="px-1 py-1 font-medium">PnL</th>
-                  {tab === "open" ? <th className="px-1 py-1" /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const pnl =
-                    tab === "open" ? p.unrealised_pnl : p.realised_pnl;
-                  return (
-                    <tr
-                      key={p.id}
-                      className="border-t border-zinc-800/60 hover:bg-zinc-800/30"
-                    >
-                      <Symbol position={p} />
-                      <td className="px-1 py-1 font-mono text-[10px] text-zinc-400">
-                        {p.quantity}
-                      </td>
-                      <td className="px-1 py-1 font-mono text-[10px] text-zinc-400">
-                        {fmt(p.avg_price)}
-                      </td>
-                      <td className="px-1 py-1 font-mono text-[10px] text-zinc-200">
-                        {tab === "open"
-                          ? fmt(p.ltp)
-                          : p.exit_price !== null
-                            ? fmt(p.exit_price)
-                            : "—"}
-                      </td>
-                      <td
-                        className={cn(
-                          "px-1 py-1 font-mono text-[10px]",
-                          tab === "open"
-                            ? "text-rose-400/80"
-                            : "text-zinc-500",
-                        )}
-                      >
-                        {tab === "open"
-                          ? p.stop_loss !== null
-                            ? fmt(p.stop_loss)
-                            : "—"
-                          : p.exit_reason
-                            ? (EXIT_REASON[p.exit_reason] ?? p.exit_reason)
-                            : "—"}
-                      </td>
-                      <td
-                        className={cn(
-                          "px-1 py-1 font-mono text-[10px] font-semibold",
-                          pnlTone(pnl),
-                        )}
-                      >
-                        <div>{signedMoney(pnl, 0)}</div>
-                        <div className="text-[9px] opacity-75">
-                          {p.pnl_pct > 0 ? "+" : ""}
-                          {fmt(p.pnl_pct, 1)}%
-                        </div>
-                      </td>
-                      {tab === "open" ? (
-                        <td className="px-1 py-1">
-                          <div className="flex items-center justify-end gap-0.5">
-                            <button
-                              title="Scale out 50% (TP1)"
-                              aria-label={`Scale out ${p.trading_symbol}`}
-                              disabled={busy !== null || p.lots < 2}
-                              onClick={() =>
-                                run(`s-${p.id}`, () =>
-                                  engine.scaleOutPosition(p.id),
-                                )
-                              }
-                              className="rounded p-1 text-amber-400/80 transition-colors hover:bg-amber-500/15 hover:text-amber-300 disabled:opacity-30"
-                            >
-                              {busy === `s-${p.id}` ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Scissors className="h-3 w-3" />
-                              )}
-                            </button>
-                            <button
-                              title="Close position"
-                              aria-label={`Close ${p.trading_symbol}`}
-                              disabled={busy !== null}
-                              onClick={() =>
-                                run(`x-${p.id}`, () => engine.exitPosition(p.id))
-                              }
-                              className="rounded p-1 text-rose-400/80 transition-colors hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30"
-                            >
-                              {busy === `x-${p.id}` ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <X className="h-3 w-3" />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      ) : null}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-1">
+            {rows.map((p) => (
+              <PositionCard
+                key={p.id}
+                position={p}
+                closed={tab !== "open"}
+                busy={busy}
+                onScaleOut={() => run(`s-${p.id}`, () => engine.scaleOutPosition(p.id))}
+                onExit={() => run(`x-${p.id}`, () => engine.exitPosition(p.id))}
+              />
+            ))}
           </div>
         )}
 

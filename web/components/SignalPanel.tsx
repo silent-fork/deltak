@@ -242,23 +242,34 @@ export function SignalPanel({
       {/* Execution stays pinned — never scrolls out of reach */}
       <div className="shrink-0 space-y-1.5 border-t border-zinc-800/70 p-2">
         {signal.actionable ? (
+          /*
+           * Deliberately quiet. A paper fill is a routine act and a full-width
+           * neon slab reads as an alarm — the eye should go to the geometry
+           * above it, not here. Live routing is the exception and keeps the red
+           * fill, because that one is not routine.
+           */
           <Button
-            variant={mode === "live" ? "danger" : "quantum"}
-            size="lg"
-            className="w-full"
+            variant={mode === "live" ? "danger" : "outline"}
+            size="sm"
+            className={cn(
+              "h-8 w-full",
+              mode === "live"
+                ? ""
+                : "border-quantum/40 text-quantum hover:border-quantum/70 hover:bg-quantum/10",
+            )}
             onClick={execute}
             disabled={busy || effectiveLots <= 0}
           >
             {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : mode === "live" ? (
-              <Zap className="h-4 w-4" />
+              <Zap className="h-3.5 w-3.5" />
             ) : (
-              <Crosshair className="h-4 w-4" />
+              <Crosshair className="h-3.5 w-3.5" />
             )}
             {busy
               ? "Routing"
-              : `Execute ${mode === "live" ? "LIVE" : "Paper"} · ${effectiveLots} lot${effectiveLots === 1 ? "" : "s"}`}
+              : `Execute ${mode === "live" ? "Live" : "Paper"} · ${effectiveLots} lot${effectiveLots === 1 ? "" : "s"}`}
           </Button>
         ) : (
           <div className="flex items-start gap-2 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-2 text-[10px] leading-snug text-zinc-500">

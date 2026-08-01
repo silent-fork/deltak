@@ -49,11 +49,10 @@ export function SignalDeck({
   }, [hasOpen]);
 
   return (
-    // Sized to what it holds, capped at the column. A blocked signal is four
-    // lines and a reason; stretching that to the full height of the chain beside
-    // it just prints a hole between the geometry and the execute button. The
-    // book fills far more, so the cap is what stops it running past the board.
-    <Card className="min-h-0 xl:max-h-full xl:flex-none">
+    // Fills the column to the bottom, level with the chain beside it. Both
+    // bodies scroll internally, so a long rationale or a busy book takes the
+    // height rather than pushing the card past the board.
+    <Card className="min-h-0 flex-1 xl:basis-0">
       <CardHeader className="shrink-0">
         <div className="flex min-w-0 items-center gap-1">
           {(

@@ -108,6 +108,8 @@ export function useEngine(simulate: boolean) {
   const scaledRef = useRef(new Set<string>());
   const daylightDoneRef = useRef(false);
   const resyncRef = useRef(0);
+  /** Seeded-quote count at the last rebuild — the "has anything changed" flag. */
+  const lastSeedRef = useRef(-1);
   const modeRef = useRef<ExecutionMode>("paper");
   const sessionRef = useRef<EngineSession>(NO_SESSION);
   const busyRef = useRef(false);
@@ -362,35 +364,55 @@ export function useEngine(simulate: boolean) {
       const cap = ledger.equity;
       const free = Math.max(0, cap - ledger.deployed);
 
-      for (const u of UNDERLYINGS) {
-        const builder = buildersRef.current[u];
-        const engine = signalEnginesRef.current[u];
-        if (!builder || !engine) continue;
-        const spot = ticksRef.current.ltp(master.spotToken(u));
-        // Rotation only advances on real prints. With the market shut the
-        // prices are frozen at the close, and pushing that same number into the
-        // RRG window once a second would erase a replayed session inside a
-        // minute — forty identical samples and every node is back at the origin.
-        const chain = builder.build(master, ticksRef.current, spot, feedLive());
-        chainsRef.current[u] = chain;
-        signalsRef.current[u] = engine.evaluate(chain, master, cap, free);
+      /**
+       * Out of hours the board is settled, not running.
+       *
+       * With no feed every input is a fixed number, so rebuilding the chain and
+       * re-deriving the levels once a second recomputes the identical answer
+       * forever — and worse, each rebuild pushes another point onto the wall
+       * trail and another sample into the rotation windows, so the very history
+       * the replay just installed is ground down by the loop that follows it.
+       * So the pipeline runs while replayed data is still arriving, then stops
+       * until the feed or the bell brings something new.
+       */
+      const live = feedLive();
+      const seededNow = ticksRef.current.seeded;
+      const settling = !live && seededNow !== lastSeedRef.current;
+      lastSeedRef.current = seededNow;
+      const idle = !live && !settling && Object.keys(chainsRef.current).length > 0;
+
+      if (!idle) {
+        for (const u of UNDERLYINGS) {
+          const builder = buildersRef.current[u];
+          const engine = signalEnginesRef.current[u];
+          if (!builder || !engine) continue;
+          const spot = ticksRef.current.ltp(master.spotToken(u));
+          // Rotation advances on real prints only — see above.
+          const chain = builder.build(master, ticksRef.current, spot, live);
+          chainsRef.current[u] = chain;
+          signalsRef.current[u] = engine.evaluate(chain, master, cap, free);
+        }
       }
 
-      await runGuards({
-        ledger,
-        chains: chainsRef.current,
-        rrg: rrgRef.current,
-        cfg: cfgRef.current,
-        ltp: (token) => ticksRef.current.ltp(token),
-        exit: bookExit,
-        scaleOut: bookScaleOut,
-        log,
-        scaled: scaledRef.current,
-        daylightRestDone: daylightDoneRef.current,
-        onDaylightRestDone: () => {
-          daylightDoneRef.current = true;
-        },
-      });
+      // Guards act on live prices. Against a frozen board they can only fire on
+      // yesterday's numbers, which is worse than not firing at all.
+      if (live) {
+        await runGuards({
+          ledger,
+          chains: chainsRef.current,
+          rrg: rrgRef.current,
+          cfg: cfgRef.current,
+          ltp: (token) => ticksRef.current.ltp(token),
+          exit: bookExit,
+          scaleOut: bookScaleOut,
+          log,
+          scaled: scaledRef.current,
+          daylightRestDone: daylightDoneRef.current,
+          onDaylightRestDone: () => {
+            daylightDoneRef.current = true;
+          },
+        });
+      }
 
       // Re-subscribe strikes that drifted into range as spot moved.
       resyncRef.current -= 1;

@@ -250,14 +250,14 @@ function WallMigration({
 
 function Wall({
   side,
-  prior,
+  vanguard,
   live,
   shift,
   distance,
   spot,
 }: {
   side: "aegis" | "zenith";
-  prior: number | null;
+  vanguard: number | null;
   live: number | null;
   shift: number;
   distance: number | null;
@@ -265,7 +265,7 @@ function Wall({
 }) {
   const support = side === "aegis";
   const name = support ? "Aegis" : "Zenith";
-  const merged = prior !== null && prior === live;
+  const merged = vanguard !== null && vanguard === live;
 
   return (
     <div
@@ -320,13 +320,13 @@ function Wall({
         >
           {live !== null ? fmt(live, 0) : "—"}
         </span>
-        {/* Only name the older wall when it actually disagrees. */}
-        {!merged && prior !== null ? (
+        {/* Only name the cumulative wall when it stands somewhere else. */}
+        {!merged && vanguard !== null ? (
           <span
-            title={`${name} prior — the cumulative wall carried into the session, now superseded.`}
+            title={`${name} Vanguard — the cumulative open-interest wall, held ahead of the live one. Where the bound settles if today's writing fades.`}
             className="font-mono text-[10px] leading-none text-zinc-500"
           >
-            prior {fmt(prior, 0)}
+            vgd {fmt(vanguard, 0)}
           </span>
         ) : null}
       </div>
@@ -391,8 +391,8 @@ export function CoaMatrixPanel({
         <span
           title={
             settled
-              ? "Both walls agree with the levels carried into the session."
-              : "At least one wall has been rebuilt by today's writers."
+              ? "Both walls stand on their cumulative Vanguard strike."
+              : "At least one wall has been built away from its Vanguard by today's writers."
           }
           className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-zinc-600"
         >
@@ -404,7 +404,7 @@ export function CoaMatrixPanel({
         <div className="shrink-0 grid grid-cols-2 gap-1">
           <Wall
             side="aegis"
-            prior={levels.aegis_0}
+            vanguard={levels.aegis_0}
             live={levels.aegis_1}
             shift={levels.aegis_shift}
             distance={toSupport}
@@ -412,7 +412,7 @@ export function CoaMatrixPanel({
           />
           <Wall
             side="zenith"
-            prior={levels.zenith_0}
+            vanguard={levels.zenith_0}
             live={levels.zenith_1}
             shift={levels.zenith_shift}
             distance={toResistance}
