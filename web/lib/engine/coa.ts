@@ -245,10 +245,19 @@ export class ChainBuilder {
     if (hist.length > 60) hist.shift();
   }
 
-  /** Net migration of a level over the history window, in strike steps. */
+  /**
+   * Net migration of a level, in strike steps, over a *recent* lookback rather
+   * than the whole trail. A first-vs-last comparison over the entire buffer
+   * would let a single noisy early print anchor "solid vs migrating" long
+   * after it stopped being representative — a wall that has been flat for the
+   * last `shiftLookback` samples should read as solid regardless of how it got
+   * there.
+   */
   private shift(hist: number[]): number {
     if (hist.length < 2 || this.step <= 0) return 0;
-    return Math.round((hist[hist.length - 1] - hist[0]) / this.step);
+    const lookback = Math.min(hist.length - 1, this.cfg.shiftLookback);
+    const from = hist[hist.length - 1 - lookback];
+    return Math.round((hist[hist.length - 1] - from) / this.step);
   }
 
   /**

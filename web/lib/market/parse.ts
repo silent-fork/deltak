@@ -160,6 +160,17 @@ export function futuresExpiry(symbol: string): string | null {
   return `20${m[4]}-${String(month).padStart(2, "0")}-${m[2]}`;
 }
 
+/**
+ * True when one `OIBuildup` class's rows include the underlying's near-month
+ * futures contract. The endpoint is called once per class (Long/Short Built
+ * Up, Short Covering, Long Unwinding); whichever call's rows contain the
+ * contract is the class it currently sits in.
+ */
+export function buildupIncludesUnderlying(rows: OiBuildupRow[], underlying: string): boolean {
+  const want = underlying.toUpperCase();
+  return rows.some((r) => FUT_PATTERN.exec(r.trading_symbol.toUpperCase())?.[1] === want);
+}
+
 export function pcrForUnderlying(
   rows: PcrRow[],
   underlying: string,

@@ -8,17 +8,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { calculateSize, roundToLot, resolveLotSize } from "../lib/engine/sizing";
+import {
+  calculateSize,
+  legRiskAtStop,
+  portfolioRiskAtStop,
+  roundToLot,
+  resolveLotSize,
+} from "../lib/engine/sizing";
 import { RrgEngine, classifyQuadrant, MIN_SAMPLES } from "../lib/engine/rrg";
 import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
-import { classifyProtocol, SignalEngine } from "../lib/engine/dkms";
+import { buildupContradicts, classifyProtocol, SignalEngine } from "../lib/engine/dkms";
 import { Ledger, applySlippage } from "../lib/engine/ledger";
 import {
   NSE_OPTIONS_RATES,
   estimateCharges,
   roundTripCharges,
 } from "../lib/engine/charges";
-import { breach } from "../lib/engine/risk";
+import { breach, checkWeakeningRotation, weakeningCorroborated } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
@@ -28,7 +34,7 @@ import {
   secondsToDaylightRest,
   secondsToNextOpen,
 } from "../lib/engine/config";
-import type { CoaLevels } from "../lib/types";
+import type { CoaLevels, OptionChain } from "../lib/types";
 
 /* ------------------------------------------------------------------ sizing */
 
@@ -69,6 +75,36 @@ test("invalid stop is rejected and lot helpers behave", () => {
   assert.equal(roundToLot(163, 75), 150);
   assert.equal(resolveLotSize("FINNIFTY"), 40);
   assert.equal(resolveLotSize("BANKNIFTY"), 15);
+});
+
+test("the single-position concentration cap can bind tighter than capital affordability", () => {
+  // Risk-derived: floor(500000*30% / (15*75)) = floor(150000/1125) = 133 lots,
+  // costing 133*60*75 = 598,500 — capital alone would only trim this to 111
+  // lots. The 10%-of-equity concentration ceiling is meant to bind first.
+  const r = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 15, capital: 500_000, riskPct: 30,
+    lotSize: 75, entryPrice: 60, maxPositionCapitalPct: 10,
+  });
+  assert.equal(r.capped_by, "CONCENTRATION");
+  assert.equal(r.lots, 11); // floor(50,000 / (60*75))
+  assert.ok(r.entry_cost <= 50_000);
+});
+
+test("no concentration cap given leaves capital affordability as the only clamp", () => {
+  const r = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 1, capital: 100_000, riskPct: 1,
+    lotSize: 75, entryPrice: 400,
+  });
+  assert.equal(r.capped_by, "CAPITAL");
+});
+
+test("portfolio risk sums each leg's own loss-at-stop", () => {
+  const long = { side: "BUY" as const, avg_price: 165, stop_loss: 123.75, quantity: 150 };
+  const short = { side: "SELL" as const, avg_price: 100, stop_loss: 120, quantity: 75 };
+  assert.equal(legRiskAtStop(long), 6187.5); // (165-123.75)*150
+  assert.equal(legRiskAtStop(short), 1500); // a short's risk runs the other way: (120-100)*75
+  assert.equal(legRiskAtStop({ ...long, stop_loss: null }), 0);
+  assert.equal(portfolioRiskAtStop([long, short]), 6187.5 + 1500);
 });
 
 /* --------------------------------------------------------------------- RRG */
@@ -222,6 +258,35 @@ test("COA 2.0 follows intraday OI change", () => {
   assert.equal(chain.levels.zenith_1, 24_700);
 });
 
+test("wall shift looks at a recent window, not the whole trail", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore(), 24_500, {
+    "24300PE": 900_000, "24800CE": 850_000,
+  });
+  const cfg = { ...DEFAULT_CONFIG, shiftLookback: 5 };
+  const builder = new ChainBuilder("NIFTY", new RrgEngine(), cfg);
+
+  // First build: COA 2.0 has no delta yet, so aegis_1 falls back to the COA
+  // 1.0 wall at 24_300 — a noisy early print sits at the front of the trail.
+  const first = builder.build(master, ticks, 24_500);
+  assert.equal(first.levels.aegis_1, 24_300);
+
+  // Writers then move fresh intraday OI onto 24_450 and hold it there for
+  // longer than the lookback — long enough to roll the 24_300 print out of a
+  // 5-sample recent window, even though it is still inside the full trail.
+  const put = master.find("NIFTY", 24_450, "PE")!;
+  let chain = first;
+  for (let i = 0; i < 8; i++) {
+    const t = emptyTick(put.token); t.ltp = 60; t.oi = 400_000 + i; ticks.apply(t);
+    chain = builder.build(master, ticks, 24_500);
+  }
+  assert.equal(chain.levels.aegis_1, 24_450);
+  // A first-vs-last comparison over the whole trail would still read the
+  // 3-strike jump from the stale 24_300 print; the recent window reads a wall
+  // that has held for longer than it as settled.
+  assert.equal(chain.levels.aegis_shift, 0);
+});
+
 test("selectItm honours depth and direction", () => {
   const master = makeMaster();
   const b = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG);
@@ -311,6 +376,44 @@ test("signal geometry is internally consistent", () => {
   assert.equal(Number((sig.entry_price! - sig.stop_loss!).toFixed(2)), sig.stop_loss_points);
 });
 
+test("buildup contradicts a thesis only when it opposes the direction", () => {
+  assert.equal(buildupContradicts("CE", "Short Built Up"), true);
+  assert.equal(buildupContradicts("CE", "Long Built Up"), false);
+  assert.equal(buildupContradicts("CE", "Short Covering"), false);
+  assert.equal(buildupContradicts("PE", "Long Built Up"), true);
+  assert.equal(buildupContradicts("PE", "Long Unwinding"), false);
+  assert.equal(buildupContradicts("CE", null), false);
+});
+
+test("a signal is held when window PCR diverges too far from the cumulative reading", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  assert.ok(chain.pcr > 0);
+  const sig = engine.evaluate(chain, master, 1_000_000, undefined, {
+    marketPcr: chain.pcr / 3, // far enough apart to trip the default 40% gate
+  });
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.blocked_reason, "PCR_DIVERGENCE");
+});
+
+test("agreeing PCR does not block an otherwise-qualifying signal", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000, undefined, { marketPcr: chain.pcr });
+  assert.equal(sig.actionable, true);
+});
+
+test("futures OI buildup contradicting the thesis holds the signal", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000, undefined, {
+    buildupClass: "Short Built Up", // contradicts the CE thesis Alpha selects here
+  });
+  assert.equal(sig.option_type, "CE");
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.blocked_reason, "BUILDUP_MISMATCH");
+});
+
 test("no capital means no actionable signal", () => {
   const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
   const chain = builder.build(master, ticks, 24_300);
@@ -374,6 +477,50 @@ test("0.35% invalidation band", () => {
   assert.equal(breach(24_800 + 100, 24_800, "above", pct), true);
   assert.equal(breach(24_800 + 50, 24_800, "above", pct), false);
   assert.equal(breach(24_500, null, "below", pct), false);
+});
+
+test("weakeningCorroborated requires a real adverse move, not just theta drift", () => {
+  assert.equal(weakeningCorroborated("CE", 24_000, 24_000, 0.05), false); // flat spot — theta only
+  assert.equal(weakeningCorroborated("CE", 24_000, 23_988, 0.05), false); // inside the band
+  assert.equal(weakeningCorroborated("CE", 24_000, 23_980, 0.05), true); // outside, against a call
+  assert.equal(weakeningCorroborated("PE", 24_000, 24_020, 0.05), true); // outside, against a put
+  assert.equal(weakeningCorroborated("PE", 24_000, 23_980, 0.05), false); // moved in the put's favour
+  assert.equal(weakeningCorroborated("CE", 0, 24_000, 0.05), true); // no baseline to gate on
+});
+
+test("weakening scale-out is suppressed on a flat tape and fires on a real pullback", async () => {
+  async function scenario(spotNow: number): Promise<boolean> {
+    const ledger = new Ledger(500_000, 0, 25);
+    ledger.open({
+      underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY23900CE",
+      quantity: 150, lots: 2, lotSize: 75, price: 100,
+      optionType: "CE", strike: 23_900, stopLoss: 75, target: 150,
+      entrySpot: 24_000, mode: "paper",
+    });
+    const ticks = new TickStore();
+    const t = emptyTick("1001"); t.ltp = 105; // still a winner
+    ticks.apply(t);
+    ledger.markToMarket(ticks);
+
+    let scaledOut = false;
+    await checkWeakeningRotation({
+      ledger,
+      chains: { NIFTY: { spot: spotNow } as unknown as OptionChain },
+      rrg: { NIFTY: { quadrant: () => "WEAKENING" } as unknown as RrgEngine },
+      cfg: DEFAULT_CONFIG,
+      ltp: () => 0,
+      exit: async () => {},
+      scaleOut: async () => { scaledOut = true; },
+      log: () => {},
+      scaled: new Set<string>(),
+      daylightRestDone: true,
+      onDaylightRestDone: () => {},
+    });
+    return scaledOut;
+  }
+
+  assert.equal(await scenario(24_000), false); // premium drifted, spot did not
+  assert.equal(await scenario(23_950), true); // spot actually pulled back
 });
 
 test("daylight rest countdown is bounded and monotonic", () => {

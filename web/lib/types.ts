@@ -125,6 +125,8 @@ export interface Position {
   lot_size: number;
   avg_price: number;
   ltp: number;
+  /** Index spot at entry — lets a risk guard tell a real move from theta noise. */
+  entry_spot: number | null;
   stop_loss: number | null;
   target: number | null;
   unrealised_pnl: number;

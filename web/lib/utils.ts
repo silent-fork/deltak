@@ -133,7 +133,10 @@ export const BLOCK_REASONS: Record<string, string> = {
   WEAKENING_NODE: "Node is in Weakening — scaling out, not adding.",
   LAGGING_NODE: "Lagging quadrant — long accumulation forbidden.",
   CAPITAL: "Capped by deployable capital.",
+  CONCENTRATION: "Capped by the single-position capital ceiling.",
   RISK_BUDGET: "Risk budget too small for one lot.",
   INVALID_STOP: "Stop distance is invalid.",
   ZERO_LOTS: "Sizing resolved to zero lots.",
+  BUILDUP_MISMATCH: "Futures OI buildup contradicts this thesis.",
+  PCR_DIVERGENCE: "Window PCR diverges too far from the cumulative reading.",
 };

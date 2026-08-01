@@ -1,4 +1,4 @@
-import type { SizingResult } from "@/lib/types";
+import type { Side, SizingResult } from "@/lib/types";
 import { INDEX_UNIVERSE } from "./config";
 
 /**
@@ -28,6 +28,14 @@ export function calculateSize(params: {
   lotSize?: number;
   entryPrice?: number;
   maxDeployable?: number;
+  /**
+   * Hard ceiling on this position's premium spend, percent of `capital`,
+   * independent of the risk-% math above. Without it, a generous risk% on a
+   * cheaply-stopped contract sizes up until the capital-affordability clamp
+   * binds — which can mean "spend nearly all deployable capital" while the
+   * panel still reads "risk N%". This bounds that directly.
+   */
+  maxPositionCapitalPct?: number;
 }): SizingResult {
   const {
     underlying,
@@ -36,6 +44,7 @@ export function calculateSize(params: {
     riskPct,
     entryPrice,
     maxDeployable,
+    maxPositionCapitalPct,
   } = params;
 
   const lot = resolveLotSize(underlying, params.lotSize);
@@ -53,13 +62,18 @@ export function calculateSize(params: {
 
   let entryCost = 0;
   if (entryPrice && entryPrice > 0 && lots > 0) {
-    const budget =
+    const deployableBudget =
       maxDeployable === undefined ? capital : Math.min(capital, maxDeployable);
+    const concentrationBudget =
+      maxPositionCapitalPct && maxPositionCapitalPct > 0
+        ? capital * (maxPositionCapitalPct / 100)
+        : Infinity;
+    const budget = Math.min(deployableBudget, concentrationBudget);
     const costPerLot = entryPrice * lot;
     const affordable = costPerLot > 0 ? Math.floor(budget / costPerLot) : 0;
     if (affordable < lots) {
       lots = affordable;
-      cappedBy = "CAPITAL";
+      cappedBy = concentrationBudget < deployableBudget ? "CONCENTRATION" : "CAPITAL";
     }
     entryCost = lots * costPerLot;
   }
@@ -79,4 +93,37 @@ export function calculateSize(params: {
     risk_pct: riskPct,
     capped_by: cappedBy,
   };
+}
+
+/* ----------------------------------------------------- portfolio risk cap */
+
+/**
+ * Enough of a leg to price its own worst case — a live `Position` and a
+ * not-yet-opened candidate both satisfy this.
+ */
+export interface RiskLeg {
+  side: Side;
+  avg_price: number;
+  stop_loss: number | null;
+  quantity: number;
+}
+
+/**
+ * Rupees lost if this leg's own stop is hit, 0 for a leg with no stop set.
+ *
+ * This is what a "position count" cap misses: three separately-sized,
+ * separately-stopped positions across correlated underlyings (NIFTY,
+ * BANKNIFTY, FINNIFTY) can all breach in the same macro move, and the book's
+ * real loss is the *sum* of their stops, not a single bounded trade.
+ */
+export function legRiskAtStop(leg: RiskLeg): number {
+  if (leg.stop_loss === null) return 0;
+  const perUnit =
+    leg.side === "BUY" ? leg.avg_price - leg.stop_loss : leg.stop_loss - leg.avg_price;
+  return Math.max(0, perUnit) * leg.quantity;
+}
+
+/** Total rupees at risk across every open leg, at each one's own stop. */
+export function portfolioRiskAtStop(legs: RiskLeg[]): number {
+  return legs.reduce((sum, leg) => sum + legRiskAtStop(leg), 0);
 }

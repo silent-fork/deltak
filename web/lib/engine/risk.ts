@@ -104,12 +104,44 @@ export async function checkInvalidation(d: GuardDeps): Promise<void> {
   }
 }
 
+/**
+ * True when the underlying has actually moved against `optionType` since
+ * entry, rather than the option's own premium simply having drifted.
+ *
+ * A deep-ITM long's premium is dominated by intrinsic value, so on a flat
+ * tape the only thing still moving it is theta — a slow, steady decay the RRG
+ * engine cannot distinguish from genuine momentum fading, because it only
+ * ever sees the premium series. Requiring a real adverse move in the index
+ * itself keeps a quiet, sideways session from reading as a rotation.
+ */
+export function weakeningCorroborated(
+  optionType: "CE" | "PE" | null,
+  entrySpot: number,
+  spot: number,
+  minAdverseMovePct: number,
+): boolean {
+  if (entrySpot <= 0 || spot <= 0) return true; // no baseline to check against
+  const band = entrySpot * (minAdverseMovePct / 100);
+  return optionType === "PE" ? spot > entrySpot + band : spot < entrySpot - band;
+}
+
 /** Automated TP1 scale-out when a held node rotates into Weakening. */
 export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
   for (const pos of d.ledger.openPositions) {
     if (d.scaled.has(pos.id) || pos.lots < 2) continue;
     if (d.rrg[pos.underlying]?.quadrant(pos.token) !== "WEAKENING") continue;
     if (pos.unrealised_pnl <= 0) continue; // only scale out of a winner
+
+    if (pos.entry_spot !== null) {
+      const spot = d.chains[pos.underlying]?.spot ?? 0;
+      const corroborated = weakeningCorroborated(
+        pos.option_type,
+        pos.entry_spot,
+        spot,
+        d.cfg.weakeningMinAdverseMovePct,
+      );
+      if (!corroborated) continue; // premium drifted, spot did not — theta, not rotation
+    }
 
     d.log("TARGET", `${pos.trading_symbol} rotated into Weakening — TP1 scale-out.`, pos.underlying);
     await d.scaleOut(pos, 0.5);

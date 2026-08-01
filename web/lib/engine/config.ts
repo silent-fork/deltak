@@ -77,6 +77,13 @@ export interface EngineConfig {
   oiSeedSpan: number;
   /** Strike-level shift (in strike steps) that counts as a level "moving". */
   levelShiftTolerance: number;
+  /**
+   * Samples looked back over when measuring a wall's shift — recent, not the
+   * whole trail. A first-vs-last comparison over the entire buffer lets a
+   * noisy early-session print anchor "solid vs migrating" long after it has
+   * aged out of relevance; this bounds the comparison to a recent window.
+   */
+  shiftLookback: number;
 
   riskPct: number;
   /** Stop distance as a fraction of option premium. */
@@ -84,6 +91,34 @@ export interface EngineConfig {
   maxConcurrentPositions: number;
   /** Index break invalidation threshold, percent. */
   invalidationPct: number;
+  /**
+   * Minimum adverse move in the underlying (percent of entry spot) required
+   * before a Weakening-quadrant rotation triggers the TP1 scale-out. A deep-ITM
+   * long's premium can drift into Weakening from theta bleed alone on a flat
+   * tape; this keeps that guard reacting to genuine rotation, not the clock.
+   */
+  weakeningMinAdverseMovePct: number;
+  /**
+   * Hard ceiling on one position's premium spend, percent of equity —
+   * independent of the risk-% sizing math. Without it, a generous risk% on a
+   * cheaply-stopped contract can size up to "spend nearly all deployable
+   * capital" while still reading as a bounded-risk trade.
+   */
+  maxPositionCapitalPct: number;
+  /**
+   * Aggregate at-risk-at-stop ceiling across every open position, percent of
+   * equity. Bounds correlated exposure (e.g. simultaneous NIFTY/BANKNIFTY/
+   * FINNIFTY longs) without needing to model the correlation itself: it caps
+   * the total loss-at-stop the book can carry at once.
+   */
+  maxPortfolioRiskPct: number;
+  /**
+   * Divergence between the rendered chain's own PCR and the market-wide
+   * cumulative PCR, percent, beyond which a signal is held rather than fired —
+   * a wide gap means the window's PCR reflects a couple of nearby strikes, not
+   * broad positioning.
+   */
+  pcrDivergencePct: number;
 
   paperCapital: number;
   slippagePct: number;
@@ -100,6 +135,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   rrgNodeSpan: 6,
   oiSeedSpan: 5,
   levelShiftTolerance: 1,
+  shiftLookback: 20,
 
   /**
    * Sized for the 25,000 paper float: at 1% the risk budget (250) is smaller
@@ -111,6 +147,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
   defaultStopPct: 0.25,
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
+  weakeningMinAdverseMovePct: 0.05,
+  maxPositionCapitalPct: 25,
+  maxPortfolioRiskPct: 60,
+  pcrDivergencePct: 40,
 
   paperCapital: 25_000,
   slippagePct: 0.0015,

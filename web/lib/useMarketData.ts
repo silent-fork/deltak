@@ -5,9 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isMarketOpen } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
-import { fetchBatch, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
+import { fetchBatch, fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
-import { pcrForUnderlying } from "@/lib/market/parse";
+import { OI_BUILDUP_TYPES, type OiBuildupType } from "@/lib/market/constants";
+import { buildupIncludesUnderlying, pcrForUnderlying } from "@/lib/market/parse";
 import type { Candle, OiPoint, SessionStats } from "@/lib/types";
 
 /**
@@ -25,9 +26,11 @@ import type { Candle, OiPoint, SessionStats } from "@/lib/types";
  *    intraday delta rather than "whatever has moved since you connected".
  *  - `putCallRatio` gives the cumulative, whole-market PCR to set against the
  *    chain window's own.
- *
- * (`OIBuildup` is served by `/api/market/buildup` but nothing renders it, so
- * nothing here polls for it — an unread feed is just metered requests spent.)
+ *  - `OIBuildup` classifies each underlying's near-month futures as Long/Short
+ *    Built Up, Short Covering or Long Unwinding — the same "price and OI
+ *    together vs apart" question COA asks of one wall, asked of the futures
+ *    market. The signal engine holds a thesis that contradicts it (e.g. a
+ *    bullish call thesis against Short Built Up) rather than firing anyway.
  *
  * Everything here is a progressive enhancement: each panel renders from the
  * live feed alone, and gets sharper as these land. Nothing blocks the 1 Hz
@@ -49,6 +52,8 @@ const POLL_OPEN = {
   candles: 60_000,
   walls: 180_000,
   pcr: 300_000,
+  /** Four requests (one per class) each cycle — slow on purpose. */
+  buildup: 300_000,
   /** The unfocused indices only need to be roughly right. */
   backgroundSpots: 120_000,
 };
@@ -75,6 +80,8 @@ export interface MarketData {
   /** Cumulative market-wide PCR, by underlying. */
   pcr: Record<string, number>;
   pcrAt: string | null;
+  /** Each underlying's near-month futures OIBuildup class, once fetched. */
+  buildup: Partial<Record<string, OiBuildupType>>;
   loading: boolean;
   error: string | null;
 }
@@ -122,9 +129,13 @@ const EMPTY: MarketData = {
   spotStats: {},
   pcr: {},
   pcrAt: null,
+  buildup: {},
   loading: false,
   error: null,
 };
+
+/** The three indices this terminal covers — hardcoded like the PCR poll below. */
+const UNDERLYING_NAMES = ["NIFTY", "BANKNIFTY", "FINNIFTY"] as const;
 
 /**
  * Poll `run` on a schedule that widens when the market is shut.
@@ -631,6 +642,34 @@ export function useMarketData(input: MarketDataInput): MarketData {
           if (row) byUnderlying[underlying] = row.pcr;
         }
         setState((s) => ({ ...s, pcr: byUnderlying, pcrAt: res.fetched_at }));
+        ok();
+      } catch (err) {
+        fail(err);
+      }
+    }, [fail, ok]),
+  );
+
+  /* --------------------------------------------------------------- buildup */
+
+  usePoll(
+    enabled,
+    "buildup",
+    POLL_OPEN.buildup,
+    useCallback(async () => {
+      try {
+        const results = await Promise.all(
+          OI_BUILDUP_TYPES.map((datatype) => fetchBuildup(datatype, "NEAR")),
+        );
+        const next: Partial<Record<string, OiBuildupType>> = {};
+        for (const underlying of UNDERLYING_NAMES) {
+          for (let i = 0; i < OI_BUILDUP_TYPES.length; i++) {
+            if (buildupIncludesUnderlying(results[i].rows, underlying)) {
+              next[underlying] = OI_BUILDUP_TYPES[i];
+              break;
+            }
+          }
+        }
+        setState((s) => ({ ...s, buildup: next }));
         ok();
       } catch (err) {
         fail(err);

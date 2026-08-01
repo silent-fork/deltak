@@ -31,6 +31,7 @@ const openPosition: Position = {
   lot_size: 75,
   avg_price: 118.5,
   ltp: 131.2,
+  entry_spot: 24_500,
   stop_loss: 88.9,
   target: 172.4,
   unrealised_pnl: 1905,

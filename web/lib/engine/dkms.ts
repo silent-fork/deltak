@@ -7,6 +7,7 @@ import type {
   Quadrant,
   Signal,
 } from "@/lib/types";
+import type { OiBuildupType } from "@/lib/market/constants";
 import type { EngineConfig } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
@@ -42,6 +43,32 @@ export function classifyProtocol(levels: CoaLevels, tolerance: number): Protocol
   if (supportSolid && resistanceUp) return "BETA";
   if (resistanceSolid && supportDown) return "GAMMA";
   return "DELTA";
+}
+
+/**
+ * A CE thesis is bullish, a PE thesis bearish. `OIBuildup` classifies the
+ * underlying's own futures the same way COA classifies a single wall — price
+ * and OI moving together is conviction, apart is an unwind — and a thesis
+ * that contradicts fresh futures positioning is exactly the case a wall's
+ * "solid" shift can't see on its own (short-covering can build a put wall
+ * that reads identically to genuine floor-defense).
+ *
+ * `null` (not yet fetched, or the market is quiet) is permissive by design —
+ * this is a confirming signal layered on top of COA/RRG, not a dependency.
+ */
+export function buildupContradicts(
+  optionType: OptionType,
+  buildupClass: OiBuildupType | null,
+): boolean {
+  if (!buildupClass) return false;
+  return optionType === "CE" ? buildupClass === "Short Built Up" : buildupClass === "Long Built Up";
+}
+
+export interface EvaluateContext {
+  /** Cumulative, whole-market PCR for this underlying — set beside the chain's own window PCR. */
+  marketPcr?: number | null;
+  /** This underlying's near-expiry futures OIBuildup class, if fetched. */
+  buildupClass?: OiBuildupType | null;
 }
 
 const emptyLevels = (): CoaLevels => ({
@@ -104,7 +131,9 @@ export class SignalEngine {
     master: ScripMaster,
     capital: number,
     maxDeployable?: number,
+    context: EvaluateContext = {},
   ): Signal {
+    const { marketPcr = null, buildupClass = null } = context;
     const levels = chain.levels;
     const spot = chain.spot;
     const prevSpot = this.lastSpot;
@@ -213,6 +242,7 @@ export class SignalEngine {
       lotSize: inst!.lotSize || undefined,
       entryPrice: entry,
       maxDeployable,
+      maxPositionCapitalPct: this.cfg.maxPositionCapitalPct,
     });
 
     rationale.push(trigger);
@@ -222,6 +252,25 @@ export class SignalEngine {
     if (quadrant) {
       rationale.push(
         `RRG node ${quadrant} — RS-Ratio ${leg.rs_ratio?.toFixed(2)} / RS-Momentum ${leg.rs_momentum?.toFixed(2)}`,
+      );
+    }
+
+    // -- confirming layers: futures OI buildup and PCR agreement ---------- //
+    const buildupMismatch = buildupContradicts(optionType, buildupClass);
+    if (buildupMismatch) {
+      rationale.push(
+        `Futures OI buildup reads ${buildupClass} — contradicts a ${optionType === "CE" ? "bullish" : "bearish"} thesis.`,
+      );
+    }
+
+    const pcrDivergencePct =
+      marketPcr !== null && marketPcr > 0 && chain.pcr > 0
+        ? (Math.abs(chain.pcr - marketPcr) / marketPcr) * 100
+        : null;
+    const pcrDivergent = pcrDivergencePct !== null && pcrDivergencePct > this.cfg.pcrDivergencePct;
+    if (pcrDivergent) {
+      rationale.push(
+        `PCR window ${chain.pcr.toFixed(2)} diverges ${pcrDivergencePct!.toFixed(0)}% from cumulative ${marketPcr!.toFixed(2)} — weight sits outside the rendered ladder.`,
       );
     }
 
@@ -238,6 +287,12 @@ export class SignalEngine {
     } else if (quadrant === "LAGGING") {
       actionable = false;
       blockedReason = "LAGGING_NODE";
+    } else if (buildupMismatch) {
+      actionable = false;
+      blockedReason = "BUILDUP_MISMATCH";
+    } else if (pcrDivergent) {
+      actionable = false;
+      blockedReason = "PCR_DIVERGENCE";
     }
 
     const title = protocol.charAt(0) + protocol.slice(1).toLowerCase();

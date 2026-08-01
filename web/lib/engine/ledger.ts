@@ -80,6 +80,8 @@ export class Ledger {
     stopLoss?: number | null;
     target?: number | null;
     protocol?: Protocol | null;
+    /** Index spot at entry — lets a risk guard tell a real move from theta noise. */
+    entrySpot?: number | null;
     mode: ExecutionMode;
   }): Position {
     const pos: Position = {
@@ -95,6 +97,7 @@ export class Ledger {
       lot_size: params.lotSize,
       avg_price: r2(params.price),
       ltp: r2(params.price),
+      entry_spot: params.entrySpot ?? null,
       stop_loss: params.stopLoss ?? null,
       target: params.target ?? null,
       unrealised_pnl: 0,

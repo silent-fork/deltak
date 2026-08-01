@@ -33,10 +33,11 @@ import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
 import { ScripMaster, type MasterPayload } from "@/lib/engine/scripMaster";
 import { planTick } from "@/lib/engine/loop";
 import { runGuards } from "@/lib/engine/risk";
+import { legRiskAtStop, portfolioRiskAtStop } from "@/lib/engine/sizing";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
 import { SimulatedFeed } from "@/lib/stream/simFeed";
-import { useMarketData } from "@/lib/useMarketData";
+import { useMarketData, type MarketData } from "@/lib/useMarketData";
 import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
 
@@ -139,6 +140,14 @@ export function useEngine(simulate: boolean) {
   );
   const chainsRef = useRef<Record<string, OptionChain>>({});
   const signalsRef = useRef<Record<string, Signal>>({});
+  /**
+   * `market` (from `useMarketData`, declared later in this hook) as a ref, so
+   * the 1 Hz `tick()` closure below — memoized once, deliberately independent
+   * of every reactive value — can still read the latest cumulative PCR and OI
+   * buildup class at call time without being torn down and rebuilt on every
+   * poll.
+   */
+  const marketRef = useRef<MarketData | null>(null);
   const eventsRef = useRef<RiskEvent[]>([]);
   const scaledRef = useRef(new Set<string>());
   const daylightDoneRef = useRef(false);
@@ -481,7 +490,10 @@ export function useEngine(simulate: boolean) {
           // else — a replayed session must survive the loop that follows it.
           const chain = builder.build(master, ticksRef.current, spot, plan.advance);
           chainsRef.current[u] = chain;
-          signalsRef.current[u] = engine.evaluate(chain, master, cap, free);
+          signalsRef.current[u] = engine.evaluate(chain, master, cap, free, {
+            marketPcr: marketRef.current?.pcr[u] ?? null,
+            buildupClass: marketRef.current?.buildup[u] ?? null,
+          });
         }
       }
 
@@ -687,6 +699,7 @@ export function useEngine(simulate: boolean) {
     onOiBaseline,
     onContractSession,
   });
+  marketRef.current = market;
 
   /**
    * The index itself, out of hours.
@@ -943,6 +956,34 @@ export function useEngine(simulate: boolean) {
 
       const lotSize = signal.sizing.lot_size;
       const quantity = useLots * lotSize;
+
+      /**
+       * Portfolio-level at-risk ceiling.
+       *
+       * `maxConcurrentPositions` bounds how many trades can be open; it says
+       * nothing about whether they are the same bet. Three separately-sized,
+       * separately-stopped longs across NIFTY/BANKNIFTY/FINNIFTY can all
+       * breach in the same macro move, and the book's real loss is the sum of
+       * their stops — one correlated bet wearing three position slots. This
+       * bounds the total loss-at-stop the book can carry at once, directly,
+       * without needing to model the correlation itself.
+       */
+      const openRisk = portfolioRiskAtStop(ledger.openPositions);
+      const candidateRisk = legRiskAtStop({
+        side: "BUY",
+        avg_price: reference,
+        stop_loss: signal.stop_loss,
+        quantity,
+      });
+      const riskCeiling = ledger.equity * (cfgRef.current.maxPortfolioRiskPct / 100);
+      if (openRisk + candidateRisk > riskCeiling) {
+        throw new Error(
+          `Order rejected: portfolio at-risk ₹${Math.round(openRisk + candidateRisk).toLocaleString("en-IN")} ` +
+            `would exceed the ${cfgRef.current.maxPortfolioRiskPct}% ceiling ` +
+            `(₹${Math.round(riskCeiling).toLocaleString("en-IN")}) across ${openCount} open position(s).`,
+        );
+      }
+
       const currentMode = modeRef.current;
 
       let fill = reference;
@@ -974,6 +1015,7 @@ export function useEngine(simulate: boolean) {
         stopLoss: signal.stop_loss,
         target: signal.target_1,
         protocol: signal.protocol,
+        entrySpot: chainsRef.current[underlying]?.spot ?? null,
         mode: currentMode,
       });
 
