@@ -1,66 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { OiBuildupPanel } from "@/components/OiBuildupPanel";
 import { SignalPanel } from "@/components/SignalPanel";
+import { TradeBook } from "@/components/TradeBook";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
-import type {
-  OiBuildupExpiry,
-  OiBuildupType,
-} from "@/lib/market/constants";
-import type { ExecutionMode, OiBuildupRow, Signal } from "@/lib/types";
-import { PROTOCOL_META, cn } from "@/lib/utils";
+import type { ExecutionMode, LedgerSnapshot, Signal } from "@/lib/types";
+import { PROTOCOL_META, cn, pnlTone, signedMoney } from "@/lib/utils";
 
 /**
- * One frame for the two reads that decide an entry.
+ * One frame for the position: what to take, and what is already on.
  *
- * The signal engine says what this index's chain justifies; the buildup board
- * says what the rest of the F&O market is doing about it. They answer the same
- * question at different scales, they are never both acted on at once, and the
- * column has room for one panel — so they share a frame and a tab strip rather
- * than competing for the same pixels.
+ * The signal engine and the trade book are the two halves of a single decision
+ * and are never read at the same instant — you size an entry, or you manage
+ * what the entry became. Sharing a frame gives each of them the whole column
+ * instead of half of it, and puts the ledger one click from the execute button
+ * that produced it.
  */
 
-type Deck = "signal" | "buildup";
+type Deck = "signal" | "book";
 
 export function SignalDeck({
   signal,
   mode,
   onExecuted,
-  buildup,
-  buildupType,
-  buildupExpiry,
-  buildupAt,
-  marketAvailable,
-  focus,
-  onBuildupType,
-  onBuildupExpiry,
+  ledger,
+  onLedgerChanged,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
   onExecuted: () => void;
-  buildup: OiBuildupRow[];
-  buildupType: OiBuildupType;
-  buildupExpiry: OiBuildupExpiry;
-  buildupAt: string | null;
-  marketAvailable: boolean;
-  focus: string;
-  onBuildupType: (t: OiBuildupType) => void;
-  onBuildupExpiry: (e: OiBuildupExpiry) => void;
+  ledger: LedgerSnapshot | undefined;
+  onLedgerChanged: () => void;
 }) {
   const [deck, setDeck] = useState<Deck>("signal");
   const meta = signal ? PROTOCOL_META[signal.protocol] : null;
 
+  const openCount = ledger?.open_positions.length ?? 0;
+  const totalPnl = ledger?.total_pnl ?? 0;
+
+  // A fill turns the deck to the book: the moment a position exists, managing
+  // it is the live question, and the panic control must not be behind a tab
+  // nobody thought to open.
+  const hasOpen = openCount > 0;
+  useEffect(() => {
+    if (hasOpen) setDeck("book");
+  }, [hasOpen]);
+
   return (
-    <Card className="min-h-0 xl:basis-0 xl:grow-[5]">
+    // Sized to what it holds, capped at the column. A blocked signal is four
+    // lines and a reason; stretching that to the full height of the chain beside
+    // it just prints a hole between the geometry and the execute button. The
+    // book fills far more, so the cap is what stops it running past the board.
+    <Card className="min-h-0 xl:max-h-full xl:flex-none">
       <CardHeader className="shrink-0">
         <div className="flex min-w-0 items-center gap-1">
           {(
             [
               ["signal", "Delta-K Signal Engine"],
-              ["buildup", "OI Buildup"],
+              ["book", "Trade Book"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -68,39 +67,43 @@ export function SignalDeck({
               onClick={() => setDeck(key)}
               aria-pressed={deck === key}
               className={cn(
-                "truncate rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                "flex items-center gap-1.5 truncate rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
                 deck === key
                   ? "border-quantum/50 bg-quantum/10 text-quantum"
                   : "border-transparent text-zinc-500 hover:text-zinc-300",
               )}
             >
               {label}
+              {/* An open position is loud on the tab that manages it, whichever
+                  half of the deck you are looking at. */}
+              {key === "book" && openCount > 0 ? (
+                <span className="rounded bg-rose-500/20 px-1 font-mono text-[9px] text-rose-300">
+                  {openCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
 
-        {/* The protocol is the engine's headline state, so it stays visible
-            even while the buildup board is the one being read. */}
-        {meta ? (
-          <Badge className={cn("shrink-0 font-semibold", meta.tone)}>
-            Protocol {meta.name}
-          </Badge>
-        ) : null}
+        {deck === "signal" ? (
+          meta ? (
+            <Badge className={cn("shrink-0 font-semibold", meta.tone)}>
+              Protocol {meta.name}
+            </Badge>
+          ) : null
+        ) : (
+          <span
+            className={cn("shrink-0 font-mono text-xs font-bold", pnlTone(totalPnl))}
+          >
+            {signedMoney(totalPnl)}
+          </span>
+        )}
       </CardHeader>
 
       {deck === "signal" ? (
         <SignalPanel signal={signal} mode={mode} onExecuted={onExecuted} />
       ) : (
-        <OiBuildupPanel
-          rows={buildup}
-          type={buildupType}
-          expiry={buildupExpiry}
-          updatedAt={buildupAt}
-          available={marketAvailable}
-          focus={focus}
-          onType={onBuildupType}
-          onExpiry={onBuildupExpiry}
-        />
+        <TradeBook ledger={ledger} onChanged={onLedgerChanged} />
       )}
     </Card>
   );

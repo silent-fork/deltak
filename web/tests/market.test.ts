@@ -27,6 +27,10 @@ import {
   stampMs,
 } from "../lib/market/constants";
 import { MARKET_OPEN_STAMP, shiftDate } from "../lib/market/clock";
+import {
+  reconstructWallTrail,
+  spotAtFactory,
+} from "../lib/market/migration";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 
 /* ------------------------------------------------------------------ candles */
@@ -237,4 +241,88 @@ test("a historical baseline corrects ΔOI for a session joined mid-day", () => {
   // Junk never displaces a real baseline.
   assert.ok(!ticks.seedSessionOpenOi("46823", 0));
   assert.equal(ticks.oiChange("46823"), 45_000);
+});
+
+test("a seeded quote fills the board without passing for a live feed", () => {
+  const ticks = new TickStore();
+  ticks.seedQuote("46823", { ltp: 128.4, close: 131.2, volume: 91_000, oi: 166_100 });
+
+  const tick = ticks.get("46823");
+  assert.equal(tick?.ltp, 128.4);
+  assert.equal(tick?.oi, 166_100);
+  assert.equal(ticks.seeded, 1);
+  // The Live-mode guard reads `updates`; Friday's closes must never satisfy it.
+  assert.equal(ticks.updates, 0);
+
+  // A real print supersedes the seed and does count.
+  ticks.apply({ ...emptyTick("46823"), ltp: 130, oi: 167_000 });
+  assert.equal(ticks.ltp("46823"), 130);
+  assert.equal(ticks.updates, 1);
+
+  // Zero and missing fields never overwrite what is already known.
+  ticks.seedQuote("46823", { ltp: 0 });
+  assert.equal(ticks.ltp("46823"), 130);
+});
+
+/* ------------------------------------------------------- wall migration */
+
+test("wall migration rebuilds COA 2.0 bucket by bucket from historical OI", () => {
+  // Three strikes, two buckets. Spot sits at 100 all session, so 90/100 are
+  // candidates for Aegis and 100/110 for Zenith.
+  const rows = [
+    { strike: 90, putToken: "p90", callToken: "c90" },
+    { strike: 100, putToken: "p100", callToken: "c100" },
+    { strike: 110, putToken: "p110", callToken: "c110" },
+  ];
+  const t1 = "2024-08-19T09:15:00+05:30";
+  const t2 = "2024-08-19T09:30:00+05:30";
+  const at = (a: number, b: number) => [
+    { time: t1, oi: a },
+    { time: t2, oi: b },
+  ];
+
+  const trail = reconstructWallTrail(
+    rows,
+    {
+      // Put writing starts at 90 and moves up to 100 — support rising.
+      p90: at(1_000, 1_900),
+      p100: at(1_000, 2_500),
+      p110: at(1_000, 1_000),
+      // Call writing starts at 100 and moves out to 110 — resistance lifting.
+      c90: at(1_000, 1_000),
+      c100: at(1_000, 1_400),
+      c110: at(1_000, 1_100),
+    },
+    () => 100,
+  );
+
+  // The opening bucket has no build yet on either side, so it is not a reading.
+  assert.deepEqual(trail.times, [t2]);
+  assert.deepEqual(trail.aegis, [100]);
+  assert.deepEqual(trail.zenith, [100]);
+});
+
+test("a bucket with no spot, or only one wall, is not plotted", () => {
+  const rows = [{ strike: 100, putToken: "p", callToken: "c" }];
+  const t = "2024-08-19T09:30:00+05:30";
+  const series = { p: [{ time: t, oi: 10 }, { time: t, oi: 20 }] };
+
+  // No call series at all — a one-sided bucket is dropped rather than half-drawn.
+  assert.deepEqual(reconstructWallTrail(rows, series, () => 100).times, []);
+  // No spot for the bucket — nothing can be classified above or below it.
+  assert.deepEqual(reconstructWallTrail(rows, series, () => 0).times, []);
+  assert.deepEqual(reconstructWallTrail(rows, {}, () => 100).times, []);
+});
+
+test("spot lookup takes the last bar at or before the bucket", () => {
+  const spotAt = spotAtFactory(
+    parseCandles([
+      bar("2024-08-19T09:20:00+05:30", 24_100),
+      bar("2024-08-19T09:16:00+05:30", 24_000),
+    ]),
+  );
+  assert.equal(spotAt("2024-08-19T09:18:00+05:30"), 24_000);
+  assert.equal(spotAt("2024-08-19T09:30:00+05:30"), 24_100);
+  // Before the first bar there is nothing to take.
+  assert.equal(spotAt("2024-08-19T09:15:00+05:30"), 0);
 });

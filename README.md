@@ -84,15 +84,30 @@ parks genuinely trending nodes back at the origin.
 
 The live feed only knows what has happened since the socket opened, which is
 enough to price a trade and wrong for nearly everything else the HUD claims to
-show. Four Angel One reads fill that in, on their own slow timers, entirely
-outside the trading loop:
+show. Angel One's historical and market-data reads fill that in, on their own
+slow timers, entirely outside the trading loop:
 
 | API | What it fixes |
 | --- | --- |
 | `getCandleData` | The session's real shape — one-minute bars from 9:15, so the spot trace, day high/low and the previous close exist on the first paint instead of accumulating from page load |
-| `getOIData` | **The COA 2.0 baseline.** ΔOI is measured against the exchange's own session-open open interest, not against whatever the first frame this tab received happened to carry |
+| `getOIData` | **The COA 2.0 baseline.** ΔOI is measured against the exchange's own session-open open interest, not against whatever the first frame this tab received happened to carry. The same series rebuilds the wall-migration trail, bucket by bucket, at no extra request |
 | `putCallRatio` | Cumulative PCR across *every* strike, set beside the chain window's own — a window far from the cumulative reading says the weight sits outside the rendered ladder |
-| `OIBuildup` | Long Built Up / Short Built Up / Short Covering / Long Unwinding across the F&O board — the same price-versus-OI question the COA panel asks of one wall, asked of the whole market |
+| `OIBuildup` | Long Built Up / Short Built Up / Short Covering / Long Unwinding across the F&O board. Served by the route below, but nothing renders it today, so nothing polls it |
+
+### Out of hours
+
+With the market shut the socket sends nothing, and a terminal whose every price
+is zero cannot build a chain, let alone rotate one. So when `isMarketOpen()` is
+false the board is reconstructed from the last session instead: the index closes
+from `getCandleData`, each contract's closing premium and volume from the same
+endpoint, its closing open interest from `getOIData`, and — the part that cannot
+be faked from a snapshot — each contract's *series* replayed bar by bar into its
+RRG window, which is exactly what the feed would have fed it live.
+
+Two guards keep that from being mistaken for a live terminal. Seeded quotes do
+not advance the tick counter, so the Live-mode switch still refuses to route
+without a real feed; and the rotation windows only advance on genuine prints, so
+the 1 Hz loop cannot bury a replayed session under a minute of repeated closes.
 
 The OI baseline is the one that matters most. Without it a terminal opened at
 noon reads every strike as "no change", Aegis-1 and Zenith-1 silently collapse

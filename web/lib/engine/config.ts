@@ -175,3 +175,28 @@ export function secondsToDaylightRest(at: Date = new Date()): number {
   const target = DAYLIGHT_REST_MIN * 60;
   return nowSec >= target ? 0 : target - nowSec;
 }
+
+/**
+ * Seconds until the next 9:15 AM IST bell.
+ *
+ * Weekends are skipped by probing forward a day at a time and asking the IST
+ * clock what day it landed on — IST has no daylight saving, so adding whole
+ * days holds the wall clock steady. Exchange holidays are *not* known here
+ * (that would need a calendar the terminal does not carry), so a Muhurat-style
+ * closure will read as an open that never comes.
+ */
+export function secondsToNextOpen(at: Date = new Date()): number {
+  const p = istParts(at);
+  const nowSec = p.hour * 3600 + p.minute * 60 + p.second;
+  const openSec = MARKET_OPEN_MIN * 60;
+
+  for (let offset = 0; offset <= 7; offset++) {
+    const probe = offset === 0 ? at : new Date(at.getTime() + offset * 86_400_000);
+    const weekday = istParts(probe).weekday;
+    if (weekday === "Sat" || weekday === "Sun") continue;
+    // Today only counts while its bell is still ahead.
+    if (offset === 0 && nowSec >= openSec) continue;
+    return offset * 86_400 + openSec - nowSec;
+  }
+  return 0;
+}

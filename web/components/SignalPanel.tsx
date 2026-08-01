@@ -111,7 +111,7 @@ export function SignalPanel({
 
   return (
     // Body only: the deck that hosts this panel owns the card, the title and
-    // the tab strip, so the engine and the buildup board share one frame.
+    // the tab strip, so the engine and the trade book share one frame.
     <>
       <CardContent className="dk-scroll min-h-0 space-y-2 overflow-y-auto p-2">
         {/* Regime */}

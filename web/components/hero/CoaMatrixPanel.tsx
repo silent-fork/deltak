@@ -140,10 +140,13 @@ function WallMigration({
   aegis,
   zenith,
   spot,
+  historical = false,
 }: {
   aegis: number[];
   zenith: number[];
   spot: number;
+  /** True when the trail came from the session's OI history, not this tab. */
+  historical?: boolean;
 }) {
   const series = [...aegis, ...zenith, spot].filter((v) => v > 0);
   const enough = aegis.length > 1 || zenith.length > 1;
@@ -178,8 +181,17 @@ function WallMigration({
         >
           Wall Migration
         </span>
-        <span className="font-mono text-[9px] text-zinc-600">
-          {enough ? `${Math.max(aegis.length, zenith.length)} reads` : "warming"}
+        <span
+          title={
+            historical
+              ? "Rebuilt from the session's open-interest history — the same COA 2.0 rule applied at every 15-minute bucket."
+              : "Accumulated while this tab has been open."
+          }
+          className="font-mono text-[9px] text-zinc-600"
+        >
+          {enough
+            ? `${Math.max(aegis.length, zenith.length)} ${historical ? "buckets" : "reads"}`
+            : "warming"}
         </span>
       </div>
 
@@ -338,6 +350,8 @@ export function CoaMatrixPanel({
   aegisOi = [],
   zenithOi = [],
   marketPcr = null,
+  aegisTrail,
+  zenithTrail,
 }: {
   chain: OptionChain | undefined;
   /** Session OI history for the contract defending each wall. */
@@ -345,6 +359,13 @@ export function CoaMatrixPanel({
   zenithOi?: OiPoint[];
   /** Cumulative all-strike PCR for this underlying, from the market-data API. */
   marketPcr?: number | null;
+  /**
+   * Each wall's path through the session, reconstructed from historical OI.
+   * Given, it replaces the engine's own trail — which only ever covers the time
+   * this tab has been open, and is empty out of hours.
+   */
+  aegisTrail?: number[];
+  zenithTrail?: number[];
 }) {
   if (!chain) {
     return (
@@ -551,9 +572,10 @@ export function CoaMatrixPanel({
 
         {/* Where the walls have actually stood this session */}
         <WallMigration
-          aegis={levels.aegis_trail}
-          zenith={levels.zenith_trail}
+          aegis={aegisTrail ?? levels.aegis_trail}
+          zenith={zenithTrail ?? levels.zenith_trail}
           spot={chain.spot}
+          historical={!!aegisTrail}
         />
 
         {/* Corridor geometry */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { EngineProvider } from "@/components/EngineProvider";
 import { LoginScreen } from "@/components/LoginScreen";
@@ -10,7 +10,10 @@ import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
 import { OptionChainMatrix } from "@/components/OptionChainMatrix";
 import { RrgScatter } from "@/components/RrgScatter";
 import { SignalDeck } from "@/components/SignalDeck";
-import { TradeBook } from "@/components/TradeBook";
+import {
+  reconstructWallTrail,
+  spotAtFactory,
+} from "@/lib/market/migration";
 import type { Underlying } from "@/lib/types";
 import { useEngine } from "@/lib/useEngine";
 
@@ -25,6 +28,35 @@ export default function TerminalPage() {
 
   const { snapshot, streamStatus, simulated, demo, error, market } = engine;
 
+  const chain = snapshot?.chains[selected];
+  const signal = snapshot?.signals[selected];
+  const nodes = snapshot?.rrg[selected] ?? [];
+  const quote = snapshot?.spots[selected];
+
+  /**
+   * The walls' actual path through the session, rebuilt from the open-interest
+   * series already in hand. The engine's own trail only covers the time this
+   * tab has been open, so this replaces it whenever history reaches further.
+   *
+   * Every hook stays above the sign-in gate below — a hook that runs only once
+   * the terminal is unlocked changes the hook count mid-life and tears React's
+   * state apart at exactly the moment the operator signs in.
+   */
+  const rows = chain?.rows;
+  const historicalTrail = useMemo(() => {
+    if (!rows?.length || !market.candles.length) return null;
+    const trail = reconstructWallTrail(
+      rows.map((r) => ({
+        strike: r.strike,
+        callToken: r.call?.token,
+        putToken: r.put?.token,
+      })),
+      market.oiSeries,
+      spotAtFactory(market.candles),
+    );
+    return trail.times.length > 1 ? trail : null;
+  }, [rows, market.oiSeries, market.candles]);
+
   // An empty terminal is worse than no terminal: without a feed there is nothing
   // to render and no circuit breaker can act, so gate on a live session.
   if (!engine.session.authenticated && !demo) {
@@ -34,11 +66,6 @@ export default function TerminalPage() {
       </EngineProvider>
     );
   }
-
-  const chain = snapshot?.chains[selected];
-  const signal = snapshot?.signals[selected];
-  const nodes = snapshot?.rrg[selected] ?? [];
-  const quote = snapshot?.spots[selected];
 
   // The wall contracts, so the COA panel can draw each wall's OI history.
   const rowAt = (strike: number | null | undefined) =>
@@ -92,6 +119,8 @@ export default function TerminalPage() {
               aegisOi={aegisToken ? market.oiSeries[aegisToken] : undefined}
               zenithOi={zenithToken ? market.oiSeries[zenithToken] : undefined}
               marketPcr={market.pcr[selected] ?? null}
+              aegisTrail={historicalTrail?.aegis}
+              zenithTrail={historicalTrail?.zenith}
             />
             <QuantumHorizon
               chain={chain}
@@ -108,25 +137,14 @@ export default function TerminalPage() {
               <OptionChainMatrix chain={chain} signalToken={signal?.token} />
             </div>
 
-            {/* Two panels, not four: the signal engine and the buildup board
-                share a tabbed deck, and the book sits open beneath them. */}
-            <aside className="flex min-h-0 flex-col gap-1.5 xl:overflow-hidden">
+            {/* One panel: the signal engine and the trade book, tabbed. */}
+            <aside className="flex min-h-0 flex-col xl:overflow-hidden">
               <SignalDeck
                 signal={signal}
                 mode={snapshot?.mode ?? "paper"}
                 onExecuted={() => forceRefresh((n) => n + 1)}
-                buildup={market.buildup}
-                buildupType={market.buildupType}
-                buildupExpiry={market.buildupExpiry}
-                buildupAt={market.buildupAt}
-                marketAvailable={market.available}
-                focus={selected}
-                onBuildupType={market.setBuildupType}
-                onBuildupExpiry={market.setBuildupExpiry}
-              />
-              <TradeBook
                 ledger={snapshot?.ledger}
-                onChanged={() => forceRefresh((n) => n + 1)}
+                onLedgerChanged={() => forceRefresh((n) => n + 1)}
               />
             </aside>
           </section>
@@ -153,6 +171,14 @@ export default function TerminalPage() {
             >
               OI base {engine.oiBaselines}
             </span>
+            {market.replayed > 0 ? (
+              <span
+                title="Contracts whose last session was replayed from historical candles because the market is closed — prices and rotation are Friday's, not live."
+                className="text-zinc-500"
+              >
+                Replay {market.replayed}
+              </span>
+            ) : null}
             <span>Risk {engine.riskPct}%</span>
             {/* The clock lives in the header, in IST — one authoritative time. */}
             <span>{snapshot?.mode === "live" ? "Live routing" : "Paper ledger"}</span>

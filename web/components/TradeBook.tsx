@@ -1,11 +1,10 @@
 "use client";
 
-import { AlertOctagon, ChevronRight, Loader2, Scissors, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertOctagon, Loader2, Scissors, X } from "lucide-react";
+import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
 import type { LedgerSnapshot, Position } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
@@ -72,24 +71,13 @@ export function TradeBook({
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmPanic, setConfirmPanic] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(true);
   const engine = useEngineContext();
-
-  // The book stands open — it is the ledger you trade against. Collapsing it is
-  // a deliberate act that hands its space to the deck above; a fill re-opens it
-  // regardless, because a book that just took a position is one you want to see.
-  const hasOpen = (ledger?.open_positions.length ?? 0) > 0;
-  useEffect(() => {
-    if (hasOpen) setExpanded(true);
-  }, [hasOpen]);
 
   if (!ledger) {
     return (
-      <Card className="min-h-0 shrink-0">
-        <CardContent className="py-6 text-center text-xs text-zinc-600">
-          Ledger loading…
-        </CardContent>
-      </Card>
+      <CardContent className="flex items-center justify-center text-xs text-zinc-600">
+        Ledger loading…
+      </CardContent>
     );
   }
 
@@ -113,56 +101,10 @@ export function TradeBook({
   const rows = tab === "open" ? open : closed;
 
   return (
-    <Card
-      className={cn(
-        "min-h-0",
-        expanded ? "xl:min-h-[200px] xl:basis-0 xl:grow-[4]" : "shrink-0",
-      )}
-    >
-      <CardHeader className="shrink-0">
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          title={expanded ? "Collapse the trade book" : "Open the trade book"}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
-          <ChevronRight
-            className={cn(
-              "h-3 w-3 shrink-0 text-zinc-500 transition-transform",
-              expanded && "rotate-90",
-            )}
-          />
-          <CardTitle className="truncate">Trade Book</CardTitle>
-          <Badge
-            className={cn(
-              "shrink-0 font-semibold",
-              ledger.mode === "live"
-                ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
-                : "border-zinc-700 text-zinc-400",
-            )}
-          >
-            {ledger.mode}
-          </Badge>
-          {/* Collapsed, the header carries the whole book: what is at risk now
-              and what has been booked. */}
-          {!expanded ? (
-            <span className="truncate font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-              {ledger.open_positions.length} open · {ledger.closed_positions.length}{" "}
-              closed · {money(ledger.equity, 0)}
-            </span>
-          ) : null}
-        </button>
-        <span
-          className={cn(
-            "shrink-0 font-mono text-xs font-bold",
-            pnlTone(ledger.total_pnl),
-          )}
-        >
-          {signedMoney(ledger.total_pnl)}
-        </span>
-      </CardHeader>
-
-      {expanded ? (
+    // Body only: the deck owns the card, the title and the tab strip. The book
+    // and the signal engine are two views of one position — what to take, and
+    // what is already on — so they share a frame.
+    <>
       <CardContent className="dk-scroll min-h-0 space-y-2 overflow-y-auto p-2">
         <div className="grid grid-cols-4 gap-1">
           <Metric label="Equity" value={money(ledger.equity, 0)} />
@@ -332,11 +274,7 @@ export function TradeBook({
           </div>
         ) : null}
       </CardContent>
-      ) : null}
 
-      {/* Flatten stays on screen whenever it has something to flatten —
-          collapsing the book must never put the panic control behind a click. */}
-      {expanded || open.length ? (
       <div className="shrink-0 border-t border-zinc-800/70 p-2">
         {confirmPanic ? (
           <div className="flex items-center gap-2 rounded border border-rose-500/50 bg-rose-500/10 p-2">
@@ -376,7 +314,6 @@ export function TradeBook({
           </Button>
         )}
       </div>
-      ) : null}
-    </Card>
+    </>
   );
 }

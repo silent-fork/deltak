@@ -7,6 +7,7 @@ import {
   Plug,
   PlugZap,
   Radio,
+  Sunrise,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -123,7 +124,9 @@ export function Header({
 
   const engine = useEngineContext();
   const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
+  const toOpen = useCountdown(snapshot?.seconds_to_open);
   const clock = useIstClock();
+  const marketOpen = snapshot?.market_open ?? false;
   const mode: ExecutionMode = snapshot?.mode ?? "paper";
   const authed = snapshot?.authenticated ?? false;
 
@@ -202,11 +205,11 @@ export function Header({
           <Badge
             className={cn(
               "h-7 border-zinc-800",
-              snapshot?.market_open ? "text-emerald-300" : "text-zinc-500",
+              marketOpen ? "text-emerald-300" : "text-zinc-500",
             )}
           >
             <Activity className="h-3 w-3" />
-            {snapshot?.market_open ? "Open" : "Closed"}
+            {marketOpen ? "Open" : "Closed"}
           </Badge>
 
           <Badge className={cn("h-7 border-zinc-800", streamTone)}>
@@ -227,21 +230,40 @@ export function Header({
             </span>
           </span>
 
-          {/* Daylight Rest countdown */}
-          <Badge
-            title="Time to the 3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
-            className={cn(
-              "h-7 border-zinc-800 font-semibold",
-              seconds === 0
-                ? "text-zinc-500"
-                : seconds < 600
-                  ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
-                  : "text-quantum",
-            )}
-          >
-            <AlarmClock className="h-3 w-3" />
-            {seconds === 0 ? "Rest" : countdown(seconds)}
-          </Badge>
+          {/*
+            One slot, two clocks. In session it counts down to the 3:15 PM
+            flatten; out of hours that number means nothing — a Saturday
+            afternoon has no Daylight Rest — so it counts to the next bell
+            instead. Exchange holidays are not known to the terminal, so the
+            open it names is the next weekday's, holiday or not.
+          */}
+          {marketOpen ? (
+            <Badge
+              title="Time to the 3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
+              className={cn(
+                "h-7 border-zinc-800 font-semibold",
+                seconds === 0
+                  ? "text-zinc-500"
+                  : seconds < 600
+                    ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
+                    : "text-quantum",
+              )}
+            >
+              <AlarmClock className="h-3 w-3" />
+              {seconds === 0 ? "Rest" : countdown(seconds)}
+            </Badge>
+          ) : (
+            <Badge
+              title="Time to the next 9:15 AM IST open, skipping the weekend. Exchange holidays are not accounted for."
+              className="h-7 border-zinc-800 font-semibold text-zinc-400"
+            >
+              <Sunrise className="h-3 w-3" />
+              <span className="text-[9px] font-normal uppercase tracking-wider text-zinc-600">
+                Opens
+              </span>
+              {toOpen > 0 ? countdown(toOpen) : "—"}
+            </Badge>
+          )}
 
           <button
             onClick={toggleMode}

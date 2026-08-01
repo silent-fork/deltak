@@ -64,6 +64,34 @@ export class TickStore {
     return tick;
   }
 
+  /**
+   * Fill a contract in from historical data, without pretending it is a print.
+   *
+   * Out of hours the socket sends nothing, so every price on the board is zero
+   * and the chain cannot even be built. Seeding the last session's closes fixes
+   * that — but `updates` deliberately does not move: it is the counter the Live
+   * mode guard reads to refuse routing without a live feed, and a terminal full
+   * of Friday's closes must never satisfy it.
+   */
+  seedQuote(
+    token: string,
+    values: { ltp?: number; close?: number; volume?: number; oi?: number },
+  ): void {
+    const base = this.ticks.get(token) ?? emptyTick(token);
+    const next: Tick = {
+      ...base,
+      ltp: values.ltp && values.ltp > 0 ? values.ltp : base.ltp,
+      close: values.close && values.close > 0 ? values.close : base.close,
+      volume: values.volume && values.volume > 0 ? values.volume : base.volume,
+      oi: values.oi && values.oi > 0 ? values.oi : base.oi,
+    };
+    this.ticks.set(token, next);
+    this.seeded += 1;
+  }
+
+  /** Contracts filled in from history rather than from the feed. */
+  seeded = 0;
+
   get(token: string): Tick | undefined {
     return this.ticks.get(token);
   }

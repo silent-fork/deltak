@@ -21,6 +21,7 @@ import {
   UNDERLYINGS,
   isMarketOpen,
   secondsToDaylightRest,
+  secondsToNextOpen,
   type EngineConfig,
 } from "@/lib/engine/config";
 import { ChainBuilder } from "@/lib/engine/coa";
@@ -338,6 +339,7 @@ export function useEngine(simulate: boolean) {
       feed_connected: feedLive(),
       market_open: isMarketOpen(),
       seconds_to_daylight_rest: secondsToDaylightRest(),
+      seconds_to_open: secondsToNextOpen(),
       spots,
       chains: { ...chainsRef.current },
       rrg: rrgNodes,
@@ -365,7 +367,11 @@ export function useEngine(simulate: boolean) {
         const engine = signalEnginesRef.current[u];
         if (!builder || !engine) continue;
         const spot = ticksRef.current.ltp(master.spotToken(u));
-        const chain = builder.build(master, ticksRef.current, spot, true);
+        // Rotation only advances on real prints. With the market shut the
+        // prices are frozen at the close, and pushing that same number into the
+        // RRG window once a second would erase a replayed session inside a
+        // minute — forty identical samples and every node is back at the origin.
+        const chain = builder.build(master, ticksRef.current, spot, feedLive());
         chainsRef.current[u] = chain;
         signalsRef.current[u] = engine.evaluate(chain, master, cap, free);
       }
@@ -405,7 +411,7 @@ export function useEngine(simulate: boolean) {
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, buildSnapshot, log, spotMap]);
+  }, [bookExit, bookScaleOut, buildSnapshot, feedLive, log, spotMap]);
 
   /* --------------------------------------------------------- lifecycle */
 
@@ -494,9 +500,42 @@ export function useEngine(simulate: boolean) {
     );
   }, [focusChain]);
 
-  const onOiBaseline = useCallback((token: string, oi: number) => {
-    ticksRef.current.seedSessionOpenOi(token, oi);
+  const onOiBaseline = useCallback((token: string, openOi: number, lastOi: number) => {
+    ticksRef.current.seedSessionOpenOi(token, openOi);
+    // With the market shut the feed will never send an OI frame, so the closing
+    // reading stands in. In session the feed is authoritative and this would be
+    // a stale number fighting a live one.
+    if (!isMarketOpen() && lastOi > 0) {
+      ticksRef.current.seedQuote(token, { oi: lastOi });
+    }
   }, []);
+
+  /**
+   * Replay a contract's last session into its rotation window.
+   *
+   * The RRG is a series, not a snapshot: with no feed it has nothing to rotate,
+   * and every node sits at the origin however long you leave the terminal open.
+   * Feeding it the session's bars gives it exactly what the feed would have —
+   * premium against spot, in order — and the closing premium doubles as the
+   * ladder's last price so the chain reads as Friday's close rather than dashes.
+   */
+  const onContractSession = useCallback(
+    (
+      token: string,
+      replay: { pairs: [number, number][]; lastClose: number; volume: number },
+    ) => {
+      const underlying = masterRef.current.instrument(token)?.name;
+      const rrg = underlying ? rrgRef.current[underlying] : undefined;
+      if (rrg) {
+        for (const [premium, spot] of replay.pairs) rrg.update(token, premium, spot);
+      }
+      ticksRef.current.seedQuote(token, {
+        ltp: replay.lastClose,
+        volume: replay.volume,
+      });
+    },
+    [],
+  );
 
   const market = useMarketData({
     enabled: session.authenticated,
@@ -505,7 +544,26 @@ export function useEngine(simulate: boolean) {
     seedTokens,
     wallTokens,
     onOiBaseline,
+    onContractSession,
   });
+
+  /**
+   * The index itself, out of hours.
+   *
+   * Nothing else can be built without it: a spot of zero means no ATM strike,
+   * no chain, and therefore no rotation nodes to draw whatever the replay
+   * loaded. The candle session carries both the close and the one before it, so
+   * the change on the day survives the market being shut.
+   */
+  const sessionClose = market.stats?.close ?? 0;
+  const sessionPrevClose = market.stats?.prev_close ?? 0;
+  useEffect(() => {
+    if (isMarketOpen() || !spotToken || sessionClose <= 0) return;
+    ticksRef.current.seedQuote(spotToken, {
+      ltp: sessionClose,
+      close: sessionPrevClose,
+    });
+  }, [spotToken, sessionClose, sessionPrevClose]);
 
   // One line in the log when the baselines land, not one per contract.
   const seedingRef = useRef(false);

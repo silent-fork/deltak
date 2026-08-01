@@ -17,7 +17,11 @@ import { breach } from "../lib/engine/risk";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
-import { DEFAULT_CONFIG, secondsToDaylightRest } from "../lib/engine/config";
+import {
+  DEFAULT_CONFIG,
+  secondsToDaylightRest,
+  secondsToNextOpen,
+} from "../lib/engine/config";
 import type { CoaLevels } from "../lib/types";
 
 /* ------------------------------------------------------------------ sizing */
@@ -422,4 +426,13 @@ test("tick store tracks intraday OI change and carries fields forward", () => {
   assert.equal(s.prevLtp("35005"), 100);
   assert.equal(s.get("35005")!.volume, 999);
   assert.equal(s.get("35005")!.close, 95);
+});
+
+test("the next-open clock skips the weekend", () => {
+  // Saturday noon IST — the next bell is Monday's, two days and 2h45m out.
+  assert.equal(secondsToNextOpen(new Date("2026-08-01T06:30:00Z")), 162_900);
+  // Monday 08:00 IST, before the bell.
+  assert.equal(secondsToNextOpen(new Date("2026-08-03T02:30:00Z")), 4_500);
+  // Monday 16:00 IST, after the close — tomorrow's bell.
+  assert.equal(secondsToNextOpen(new Date("2026-08-03T10:30:00Z")), 62_100);
 });

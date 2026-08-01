@@ -3,17 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isMarketOpen } from "@/lib/engine/config";
+import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
-import { fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
+import { fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
 import { pcrForUnderlying } from "@/lib/market/parse";
-import type { OiBuildupExpiry, OiBuildupType } from "@/lib/market/constants";
-import type {
-  Candle,
-  OiBuildupRow,
-  OiPoint,
-  SessionStats,
-} from "@/lib/types";
+import type { Candle, OiPoint, SessionStats } from "@/lib/types";
 
 /**
  * Historical and market-data context for the terminal.
@@ -22,7 +17,7 @@ import type {
  * enough to price a trade and wrong for almost everything else the HUD claims
  * to show: a session joined at noon has no morning, and — worse — no
  * session-open open interest, which is the baseline the entire COA 2.0 layer
- * is computed against. These four endpoints fill that in:
+ * is computed against. These reads fill that in:
  *
  *  - `getCandleData` gives the session its actual shape (open, high, low, and
  *    the previous close every change% is quoted against).
@@ -30,7 +25,9 @@ import type {
  *    intraday delta rather than "whatever has moved since you connected".
  *  - `putCallRatio` gives the cumulative, whole-market PCR to set against the
  *    chain window's own.
- *  - `OIBuildup` gives the market-wide accumulation/unwind picture.
+ *
+ * (`OIBuildup` is served by `/api/market/buildup` but nothing renders it, so
+ * nothing here polls for it — an unread feed is just metered requests spent.)
  *
  * Everything here is a progressive enhancement: each panel renders from the
  * live feed alone, and gets sharper as these land. Nothing blocks the 1 Hz
@@ -39,12 +36,15 @@ import type {
 
 /** Trading-day lookback for the candle window — enough to clear a long weekend. */
 const CANDLE_LOOKBACK_DAYS = 5;
+/** A finished session's open interest never changes again. */
+const OI_SESSION_TTL_MS = 12 * 60 * 60_000;
+/** Bar interval for the closed-market replay — a session is 75 of these. */
+const REPLAY_INTERVAL = "FIVE_MINUTE" as const;
 
 const POLL_OPEN = {
   candles: 60_000,
   walls: 180_000,
   pcr: 300_000,
-  buildup: 300_000,
 };
 /** Out of hours nothing is moving; keep the loops alive, ten times slower. */
 const CLOSED_MULTIPLIER = 10;
@@ -60,13 +60,11 @@ export interface MarketData {
   /** Contracts whose session-open OI baseline has been established. */
   seeded: number;
   seeding: boolean;
+  /** Contracts replayed from history because the market is shut. */
+  replayed: number;
   /** Cumulative market-wide PCR, by underlying. */
   pcr: Record<string, number>;
   pcrAt: string | null;
-  buildup: OiBuildupRow[];
-  buildupAt: string | null;
-  buildupType: OiBuildupType;
-  buildupExpiry: OiBuildupExpiry;
   loading: boolean;
   error: string | null;
 }
@@ -81,8 +79,20 @@ export interface MarketDataInput {
   seedTokens: string[];
   /** The two wall contracts, whose OI curve is drawn. */
   wallTokens: string[];
-  /** Called once per contract with its session-open open interest. */
-  onOiBaseline: (token: string, oi: number) => void;
+  /**
+   * Called once per contract with its session-open open interest, and the last
+   * reading of the window alongside it.
+   */
+  onOiBaseline: (token: string, openOi: number, lastOi: number) => void;
+  /**
+   * Called out of hours with a contract's session replayed against the index:
+   * `[premium, spot]` bar by bar, plus what it closed at. This is what lets the
+   * rotation graph and the ladder show the last session instead of blanks.
+   */
+  onContractSession: (
+    token: string,
+    replay: { pairs: [number, number][]; lastClose: number; volume: number },
+  ) => void;
 }
 
 const EMPTY: MarketData = {
@@ -92,12 +102,9 @@ const EMPTY: MarketData = {
   oiSeries: {},
   seeded: 0,
   seeding: false,
+  replayed: 0,
   pcr: {},
   pcrAt: null,
-  buildup: [],
-  buildupAt: null,
-  buildupType: "Long Built Up",
-  buildupExpiry: "NEAR",
   loading: false,
   error: null,
 };
@@ -146,21 +153,41 @@ function usePoll(
   }, [enabled, key, baseMs]);
 }
 
-export function useMarketData(input: MarketDataInput): MarketData & {
-  setBuildupType: (t: OiBuildupType) => void;
-  setBuildupExpiry: (e: OiBuildupExpiry) => void;
-} {
-  const { enabled, focus, spotToken, seedTokens, wallTokens, onOiBaseline } = input;
+export function useMarketData(input: MarketDataInput): MarketData {
+  const {
+    enabled,
+    focus,
+    spotToken,
+    seedTokens,
+    wallTokens,
+    onOiBaseline,
+    onContractSession,
+  } = input;
 
   const [state, setState] = useState<MarketData>(EMPTY);
-  const [buildupType, setBuildupType] = useState<OiBuildupType>("Long Built Up");
-  const [buildupExpiry, setBuildupExpiry] = useState<OiBuildupExpiry>("NEAR");
 
   // `date:token` for every contract already baselined, so a drifting ATM band
   // only ever costs a request for the strikes that are genuinely new.
   const seenRef = useRef(new Set<string>());
+  const replayedRef = useRef(new Set<string>());
   const baselineRef = useRef(onOiBaseline);
   baselineRef.current = onOiBaseline;
+  const replayRef = useRef(onContractSession);
+  replayRef.current = onContractSession;
+  // The spot session doubles as the RRG benchmark, read at call time so the
+  // replay does not restart every time a candle poll lands.
+  const spotCandlesRef = useRef(state.candles);
+  spotCandlesRef.current = state.candles;
+
+  /**
+   * The session everything else is keyed to.
+   *
+   * On a Saturday "today" has no bars, so every historical window would come
+   * back empty. The candle response already reports which date it actually
+   * returned, so that date — Friday's — is what the OI and replay passes ask
+   * for too, and the whole board lands on one consistent session.
+   */
+  const sessionDate = state.stats?.date ?? istDate();
 
   const fail = useCallback((err: unknown) => {
     const message =
@@ -183,7 +210,14 @@ export function useMarketData(input: MarketDataInput): MarketData & {
   // Switching instrument drops the old session immediately: a trace spliced
   // from two different price scales is worse than no trace at all.
   useEffect(() => {
-    setState((s) => ({ ...s, candles: [], stats: null, oiSeries: {} }));
+    setState((s) => ({
+      ...s,
+      candles: [],
+      stats: null,
+      oiSeries: {},
+      replayed: 0,
+    }));
+    replayedRef.current.clear();
   }, [focus]);
 
   usePoll(
@@ -221,7 +255,7 @@ export function useMarketData(input: MarketDataInput): MarketData & {
   useEffect(() => {
     if (!enabled || !seedKey) return;
     let cancelled = false;
-    const date = istDate();
+    const date = sessionDate;
 
     void (async () => {
       const pending = seedKey
@@ -233,25 +267,31 @@ export function useMarketData(input: MarketDataInput): MarketData & {
       for (const token of pending) {
         if (cancelled) return;
         try {
-          // Only the first bar of the day is needed, so the window is fixed at
-          // the open: the request is identical all session and answers from
-          // cache on every later pass.
+          // The window is fixed to the whole session rather than tracking the
+          // clock, so the request is identical all day and answers from cache
+          // on every later pass. Both ends are wanted: the first reading is the
+          // ΔOI baseline, the last is what the ladder shows once the feed stops.
           const res = await fetchOi(
             {
               exchange: "NFO",
               symboltoken: token,
               interval: "FIFTEEN_MINUTE",
               fromdate: `${date} ${MARKET_OPEN_STAMP}`,
-              todate: `${date} 09:30`,
+              todate: `${date} 15:30`,
             },
-            // Cached for the whole session — the session's open never changes.
-            12 * 60 * 60_000,
+            OI_SESSION_TTL_MS,
           );
           if (cancelled) return;
           if (res.open_oi && res.open_oi > 0) {
             seenRef.current.add(`${date}:${token}`);
-            baselineRef.current(token, res.open_oi);
-            setState((s) => ({ ...s, seeded: seenRef.current.size }));
+            baselineRef.current(token, res.open_oi, res.last_oi ?? 0);
+            // The series is kept, not just its ends: the wall migration is
+            // reconstructed from these same readings, at no extra request.
+            setState((s) => ({
+              ...s,
+              seeded: seenRef.current.size,
+              oiSeries: { ...s.oiSeries, [token]: res.series },
+            }));
           }
         } catch (err) {
           if (cancelled) return;
@@ -267,7 +307,7 @@ export function useMarketData(input: MarketDataInput): MarketData & {
     return () => {
       cancelled = true;
     };
-  }, [enabled, seedKey, fail]);
+  }, [enabled, seedKey, sessionDate, fail]);
 
   /* ---------------------------------------------------------- wall curves */
 
@@ -278,7 +318,7 @@ export function useMarketData(input: MarketDataInput): MarketData & {
     `walls:${wallKey}`,
     POLL_OPEN.walls,
     useCallback(async () => {
-      const date = istDate();
+      const date = sessionDate;
       const window = sessionWindow(0);
       for (const token of wallKey.split(",").filter(Boolean)) {
         try {
@@ -287,7 +327,9 @@ export function useMarketData(input: MarketDataInput): MarketData & {
             symboltoken: token,
             interval: "FIFTEEN_MINUTE",
             fromdate: `${date} ${MARKET_OPEN_STAMP}`,
-            todate: window.todate,
+            // A closed session is finished, so its curve is asked for whole and
+            // then cached; a live one is asked for up to the minute.
+            todate: date === istDate() ? window.todate : `${date} 15:30`,
           });
           if (!res.series.length) continue;
           setState((s) => ({
@@ -300,7 +342,7 @@ export function useMarketData(input: MarketDataInput): MarketData & {
             const key = `${date}:${token}`;
             if (!seenRef.current.has(key)) {
               seenRef.current.add(key);
-              baselineRef.current(token, res.open_oi);
+              baselineRef.current(token, res.open_oi, res.last_oi ?? 0);
               setState((s) => ({ ...s, seeded: seenRef.current.size }));
             }
           }
@@ -310,8 +352,91 @@ export function useMarketData(input: MarketDataInput): MarketData & {
           break;
         }
       }
-    }, [wallKey, fail, ok]),
+    }, [wallKey, sessionDate, fail, ok]),
   );
+
+  /* ------------------------------------------ closed-market session replay */
+
+  /**
+   * Out of hours the socket sends nothing, so the rotation graph has no series
+   * to rotate and the ladder has no prices to show. The same candle endpoint
+   * that draws the spot trace serves option contracts too, so each contract's
+   * session is fetched and replayed against the index bar by bar — which is
+   * exactly what the live feed would have fed the RRG windows, only after the
+   * fact.
+   *
+   * In session this does nothing: the feed is the better source, and replaying
+   * stale bars on top of live ones would drag every node backwards.
+   */
+  useEffect(() => {
+    if (!enabled || !seedKey || isMarketOpen()) return;
+    const spot = spotCandlesRef.current;
+    if (spot.length < MIN_SAMPLES) return;
+
+    let cancelled = false;
+    const date = sessionDate;
+    // Spot closes by bar time, so an option bar can be paired with the index at
+    // the same instant rather than by position — the two series skip different
+    // minutes when a strike goes untraded.
+    const benchmark = new Map(spot.map((c) => [c.time.slice(0, 16), c.close]));
+
+    void (async () => {
+      const pending = seedKey
+        .split(",")
+        .filter((t) => t && !replayedRef.current.has(`${date}:${t}`));
+      if (!pending.length) return;
+
+      for (const token of pending) {
+        if (cancelled) return;
+        try {
+          const res = await fetchCandles(
+            {
+              exchange: "NFO",
+              symboltoken: token,
+              interval: REPLAY_INTERVAL,
+              ...sessionWindow(CANDLE_LOOKBACK_DAYS),
+            },
+            OI_SESSION_TTL_MS,
+          );
+          if (cancelled) return;
+
+          const bars = res.session;
+          if (!bars.length) {
+            // An untraded strike has no session; do not ask again today.
+            replayedRef.current.add(`${date}:${token}`);
+            continue;
+          }
+
+          const pairs: [number, number][] = [];
+          let volume = 0;
+          for (const bar of bars) {
+            volume += bar.volume;
+            const spotClose = benchmark.get(bar.time.slice(0, 16));
+            if (spotClose && spotClose > 0 && bar.close > 0) {
+              pairs.push([bar.close, spotClose]);
+            }
+          }
+
+          replayedRef.current.add(`${date}:${token}`);
+          replayRef.current(token, {
+            pairs,
+            lastClose: bars[bars.length - 1].close,
+            volume,
+          });
+          setState((s) => ({ ...s, replayed: replayedRef.current.size }));
+          ok();
+        } catch (err) {
+          if (cancelled) return;
+          fail(err);
+          break;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, seedKey, sessionDate, fail, ok]);
 
   /* -------------------------------------------------------------- pcr */
 
@@ -336,41 +461,14 @@ export function useMarketData(input: MarketDataInput): MarketData & {
     }, [fail, ok]),
   );
 
-  /* ---------------------------------------------------------- oi buildup */
-
-  usePoll(
-    enabled,
-    `buildup:${buildupExpiry}:${buildupType}`,
-    POLL_OPEN.buildup,
-    useCallback(async () => {
-      try {
-        const res = await fetchBuildup(buildupType, buildupExpiry);
-        setState((s) => ({
-          ...s,
-          buildup: res.rows,
-          buildupAt: res.fetched_at,
-        }));
-        ok();
-      } catch (err) {
-        fail(err);
-      }
-    }, [buildupType, buildupExpiry, fail, ok]),
-  );
-
   /* --------------------------------------------------------------- reset */
 
   useEffect(() => {
     if (enabled) return;
     seenRef.current.clear();
+    replayedRef.current.clear();
     setState(EMPTY);
   }, [enabled]);
 
-  return {
-    ...state,
-    available: enabled,
-    buildupType,
-    buildupExpiry,
-    setBuildupType,
-    setBuildupExpiry,
-  };
+  return { ...state, available: enabled };
 }

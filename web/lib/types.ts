@@ -183,6 +183,8 @@ export interface EngineSnapshot {
   feed_connected: boolean;
   market_open: boolean;
   seconds_to_daylight_rest: number;
+  /** Seconds to the next 9:15 AM IST bell — what the clock counts out of hours. */
+  seconds_to_open: number;
   spots: Record<string, SpotQuote>;
   chains: Record<string, OptionChain>;
   rrg: Record<string, RrgNode[]>;

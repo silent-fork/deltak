@@ -34,7 +34,7 @@ function LegCells({
   if (!leg) {
     return (
       <>
-        {Array.from({ length: 7 }, (_, i) => (
+        {Array.from({ length: 6 }, (_, i) => (
           <td key={i} className="px-1.5 py-1 text-zinc-700">
             —
           </td>
@@ -67,21 +67,6 @@ function LegCells({
 
     <td key="vol" className="px-1.5 py-1 font-mono text-[10px] text-zinc-500">
       {compact(leg.volume)}
-    </td>,
-
-    <td key="doi" className="px-1.5 py-1" title={`${signed(leg.oi_change_pct, 1)}% of prior OI`}>
-      <span
-        className={cn(
-          "font-mono text-[10px]",
-          leg.oi_change === 0
-            ? "text-zinc-600"
-            : leg.oi_change > 0
-              ? "text-emerald-400"
-              : "text-rose-400",
-        )}
-      >
-        {leg.oi_change === 0 ? "—" : signed(leg.oi_change / 1000, 1) + "K"}
-      </span>
     </td>,
 
     <td key="oi" className="relative px-1.5 py-1">
@@ -135,13 +120,23 @@ function LegCells({
   return <>{side === "call" ? cells.reverse() : cells}</>;
 }
 
-const HEAD = ["RRG", "RS", "Vol", "ΔOI", "OI", "Bid·Ask", "LTP"] as const;
+/**
+ * Sticky header cells.
+ *
+ * `h-*` on a `<th>` is a minimum, so the offsets below are exact only because
+ * both rows are pinned to the same height as the text they hold.
+ */
+const BAND_TH =
+  "sticky top-0 z-20 h-[19px] bg-zinc-900 px-1.5 py-0.5 font-medium";
+const COL_TH =
+  "sticky top-[19px] z-20 h-[19px] bg-zinc-900 px-1.5 py-0.5 font-medium shadow-[0_1px_0_rgb(39,39,42)]";
+
+const HEAD = ["RRG", "RS", "Vol", "OI", "Bid·Ask", "LTP"] as const;
 
 const HEAD_TITLE: Record<string, string> = {
   RRG: "Relative-rotation quadrant for this contract.",
   RS: "RS-Ratio — relative strength against the index.",
   Vol: "Session volume.",
-  "ΔOI": "Intraday change in open interest — where writers are building.",
   OI: "Cumulative open interest.",
   "Bid·Ask": "Best bid and ask.",
   LTP: "Last traded premium and its change on the day.",
@@ -199,33 +194,36 @@ export function OptionChainMatrix({
 
       <CardContent className="dk-scroll min-h-0 flex-1 overflow-auto p-0">
         <table className="w-full border-collapse text-right">
-          <thead className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur">
+          {/*
+            Both header rows stick, and they stick per-cell rather than as a
+            `<thead>`: a translucent header over a scrolling ladder let the rows
+            underneath print straight through the labels. So each cell carries
+            its own opaque fill, the second row is offset by the first row's
+            fixed height, and the pair casts one shadow to separate itself from
+            the strikes moving under it.
+          */}
+          <thead>
             <tr className="text-[9px] uppercase tracking-wider text-zinc-500">
               <th
-                colSpan={7}
-                className="border-b border-zinc-800 px-1.5 py-1 text-center text-emerald-500/80"
+                colSpan={6}
+                className={cn(BAND_TH, "text-center text-emerald-500/80")}
               >
                 Calls
               </th>
-              <th className="border-b border-zinc-800 px-1.5 py-1 text-center text-quantum/80">
-                Strike
-              </th>
-              <th
-                colSpan={7}
-                className="border-b border-zinc-800 px-1.5 py-1 text-center text-rose-500/80"
-              >
+              <th className={cn(BAND_TH, "text-center text-quantum/80")}>Strike</th>
+              <th colSpan={6} className={cn(BAND_TH, "text-center text-rose-500/80")}>
                 Puts
               </th>
             </tr>
             <tr className="text-[9px] uppercase tracking-wider text-zinc-600">
               {[...HEAD].reverse().map((h) => (
-                <th key={`c-${h}`} className="px-1.5 py-1 font-medium" title={HEAD_TITLE[h]}>
+                <th key={`c-${h}`} className={COL_TH} title={HEAD_TITLE[h]}>
                   {h}
                 </th>
               ))}
-              <th className="px-1.5 py-1 text-center font-medium">—</th>
+              <th className={cn(COL_TH, "text-center")}>—</th>
               {HEAD.map((h) => (
-                <th key={`p-${h}`} className="px-1.5 py-1 font-medium" title={HEAD_TITLE[h]}>
+                <th key={`p-${h}`} className={COL_TH} title={HEAD_TITLE[h]}>
                   {h}
                 </th>
               ))}
