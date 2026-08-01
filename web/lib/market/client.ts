@@ -2,6 +2,8 @@ import { ApiError, api } from "@/lib/api";
 import type {
   BuildupResponse,
   CandleResponse,
+  MarginPosition,
+  MarginResponse,
   OiResponse,
   PcrResponse,
 } from "@/lib/types";
@@ -112,6 +114,19 @@ export function fetchOi(req: CandleRequest, ttlMs = 120_000) {
 
 export function fetchPcr(ttlMs = 120_000) {
   return cached<PcrResponse>("pcr", ttlMs, () => api.market.pcr());
+}
+
+/**
+ * Margin for a basket. Cached on the exact basket: the panel re-asks whenever
+ * lots change, and an operator nudging the stepper should not spend a request
+ * per keypress.
+ */
+export function fetchMargin(positions: MarginPosition[], ttlMs = 60_000) {
+  return cached<MarginResponse>(
+    `margin:${JSON.stringify(positions)}`,
+    ttlMs,
+    () => api.market.margin({ positions }),
+  );
 }
 
 export function fetchBuildup(

@@ -1,6 +1,7 @@
 import type {
   BuildupResponse,
   CandleResponse,
+  MarginResponse,
   OiResponse,
   PcrResponse,
   Position,
@@ -119,6 +120,12 @@ export const api = {
         body: JSON.stringify(body),
       }),
     pcr: () => request<PcrResponse>("/api/market/pcr"),
+    /** Batch margin calculator — what the broker blocks, not what it costs. */
+    margin: (body: unknown) =>
+      request<MarginResponse>("/api/margin", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     buildup: (body: unknown) =>
       request<BuildupResponse>("/api/market/buildup", {
         method: "POST",

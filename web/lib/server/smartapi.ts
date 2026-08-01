@@ -24,6 +24,7 @@ export const CANDLE_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/ge
 export const OI_DATA_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getOIData`;
 export const PCR_URL = `${API_ROOT}/rest/secure/angelbroking/marketData/v1/putCallRatio`;
 export const OI_BUILDUP_URL = `${API_ROOT}/rest/secure/angelbroking/marketData/v1/OIBuildup`;
+export const MARGIN_BATCH_URL = `${API_ROOT}/rest/secure/angelbroking/margin/v1/batch`;
 
 export const API_KEY = process.env.DK_API_KEY ?? "";
 export const CLIENT_LOCAL_IP = process.env.DK_CLIENT_LOCAL_IP ?? "127.0.0.1";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Crosshair, Loader2, Minus, Plus, Zap } from "lucide-react";
+import { Ban, Crosshair, Loader2, Minus, Moon, Plus, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { QuadrantPill } from "@/components/QuadrantPill";
@@ -8,8 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
-import type { ExecutionMode, Signal } from "@/lib/types";
-import { BLOCK_REASONS, PROTOCOL_META, cn, fmt, money } from "@/lib/utils";
+import { roundTripCharges } from "@/lib/engine/charges";
+import { fetchMargin } from "@/lib/market/client";
+import type {
+  ExecutionMode,
+  MarginEstimate,
+  OptionChain,
+  Signal,
+} from "@/lib/types";
+import { BLOCK_REASONS, PROTOCOL_META, cn, compact, fmt, money } from "@/lib/utils";
 
 /**
  * The first three rationale lines restate the COA levels, PCR and spot, which
@@ -50,10 +57,13 @@ function Metric({
 export function SignalPanel({
   signal,
   mode,
+  chain,
   onExecuted,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
+  /** The chain the signal came from — for the contract's own book detail. */
+  chain?: OptionChain;
   onExecuted: () => void;
 }) {
   const [lots, setLots] = useState<number | null>(null);
@@ -61,7 +71,10 @@ export function SignalPanel({
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
+  const [margin, setMargin] = useState<MarginEstimate | null>(null);
   const engine = useEngineContext();
+  const marketOpen = engine.snapshot?.market_open ?? false;
+  const authenticated = engine.session.authenticated;
 
   // Follow the engine's sizing until the user overrides it for this signal.
   const suggested = signal?.sizing?.lots ?? 0;
@@ -76,6 +89,96 @@ export function SignalPanel({
   );
 
   const effectiveLots = lots ?? suggested;
+  const lotSize = signal?.sizing?.lot_size ?? 0;
+  const quantity = effectiveLots * lotSize;
+  const entryPrice = signal?.entry_price ?? 0;
+  const token = signal?.token ?? null;
+
+  /**
+   * What the broker will actually block.
+   *
+   * Premium is what the trade costs; margin is what it ties up, and for the
+   * capital cap in the sizing to mean anything it has to be the second number.
+   * Debounced, because the lot stepper is a button an operator holds down.
+   */
+  useEffect(() => {
+    if (!authenticated || !token || quantity <= 0 || entryPrice <= 0) {
+      setMargin(null);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      void fetchMargin([
+        {
+          exchange: "NFO",
+          qty: quantity,
+          price: entryPrice,
+          productType: "INTRADAY",
+          token,
+          tradeType: "BUY",
+          orderType: "LIMIT",
+        },
+      ])
+        .then((res) => {
+          if (!cancelled) setMargin(res.margin);
+        })
+        .catch(() => {
+          if (!cancelled) setMargin(null);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [authenticated, token, quantity, entryPrice]);
+
+  /**
+   * The trade's arithmetic, after costs.
+   *
+   * A paper ledger that ignores charges answers a different question from the
+   * one being asked: on index options STT and exchange turnover dominate, so
+   * the breakeven is meaningfully above the entry and a 1:2 gross reward is not
+   * 1:2 net. These are the same numbers the ledger will book on the fill.
+   */
+  const math = useMemo(() => {
+    if (!signal?.entry_price || !signal.sizing || quantity <= 0) return null;
+    const entry = signal.entry_price;
+    const stop = signal.stop_loss ?? 0;
+    const tp1 = signal.target_1 ?? 0;
+
+    const atStop = roundTripCharges({ price: entry, quantity }, stop || entry);
+    const atTarget = roundTripCharges({ price: entry, quantity }, tp1 || entry);
+
+    const grossLoss = stop > 0 ? (entry - stop) * quantity : 0;
+    const grossGain = tp1 > 0 ? (tp1 - entry) * quantity : 0;
+    const netLoss = grossLoss + atStop.total;
+    const netGain = grossGain - atTarget.total;
+
+    return {
+      cost: entry * quantity,
+      charges: atTarget,
+      netLoss,
+      netGain,
+      rr: netLoss > 0 ? netGain / netLoss : null,
+      // Every rupee of charge has to be earned back before the trade is level.
+      breakeven: entry + atTarget.total / quantity,
+    };
+  }, [signal?.entry_price, signal?.stop_loss, signal?.target_1, signal?.sizing, quantity]);
+
+  /** The contract's own book, for the node the engine picked. */
+  const leg = useMemo(() => {
+    if (!chain || !signal?.strike || !signal.option_type) return null;
+    const row = chain.rows.find((r) => r.strike === signal.strike);
+    return signal.option_type === "CE" ? (row?.call ?? null) : (row?.put ?? null);
+  }, [chain, signal?.strike, signal?.option_type]);
+
+  const daysToExpiry = useMemo(() => {
+    if (!chain?.expiry) return null;
+    const days = Math.round(
+      (Date.parse(`${chain.expiry}T15:30:00+05:30`) - Date.now()) / 86_400_000,
+    );
+    return Number.isFinite(days) ? Math.max(0, days) : null;
+  }, [chain?.expiry]);
 
   if (!signal) {
     return (
@@ -223,6 +326,134 @@ export function SignalPanel({
           </div>
         ) : null}
 
+        {/* What the trade is actually worth, after what it costs */}
+        {math ? (
+          <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="dk-label">Trade Math</span>
+              <span
+                title="Reward against risk, both net of charges. Gross ratios flatter an options trade — the costs land on the loss side twice."
+                className={cn(
+                  "font-mono text-[10px] font-semibold",
+                  math.rr === null
+                    ? "text-zinc-500"
+                    : math.rr >= 1.5
+                      ? "text-emerald-300"
+                      : math.rr >= 1
+                        ? "text-amber-300"
+                        : "text-rose-300",
+                )}
+              >
+                {math.rr === null ? "—" : `${fmt(math.rr, 2)} : 1 net`}
+              </span>
+            </div>
+
+            <div className="mt-1.5 grid grid-cols-4 gap-1">
+              <Metric
+                label="Risk"
+                value={money(math.netLoss, 0)}
+                tone="text-rose-300"
+                title="Loss at the stop, including the charges on both legs."
+              />
+              <Metric
+                label="Reward"
+                value={money(math.netGain, 0)}
+                tone="text-emerald-300"
+                title="Gain at TP1, after the charges on both legs."
+              />
+              <Metric
+                label="B/E"
+                value={money(math.breakeven)}
+                title="Premium the contract has to reach before the trade is level on costs."
+              />
+              <Metric
+                label="Costs"
+                value={money(math.charges.total, 0)}
+                tone="text-amber-300/90"
+                title={`Round trip: brokerage ${money(math.charges.entry.brokerage + math.charges.exit.brokerage, 0)}, STT ${money(math.charges.exit.stt, 0)}, exchange + SEBI ${money(math.charges.entry.exchange + math.charges.exit.exchange + math.charges.entry.sebi + math.charges.exit.sebi, 0)}, stamp ${money(math.charges.entry.stamp, 0)}, GST ${money(math.charges.entry.gst + math.charges.exit.gst, 0)}. The ledger books exactly these on a paper fill.`}
+              />
+            </div>
+
+            {/* Margin — what the broker blocks, which is not what it costs */}
+            <div className="mt-1.5 flex items-baseline justify-between gap-2 border-t border-zinc-800/70 pt-1.5 font-mono text-[10px]">
+              <span className="dk-label text-[9px]">Margin</span>
+              {margin ? (
+                <span
+                  title={`Angel One batch margin calculator: span ${money(margin.span, 0)}, net premium ${money(margin.net_premium, 0)}, options premium ${money(margin.options_premium, 0)}, benefit ${money(margin.benefit, 0)}.`}
+                  className="truncate text-zinc-300"
+                >
+                  {money(margin.total, 0)}
+                  <span className="ml-1.5 text-zinc-600">
+                    premium {money(margin.net_premium || math.cost, 0)}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-zinc-600">
+                  {authenticated ? "calculating…" : "needs a broker session"}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {/* The contract's own book */}
+        {leg || chain?.expiry ? (
+          <div className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="dk-label">Contract</span>
+              <span className="font-mono text-[9px] text-zinc-500">
+                {chain?.expiry ?? "—"}
+                {daysToExpiry !== null ? (
+                  <span
+                    className={cn(
+                      "ml-1.5",
+                      daysToExpiry <= 1 ? "text-amber-300" : "text-zinc-600",
+                    )}
+                    title="Days to expiry. Inside a day, theta is the dominant term in this premium."
+                  >
+                    {daysToExpiry}d
+                  </span>
+                ) : null}
+              </span>
+            </div>
+            <div className="mt-1 grid grid-cols-4 gap-1 font-mono text-[10px]">
+              <div title="Open interest on this contract.">
+                <span className="dk-label text-[8px]">OI</span>{" "}
+                <span className="text-zinc-300">{compact(leg?.oi ?? 0)}</span>
+              </div>
+              <div title="Open interest added or unwound since the session open.">
+                <span className="dk-label text-[8px]">ΔOI</span>{" "}
+                <span
+                  className={cn(
+                    (leg?.oi_change ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400",
+                  )}
+                >
+                  {leg ? compact(leg.oi_change) : "—"}
+                </span>
+              </div>
+              <div title="Session volume on this contract.">
+                <span className="dk-label text-[8px]">Vol</span>{" "}
+                <span className="text-zinc-300">{compact(leg?.volume ?? 0)}</span>
+              </div>
+              <div
+                className="text-right"
+                title="Bid-ask spread — what crossing it costs on top of the charges above."
+              >
+                <span className="dk-label text-[8px]">Spread</span>{" "}
+                <span
+                  className={cn(
+                    leg && leg.best_bid > 0 && leg.best_ask - leg.best_bid > leg.best_bid * 0.02
+                      ? "text-amber-300"
+                      : "text-zinc-300",
+                  )}
+                >
+                  {leg && leg.best_bid > 0 ? fmt(leg.best_ask - leg.best_bid) : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Rationale */}
         {rationale.length ? (
           <ul className="space-y-0.5">
@@ -241,6 +472,19 @@ export function SignalPanel({
 
       {/* Execution stays pinned — never scrolls out of reach */}
       <div className="shrink-0 space-y-1.5 border-t border-zinc-800/70 p-2">
+        {/* A paper fill out of hours is a legitimate thing to want — you are
+            testing the strategy, not the exchange — but it books at the last
+            close and sits still until the bell, so say that rather than let a
+            flat P&L look like a flat market. */}
+        {!marketOpen && mode === "paper" ? (
+          <div className="flex items-start gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[9px] leading-snug text-zinc-500">
+            <Moon className="mt-px h-3 w-3 shrink-0 text-zinc-600" />
+            <span>
+              Market closed — this books at the last traded price and marks flat
+              until the 9:15 bell, then tracks live.
+            </span>
+          </div>
+        ) : null}
         {signal.actionable ? (
           /*
            * Deliberately quiet. A paper fill is a routine act and a full-width

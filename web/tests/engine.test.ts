@@ -13,6 +13,11 @@ import { RrgEngine, classifyQuadrant, MIN_SAMPLES } from "../lib/engine/rrg";
 import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
 import { classifyProtocol, SignalEngine } from "../lib/engine/dkms";
 import { Ledger, applySlippage } from "../lib/engine/ledger";
+import {
+  NSE_OPTIONS_RATES,
+  estimateCharges,
+  roundTripCharges,
+} from "../lib/engine/charges";
 import { breach } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
 import { decodePacket } from "../lib/stream/smartstream";
@@ -501,4 +506,93 @@ test("the simulated feed is its own market at any hour", () => {
   const p = plan({ simulated: true, printsChanged: true });
   assert.equal(p.advance, true);
   assert.equal(p.guards, true);
+});
+
+/* -------------------------------------------------------------- charges */
+
+test("charges follow the leg: STT on the sell, stamp duty on the buy", () => {
+  const qty = 75;
+  const price = 200; // ₹15,000 of premium turnover
+  const buy = estimateCharges({ side: "BUY", price, quantity: qty });
+  const sell = estimateCharges({ side: "SELL", price, quantity: qty });
+
+  assert.equal(buy.turnover, 15_000);
+  // STT is 0.10% of the sell premium, and is not levied on a purchase.
+  assert.equal(buy.stt, 0);
+  assert.equal(sell.stt, 15);
+  // Stamp duty is the mirror image.
+  assert.equal(sell.stamp, 0);
+  assert.equal(buy.stamp, 0.45);
+
+  // Brokerage is the flat fee until 0.25% of turnover is cheaper.
+  assert.equal(buy.brokerage, 20);
+  assert.equal(estimateCharges({ side: "BUY", price: 1, quantity: 75 }).brokerage, 0.19);
+
+  // GST rides brokerage and the exchange/SEBI fees, never STT or stamp duty.
+  const taxable = buy.brokerage + buy.exchange + buy.sebi + buy.ipft;
+  assert.equal(buy.gst, Number((taxable * 0.18).toFixed(2)));
+  assert.equal(
+    buy.total,
+    Number(
+      (buy.brokerage + buy.exchange + buy.sebi + buy.ipft + buy.stamp + buy.gst).toFixed(2),
+    ),
+  );
+});
+
+test("a zero-turnover leg costs nothing at all", () => {
+  const none = estimateCharges({ side: "BUY", price: 0, quantity: 75 });
+  assert.equal(none.total, 0);
+  assert.equal(none.brokerage, 0);
+});
+
+test("a round trip is priced at entry and at the assumed exit", () => {
+  const trip = roundTripCharges({ price: 100, quantity: 75 }, 150);
+  // The exit leg is dearer: it carries STT, on a larger premium.
+  assert.ok(trip.exit.total > trip.entry.total);
+  assert.equal(trip.total, Number((trip.entry.total + trip.exit.total).toFixed(2)));
+  assert.equal(trip.exit.stt, Number((150 * 75 * NSE_OPTIONS_RATES.sttSellPct).toFixed(2)));
+});
+
+test("the ledger books real charges on both legs, never below the minimum", () => {
+  const ledger = new Ledger(100_000, 0, 25);
+  const pos = ledger.open({
+    underlying: "NIFTY",
+    token: "1",
+    tradingSymbol: "NIFTY24450PE",
+    quantity: 75,
+    lots: 1,
+    lotSize: 75,
+    price: 200,
+    mode: "paper",
+  });
+
+  const entry = estimateCharges({ side: "BUY", price: 200, quantity: 75 });
+  assert.ok(entry.total > 25, "entry charges should exceed the flat minimum here");
+  assert.equal(ledger.snapshot("paper").charges, entry.total);
+
+  ledger.close(pos.id, 260, "TARGET");
+  const exit = estimateCharges({ side: "SELL", price: 260, quantity: 75 });
+  const total = Number((entry.total + exit.total).toFixed(2));
+  assert.equal(ledger.snapshot("paper").charges, total);
+
+  // Capital moved by the gross P&L less both legs' charges.
+  assert.equal(
+    ledger.snapshot("paper").capital,
+    Number((100_000 + (260 - 200) * 75 - total).toFixed(2)),
+  );
+});
+
+test("a nearly worthless contract still pays the broker's minimum", () => {
+  const ledger = new Ledger(100_000, 0, 25);
+  ledger.open({
+    underlying: "NIFTY",
+    token: "1",
+    tradingSymbol: "NIFTY24450PE",
+    quantity: 75,
+    lots: 1,
+    lotSize: 75,
+    price: 0.05,
+    mode: "paper",
+  });
+  assert.equal(ledger.snapshot("paper").charges, 25);
 });

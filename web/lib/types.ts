@@ -285,6 +285,28 @@ export interface OiBuildupRow {
   oi_change: number;
 }
 
+/** One leg of a margin-calculator basket. */
+export interface MarginPosition {
+  exchange: "BSE" | "NSE" | "NFO" | "MCX" | "BFO";
+  qty: number;
+  price: number;
+  productType: "DELIVERY" | "CARRYFORWARD" | "MARGIN" | "INTRADAY" | "BO";
+  token: string;
+  tradeType: "BUY" | "SELL";
+  orderType?: "LIMIT" | "MARKET" | "STOPLOSS_LIMIT" | "STOPLOSS_MARKET";
+}
+
+/** What the broker will actually block for a basket. */
+export interface MarginEstimate {
+  total: number;
+  net_premium: number;
+  span: number;
+  benefit: number;
+  delivery: number;
+  non_fo: number;
+  options_premium: number;
+}
+
 /* ------------------------------------------- market-data route envelopes */
 
 export interface CandleResponse {
@@ -307,6 +329,11 @@ export interface OiResponse {
 export interface PcrResponse {
   rows: PcrRow[];
   fetched_at: string;
+}
+
+export interface MarginResponse {
+  margin: MarginEstimate;
+  positions: number;
 }
 
 export interface BuildupResponse {

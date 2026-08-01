@@ -7,6 +7,7 @@ import type {
   Side,
 } from "@/lib/types";
 import type { TickStore } from "@/lib/stream/ticks";
+import { estimateCharges, type RateCard } from "./charges";
 
 /**
  * Virtual execution ledger — port of `backend/app/ledger.py`.
@@ -37,10 +38,22 @@ export class Ledger {
   constructor(
     capital: number,
     private slippagePct: number,
+    /**
+     * Kept as a floor only. Real charges are computed per leg from the rate
+     * card — a flat fee flatters small-premium scalps and penalises size — but
+     * a broker's minimum still applies when the percentages round to nothing.
+     */
     private costPerOrder: number,
+    private rates?: RateCard,
   ) {
     this.capital = capital;
     this.startingCapital = capital;
+  }
+
+  /** Statutory + broker charges on one leg, never below the broker's minimum. */
+  private legCharges(side: Side, price: number, quantity: number): number {
+    const c = estimateCharges({ side, price, quantity }, this.rates);
+    return Math.max(this.costPerOrder, c.total);
   }
 
   private nextId(): string {
@@ -96,8 +109,9 @@ export class Ledger {
       mode: params.mode,
     };
     this.positions.set(pos.id, pos);
-    this.charges += this.costPerOrder;
-    this.capital -= this.costPerOrder;
+    const cost = this.legCharges(pos.side, pos.avg_price, pos.quantity);
+    this.charges = r2(this.charges + cost);
+    this.capital = r2(this.capital - cost);
     return pos;
   }
 
@@ -122,8 +136,11 @@ export class Ledger {
     pos.closed_at = new Date().toISOString().slice(0, 19);
 
     this.realised = r2(this.realised + pnl);
-    this.charges += this.costPerOrder;
-    this.capital += pnl - this.costPerOrder;
+    // The exit leg is the opposite side of the entry: a long is closed by a
+    // sell, which is the leg STT is levied on.
+    const cost = this.legCharges(pos.side === "BUY" ? "SELL" : "BUY", exit, pos.quantity);
+    this.charges = r2(this.charges + cost);
+    this.capital = r2(this.capital + pnl - cost);
     this.closed.push(pos);
     return pos;
   }
@@ -142,7 +159,10 @@ export class Ledger {
     pos.quantity -= qty;
     pos.realised_pnl = r2(pos.realised_pnl + pnl);
     this.realised = r2(this.realised + pnl);
-    this.capital += pnl;
+    // A scale-out is an executed order like any other, and is charged like one.
+    const cost = this.legCharges(pos.side === "BUY" ? "SELL" : "BUY", r2(price), qty);
+    this.charges = r2(this.charges + cost);
+    this.capital = r2(this.capital + pnl - cost);
     return pos;
   }
 

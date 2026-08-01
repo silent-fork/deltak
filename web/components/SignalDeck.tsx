@@ -6,7 +6,12 @@ import { SignalPanel } from "@/components/SignalPanel";
 import { TradeBook } from "@/components/TradeBook";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
-import type { ExecutionMode, LedgerSnapshot, Signal } from "@/lib/types";
+import type {
+  ExecutionMode,
+  LedgerSnapshot,
+  OptionChain,
+  Signal,
+} from "@/lib/types";
 import { PROTOCOL_META, cn, pnlTone, signedMoney } from "@/lib/utils";
 
 /**
@@ -24,12 +29,14 @@ type Deck = "signal" | "book";
 export function SignalDeck({
   signal,
   mode,
+  chain,
   onExecuted,
   ledger,
   onLedgerChanged,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
+  chain?: OptionChain;
   onExecuted: () => void;
   ledger: LedgerSnapshot | undefined;
   onLedgerChanged: () => void;
@@ -100,7 +107,12 @@ export function SignalDeck({
       </CardHeader>
 
       {deck === "signal" ? (
-        <SignalPanel signal={signal} mode={mode} onExecuted={onExecuted} />
+        <SignalPanel
+          signal={signal}
+          mode={mode}
+          chain={chain}
+          onExecuted={onExecuted}
+        />
       ) : (
         <TradeBook ledger={ledger} onChanged={onLedgerChanged} />
       )}

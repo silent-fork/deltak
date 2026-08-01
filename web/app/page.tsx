@@ -142,6 +142,7 @@ export default function TerminalPage() {
               <SignalDeck
                 signal={signal}
                 mode={snapshot?.mode ?? "paper"}
+                chain={chain}
                 onExecuted={() => forceRefresh((n) => n + 1)}
                 ledger={snapshot?.ledger}
                 onLedgerChanged={() => forceRefresh((n) => n + 1)}

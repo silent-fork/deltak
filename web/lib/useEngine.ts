@@ -726,6 +726,16 @@ export function useEngine(simulate: boolean) {
           (brokerOrderId ? ` — order ${brokerOrderId}` : ""),
         underlying,
       );
+      // A fill taken against a settled board is real in the ledger and frozen
+      // on the screen until the feed returns. Saying so beats an operator
+      // reading a motionless P&L as a motionless market.
+      if (!isMarketOpen()) {
+        log(
+          "INFO",
+          `Booked against the last close — ${signal.trading_symbol} marks from the next print.`,
+          underlying,
+        );
+      }
 
       return {
         ok: true,
