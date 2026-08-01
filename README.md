@@ -279,6 +279,33 @@ engine that nothing in the serverless build ever read or wrote. `0004` adds
 `broker_sessions` (the watchdog's encrypted credential store, below); `0005`
 adds `positions.entry_spot`.
 
+## Auto-Driver
+
+The header's Paper/Live toggle is gone for now — Live has no server-side home
+yet (see Watchdog, below), so a toggle for a mode that wasn't really available
+was its own kind of misleading. In its place: **Auto-Driver** vs **Manual**,
+paper mode only, entirely local to the browser tab.
+
+- **Manual** (default) — today's behaviour: an actionable signal waits in the
+  Signal Deck until the operator clicks Execute.
+- **Auto-Driver** — the same tick loop that already evaluates every signal
+  also fires it: an actionable signal opens a paper position itself, through
+  the exact same `executeSignal` path a manual click uses (same sizing, same
+  portfolio-risk gate). It only ever opens the *first* position on a signal's
+  token — once one is open, later ticks skip it, so a signal that stays
+  actionable for minutes doesn't reopen every second. Nothing fires against a
+  settled board; out of hours (and not simulated) there's no live price to
+  fill against.
+
+**Scale-out stays in the browser in both modes.** The Weakening-quadrant TP1
+half-exit (`checkWeakeningRotation`) needs live RRG rotation state that only
+exists inside a running tab — it isn't gated by Auto-Driver vs Manual, it just
+always runs, the same as it always has.
+
+DKMS itself already had a name for this — the Delta-protocol rationale reads
+"auto-driver muted" when both bounds are migrating. Auto-Driver is that same
+concept, just no longer muted the rest of the time.
+
 ## Watchdog
 
 The trading loop above only runs in the browser: close the tab, and every

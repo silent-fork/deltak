@@ -4,6 +4,13 @@
  */
 
 export type ExecutionMode = "paper" | "live";
+/**
+ * Who fires an actionable signal. `auto` is the browser's own tick loop —
+ * the same "auto-driver" DKMS already names in its Delta-protocol rationale
+ * ("auto-driver muted"), just no longer muted the rest of the time. `manual`
+ * is today's behaviour: the operator clicks Execute.
+ */
+export type Automation = "auto" | "manual";
 export type OptionType = "CE" | "PE";
 export type Side = "BUY" | "SELL";
 export type Moneyness = "ITM" | "ATM" | "OTM";

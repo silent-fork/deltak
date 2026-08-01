@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  Automation,
   EngineSnapshot,
   ExecutionMode,
   OptionChain,
@@ -112,6 +113,12 @@ export function useEngine(simulate: boolean) {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
   const [session, setSession] = useState<EngineSession>(NO_SESSION);
   const [mode, setMode] = useState<ExecutionMode>("paper");
+  /**
+   * Who fires an actionable signal — the browser's own auto-driver, or the
+   * operator clicking Execute. Local, UI-only state: unlike `mode` this never
+   * touches the broker, so switching it is instant and never rejected.
+   */
+  const [automation, setAutomationState] = useState<Automation>("manual");
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [masterReady, setMasterReady] = useState(false);
   const [simulated, setSimulated] = useState(false);
@@ -934,6 +941,14 @@ export function useEngine(simulate: boolean) {
     [log],
   );
 
+  const setAutomation = useCallback(
+    (next: Automation) => {
+      setAutomationState(next);
+      log("INFO", `${next === "auto" ? "Auto-Driver engaged — actionable signals execute themselves." : "Manual control — signals wait for Execute."}`);
+    },
+    [log],
+  );
+
   const executeSignal = useCallback(
     async (underlying: string, lots?: number) => {
       const signal = signalsRef.current[underlying];
@@ -1060,6 +1075,43 @@ export function useEngine(simulate: boolean) {
     [log],
   );
 
+  /**
+   * The auto-driver. When `automation` is `"auto"`, an actionable signal
+   * fires itself exactly the way a manual Execute click does — same sizing,
+   * same portfolio-risk gate, same everything in `executeSignal` above.
+   *
+   * The only thing added here is the guard against re-firing: once a
+   * position is open on a signal's token, it's skipped on every later tick,
+   * so a signal that stays actionable for minutes opens exactly one
+   * position, not one a second. Nothing fires against a settled board — out
+   * of hours (and not simulated) there is no live price to fill against.
+   */
+  const autoInFlightRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (automation !== "auto" || !snapshot) return;
+    if (!snapshot.market_open && !simulated) return;
+
+    for (const u of UNDERLYINGS) {
+      const signal = snapshot.signals[u];
+      if (!signal?.actionable || !signal.token) continue;
+      if (autoInFlightRef.current.has(u)) continue;
+      if (snapshot.ledger.open_positions.some((p) => p.token === signal.token)) continue;
+
+      autoInFlightRef.current.add(u);
+      void executeSignal(u)
+        .catch((err) => {
+          log(
+            "INFO",
+            `Auto-Driver entry held back: ${err instanceof Error ? err.message : "unknown error"}`,
+            u,
+          );
+        })
+        .finally(() => {
+          autoInFlightRef.current.delete(u);
+        });
+    }
+  }, [snapshot, automation, simulated, executeSignal, log]);
+
   const exitPosition = useCallback(
     async (positionId: string, reason = "MANUAL") => {
       const pos = ledgerRef.current.get(positionId);
@@ -1094,6 +1146,8 @@ export function useEngine(simulate: boolean) {
     snapshot,
     session,
     mode,
+    automation,
+    setAutomation,
     streamStatus,
     masterReady,
     simulated,

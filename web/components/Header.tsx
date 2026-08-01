@@ -3,7 +3,9 @@
 import {
   Activity,
   AlarmClock,
+  Bot,
   FlaskConical,
+  Hand,
   Plug,
   Radio,
   Sunrise,
@@ -119,8 +121,6 @@ export function Header({
   onRefreshStatus: () => void;
 }) {
   const [loginOpen, setLoginOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
-  const [modeError, setModeError] = useState<string | null>(null);
 
   const engine = useEngineContext();
   const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
@@ -129,21 +129,7 @@ export function Header({
   const marketOpen = snapshot?.market_open ?? false;
   const mode: ExecutionMode = snapshot?.mode ?? "paper";
   const authed = snapshot?.authenticated ?? false;
-
-  async function toggleMode() {
-    const next: ExecutionMode = mode === "paper" ? "live" : "paper";
-    setSwitching(true);
-    setModeError(null);
-    try {
-      engine.switchMode(next);
-      onRefreshStatus();
-    } catch (err) {
-      setModeError(err instanceof Error ? err.message : "Mode switch rejected");
-      setTimeout(() => setModeError(null), 6000);
-    } finally {
-      setSwitching(false);
-    }
-  }
+  const automation = engine.automation;
 
   /*
    * "Closed" and "Live" side by side was a contradiction the operator had to
@@ -288,28 +274,35 @@ export function Header({
             </Badge>
           )}
 
+          {/*
+            Paper vs Live used to live here; Live has no server-side home yet
+            (see the Watchdog section of the README), so surfacing a toggle
+            for a mode that isn't really available was its own kind of
+            misleading. This slot is Auto-Driver vs Manual instead — who
+            fires an actionable signal, the one choice that's actually live
+            today. Purely local UI state: unlike a broker mode switch, this
+            never touches Angel One and can never be rejected.
+          */}
           <button
-            onClick={toggleMode}
-            disabled={switching}
+            onClick={() => engine.setAutomation(automation === "auto" ? "manual" : "auto")}
             title={
-              mode === "paper"
-                ? "Paper mode — virtual ledger with simulated fills. Click to go live."
-                : "LIVE mode — orders route to NSE. Click to return to paper."
+              automation === "auto"
+                ? "Auto-Driver — actionable signals execute themselves as paper trades. Click for Manual."
+                : "Manual — you execute every signal by hand from the Signal Deck. Click for Auto-Driver."
             }
             className={cn(
-              "flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50",
-              mode === "live"
-                ? "border-rose-500/60 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
+              "flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors",
+              automation === "auto"
+                ? "border-quantum/60 bg-quantum/15 text-quantum hover:bg-quantum/25"
                 : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800",
             )}
           >
-            <span
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                mode === "live" ? "bg-rose-400 animate-pulse-ring" : "bg-zinc-500",
-              )}
-            />
-            {mode === "live" ? "Live" : "Paper"}
+            {automation === "auto" ? (
+              <Bot className="h-3 w-3 animate-pulse-ring" />
+            ) : (
+              <Hand className="h-3 w-3" />
+            )}
+            {automation === "auto" ? "Auto-Driver" : "Manual"}
           </button>
 
           {/*
@@ -339,12 +332,6 @@ export function Header({
           )}
         </div>
       </div>
-
-      {modeError ? (
-        <div className="border-t border-rose-500/30 bg-rose-500/10 px-3 py-1 text-[11px] text-rose-300">
-          {modeError}
-        </div>
-      ) : null}
 
       <LoginModal
         open={loginOpen}
