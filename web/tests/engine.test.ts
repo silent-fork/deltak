@@ -14,6 +14,7 @@ import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
 import { classifyProtocol, SignalEngine } from "../lib/engine/dkms";
 import { Ledger, applySlippage } from "../lib/engine/ledger";
 import { breach } from "../lib/engine/risk";
+import { planTick } from "../lib/engine/loop";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
@@ -435,4 +436,69 @@ test("the next-open clock skips the weekend", () => {
   assert.equal(secondsToNextOpen(new Date("2026-08-03T02:30:00Z")), 4_500);
   // Monday 16:00 IST, after the close — tomorrow's bell.
   assert.equal(secondsToNextOpen(new Date("2026-08-03T10:30:00Z")), 62_100);
+});
+
+/* ------------------------------------------------------------- tick plan */
+
+const plan = (patch: Partial<Parameters<typeof planTick>[0]> = {}) =>
+  planTick({
+    marketOpen: false,
+    simulated: false,
+    printsChanged: false,
+    seedsChanged: false,
+    hasChains: true,
+    ...patch,
+  });
+
+test("a connected socket out of hours settles the board instead of running it", () => {
+  // The exact state that kept the loop advancing all weekend: SmartStream is
+  // connected and reports "live", but the exchange is shut and nothing prints.
+  const p = plan({ printsChanged: false });
+  assert.equal(p.advance, false);
+  assert.equal(p.rebuild, false);
+  assert.equal(p.guards, false);
+  assert.equal(p.settled, true);
+
+  // Even a print out of hours must not advance rotation.
+  const stray = plan({ printsChanged: true });
+  assert.equal(stray.advance, false);
+  assert.equal(stray.rebuild, false);
+});
+
+test("replayed history rebuilds the board without advancing rotation", () => {
+  // The replay feeds the RRG windows itself; the rebuild that shows the result
+  // must not stamp another sample on top of it.
+  const p = plan({ seedsChanged: true });
+  assert.equal(p.rebuild, true);
+  assert.equal(p.advance, false);
+  assert.equal(p.settled, false);
+});
+
+test("the first chain is always built, even with nothing flowing", () => {
+  const p = plan({ hasChains: false });
+  assert.equal(p.rebuild, true);
+  assert.equal(p.settled, false);
+});
+
+test("a live session advances on prints, and guards run through quiet ticks", () => {
+  const printing = plan({ marketOpen: true, printsChanged: true });
+  assert.deepEqual(printing, {
+    advance: true,
+    rebuild: true,
+    guards: true,
+    settled: false,
+  });
+
+  // A silent second mid-session: nothing to recompute, but the 3:15 PM flatten
+  // is a clock event and must still be able to fire.
+  const quiet = plan({ marketOpen: true, printsChanged: false });
+  assert.equal(quiet.advance, false);
+  assert.equal(quiet.rebuild, false);
+  assert.equal(quiet.guards, true);
+});
+
+test("the simulated feed is its own market at any hour", () => {
+  const p = plan({ simulated: true, printsChanged: true });
+  assert.equal(p.advance, true);
+  assert.equal(p.guards, true);
 });

@@ -145,11 +145,24 @@ export function Header({
     }
   }
 
+  /*
+   * "Closed" and "Live" side by side was a contradiction the operator had to
+   * resolve themselves. SmartStream accepts a subscription at any hour and then
+   * sends nothing, so a connected socket says only that the wire is up — while
+   * the exchange is shut it reads as Linked, and the board it feeds is settled
+   * on the last session rather than running.
+   */
+  const trading = marketOpen || simulated;
+  const linked = streamState === "live" && !trading;
+  const streamLabel =
+    streamState === "live" ? (trading ? "Live" : "Linked") : streamState;
   const streamTone =
-    streamState === "live"
-      ? "text-emerald-400"
-      : streamState === "error"
-        ? "text-rose-400"
+    streamState === "error"
+      ? "text-rose-400"
+      : streamState === "live"
+        ? trading
+          ? "text-emerald-400"
+          : "text-zinc-500"
         : "text-amber-400";
 
   return (
@@ -212,11 +225,21 @@ export function Header({
             {marketOpen ? "Open" : "Closed"}
           </Badge>
 
-          <Badge className={cn("h-7 border-zinc-800", streamTone)}>
+          <Badge
+            title={
+              linked
+                ? "Socket connected, exchange closed — no prints are arriving. The board is settled on the last session."
+                : "Market-data socket status."
+            }
+            className={cn("h-7 border-zinc-800", streamTone)}
+          >
             <Radio
-              className={cn("h-3 w-3", streamState === "live" && "animate-pulse-ring")}
+              className={cn(
+                "h-3 w-3",
+                streamState === "live" && trading && "animate-pulse-ring",
+              )}
             />
-            {streamState === "live" ? "Live" : streamState}
+            {streamLabel}
           </Badge>
 
           {/* Exchange wall clock */}

@@ -29,6 +29,7 @@ import { SignalEngine } from "@/lib/engine/dkms";
 import { RrgEngine } from "@/lib/engine/rrg";
 import { Ledger, applySlippage } from "@/lib/engine/ledger";
 import { ScripMaster, type MasterPayload } from "@/lib/engine/scripMaster";
+import { planTick } from "@/lib/engine/loop";
 import { runGuards } from "@/lib/engine/risk";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
@@ -110,6 +111,10 @@ export function useEngine(simulate: boolean) {
   const resyncRef = useRef(0);
   /** Seeded-quote count at the last rebuild — the "has anything changed" flag. */
   const lastSeedRef = useRef(-1);
+  /** Print count at the last rebuild: the only proof the feed is delivering. */
+  const lastPrintsRef = useRef(-1);
+  /** True while the board is frozen on a finished session. */
+  const settledRef = useRef(false);
   const modeRef = useRef<ExecutionMode>("paper");
   const sessionRef = useRef<EngineSession>(NO_SESSION);
   const busyRef = useRef(false);
@@ -365,38 +370,37 @@ export function useEngine(simulate: boolean) {
       const free = Math.max(0, cap - ledger.deployed);
 
       /**
-       * Out of hours the board is settled, not running.
-       *
-       * With no feed every input is a fixed number, so rebuilding the chain and
-       * re-deriving the levels once a second recomputes the identical answer
-       * forever — and worse, each rebuild pushes another point onto the wall
-       * trail and another sample into the rotation windows, so the very history
-       * the replay just installed is ground down by the loop that follows it.
-       * So the pipeline runs while replayed data is still arriving, then stops
-       * until the feed or the bell brings something new.
+       * Out of hours the board is settled, not running. `planTick` owns the
+       * rules and states why; the loop just obeys them.
        */
-      const live = feedLive();
+      const printsNow = ticksRef.current.updates;
       const seededNow = ticksRef.current.seeded;
-      const settling = !live && seededNow !== lastSeedRef.current;
+      const plan = planTick({
+        marketOpen: isMarketOpen(),
+        simulated: !!simRef.current?.running,
+        printsChanged: printsNow !== lastPrintsRef.current,
+        seedsChanged: seededNow !== lastSeedRef.current,
+        hasChains: Object.keys(chainsRef.current).length > 0,
+      });
+      lastPrintsRef.current = printsNow;
       lastSeedRef.current = seededNow;
-      const idle = !live && !settling && Object.keys(chainsRef.current).length > 0;
+      settledRef.current = plan.settled;
 
-      if (!idle) {
+      if (plan.rebuild) {
         for (const u of UNDERLYINGS) {
           const builder = buildersRef.current[u];
           const engine = signalEnginesRef.current[u];
           if (!builder || !engine) continue;
           const spot = ticksRef.current.ltp(master.spotToken(u));
-          // Rotation advances on real prints only — see above.
-          const chain = builder.build(master, ticksRef.current, spot, live);
+          // Rotation advances on real prints in a live session, and on nothing
+          // else — a replayed session must survive the loop that follows it.
+          const chain = builder.build(master, ticksRef.current, spot, plan.advance);
           chainsRef.current[u] = chain;
           signalsRef.current[u] = engine.evaluate(chain, master, cap, free);
         }
       }
 
-      // Guards act on live prices. Against a frozen board they can only fire on
-      // yesterday's numbers, which is worse than not firing at all.
-      if (live) {
+      if (plan.guards) {
         await runGuards({
           ledger,
           chains: chainsRef.current,
@@ -433,7 +437,7 @@ export function useEngine(simulate: boolean) {
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, buildSnapshot, feedLive, log, spotMap]);
+  }, [bookExit, bookScaleOut, buildSnapshot, log, spotMap]);
 
   /* --------------------------------------------------------- lifecycle */
 
@@ -778,6 +782,8 @@ export function useEngine(simulate: boolean) {
     riskPct: cfgRef.current.riskPct,
     /** Contracts whose COA 2.0 ΔOI is measured from a real session open. */
     oiBaselines: ticksRef.current.baselined,
+    /** The board is frozen on a finished session — nothing is being recomputed. */
+    settled: settledRef.current,
     focus,
     setFocus,
     market,

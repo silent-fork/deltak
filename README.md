@@ -107,14 +107,23 @@ endpoint, its closing open interest from `getOIData`, and — the part that cann
 be faked from a snapshot — each contract's *series* replayed bar by bar into its
 RRG window, which is exactly what the feed would have fed it live.
 
-Three guards keep that from being mistaken for a live terminal. Seeded quotes do
-not advance the tick counter, so the Live-mode switch still refuses to route
-without a real feed. The rotation windows only advance on genuine prints. And
-once the replayed data has settled the pipeline stops entirely — rebuilding a
-frozen chain once a second recomputes the same answer forever while grinding
-down the very history the replay installed, so the loop idles until the feed or
-the bell brings something new. Risk guards are idle too: against a frozen board
-they could only fire on yesterday's prices.
+Three guards keep that from being mistaken for a live terminal, and all three
+turn on one distinction: **a connected socket is not a running market.**
+SmartStream accepts a subscription at any hour and then sends nothing, so
+"feed is live" and "the exchange is trading" are different questions — the
+header reads `Linked` rather than `Live` when only the first is true.
+
+- Seeded quotes do not advance the tick counter, so the Live-mode switch still
+  refuses to route without a real feed.
+- Rotation advances only when the market is trading *and* something printed.
+- Once replayed data has settled the pipeline stops: rebuilding a frozen chain
+  once a second recomputes the same answer forever while grinding down the very
+  history the replay installed. The footer reads `Settled` while it idles.
+
+Risk guards run for the whole session rather than per print — the 3:15 PM
+Daylight Rest is a clock event and a quiet second must not skip it — and idle
+out of hours, when the exchange could not fill an exit anyway. These rules live
+in `lib/engine/loop.ts` as one pure function, and are tested there.
 
 The OI baseline is the one that matters most. Without it a terminal opened at
 noon reads every strike as "no change", Aegis-1 and Zenith-1 silently collapse

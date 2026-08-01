@@ -171,6 +171,14 @@ export default function TerminalPage() {
             >
               OI base {engine.oiBaselines}
             </span>
+            {engine.settled ? (
+              <span
+                title="Nothing is being recomputed: the exchange is closed and the board is frozen on the last session. The rotation windows and wall trail hold their replayed history until the next print."
+                className="text-quantum/70"
+              >
+                Settled
+              </span>
+            ) : null}
             {market.replayed > 0 ? (
               <span
                 title="Contracts whose last session was replayed from historical candles because the market is closed — prices and rotation are Friday's, not live."
