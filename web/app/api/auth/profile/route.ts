@@ -47,7 +47,8 @@ export async function GET() {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MOBILE_RE = /^\+?[0-9]{7,15}$/;
+/** Indian mobile numbers: ten digits, first digit 6-9. Matches the client's check. */
+const MOBILE_RE = /^[6-9]\d{9}$/;
 
 /** `""` clears the field; `undefined` leaves it untouched; anything else is validated. */
 function normalise(

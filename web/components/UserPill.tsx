@@ -91,12 +91,18 @@ function Row({
  * enough to fix a typo the broker returned or add a contact the account was
  * opened without; it never claims to change anything at the broker.
  */
+/** RFC-5322-ish, not exhaustive — matches what the server accepts. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Indian mobile numbers: ten digits, first digit 6-9. */
+const MOBILE_RE = /^[6-9]\d{9}$/;
+
 function EditableRow({
   icon: Icon,
   label,
   value,
   placeholder,
   mono = true,
+  kind = "text",
   onSave,
 }: {
   icon: typeof Mail;
@@ -104,6 +110,8 @@ function EditableRow({
   value: string | null;
   placeholder: string;
   mono?: boolean;
+  /** Shapes the input and its live validation. */
+  kind?: "text" | "email" | "mobile";
   onSave: (next: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -111,6 +119,14 @@ function EditableRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Blank is always allowed — it clears the field. A non-blank draft has to
+  // match its kind before Save is worth trying, so a malformed number never
+  // makes a round trip just to be told what the input already knew.
+  const invalid =
+    draft.trim() !== "" &&
+    ((kind === "email" && !EMAIL_RE.test(draft.trim())) ||
+      (kind === "mobile" && !MOBILE_RE.test(draft.trim())));
 
   useEffect(() => {
     if (!editing) return;
@@ -123,6 +139,7 @@ function EditableRow({
   }, [editing]);
 
   async function save() {
+    if (invalid) return;
     setBusy(true);
     setError(null);
     try {
@@ -134,6 +151,18 @@ function EditableRow({
       setBusy(false);
     }
   }
+
+  /** Digits only, capped at ten — a pasted "+91 99977 33537" lands clean. */
+  function onChangeDraft(raw: string) {
+    setDraft(kind === "mobile" ? raw.replace(/\D/g, "").slice(0, 10) : raw);
+  }
+
+  const hint =
+    kind === "email"
+      ? "Enter a valid email address."
+      : kind === "mobile"
+        ? "10 digits, starting 6-9."
+        : null;
 
   if (!editing) {
     return (
@@ -164,44 +193,57 @@ function EditableRow({
 
   return (
     <div className="py-[3px]">
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2">
         <span className="flex shrink-0 items-center gap-1.5 dk-label text-[9px]">
           <Icon className="h-3 w-3 shrink-0 text-zinc-600" />
           {label}
         </span>
-        <input
-          ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void save();
-            if (e.key === "Escape") setEditing(false);
-          }}
-          disabled={busy}
-          placeholder={placeholder}
-          className={cn(
-            "min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right text-[11px] text-zinc-100 outline-none focus:border-quantum/60 disabled:opacity-50",
-            mono && "font-mono",
-          )}
-        />
-        <button
-          onClick={save}
-          disabled={busy}
-          title="Save"
-          className="shrink-0 rounded p-0.5 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
-        >
-          <Check className="h-3 w-3" />
-        </button>
-        <button
-          onClick={() => setEditing(false)}
-          disabled={busy}
-          title="Cancel"
-          className="shrink-0 rounded p-0.5 text-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
-        >
-          <X className="h-3 w-3" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => onChangeDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            disabled={busy}
+            placeholder={placeholder}
+            type={kind === "email" ? "email" : kind === "mobile" ? "tel" : "text"}
+            inputMode={kind === "mobile" ? "numeric" : undefined}
+            maxLength={kind === "mobile" ? 10 : kind === "email" ? 254 : undefined}
+            autoComplete={kind === "email" ? "email" : kind === "mobile" ? "tel" : "off"}
+            className={cn(
+              "w-[130px] rounded-md border bg-zinc-900 px-1.5 py-1 text-[11px] text-zinc-100 outline-none transition-colors disabled:opacity-50",
+              invalid
+                ? "border-rose-500/60 focus:border-rose-400"
+                : "border-zinc-700 focus:border-quantum/60",
+              mono && "font-mono",
+            )}
+          />
+          <button
+            onClick={save}
+            disabled={busy || invalid}
+            title="Save"
+            className="shrink-0 rounded p-0.5 text-emerald-400 hover:bg-emerald-500/10 disabled:pointer-events-none disabled:opacity-30"
+          >
+            <Check className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            disabled={busy}
+            title="Cancel"
+            className="shrink-0 rounded p-0.5 text-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
       </div>
-      {error ? <div className="mt-1 text-right text-[9px] text-rose-400">{error}</div> : null}
+      {error ? (
+        <div className="mt-1 text-right text-[9px] text-rose-400">{error}</div>
+      ) : invalid && hint ? (
+        <div className="mt-1 text-right text-[9px] text-zinc-500">{hint}</div>
+      ) : null}
     </div>
   );
 }
@@ -407,6 +449,7 @@ export function UserPill({
               value={profile?.email ?? null}
               placeholder="Add email"
               mono={false}
+              kind="email"
               onSave={async (next) => {
                 const { profile: updated } = await api.updateProfile({ email: next });
                 engine.setProfile(updated);
@@ -417,6 +460,7 @@ export function UserPill({
               label="Mobile"
               value={profile?.mobile_no ?? null}
               placeholder="Add mobile"
+              kind="mobile"
               onSave={async (next) => {
                 const { profile: updated } = await api.updateProfile({ mobile_no: next });
                 engine.setProfile(updated);
