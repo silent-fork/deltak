@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { cachedProfile, fetchProfile, rememberProfile } from "@/lib/server/profile";
+import {
+  cachedProfile,
+  fetchProfile,
+  profileFromRow,
+  rememberProfile,
+} from "@/lib/server/profile";
 import { SESSION_COOKIE, SmartApiError, decodeSession } from "@/lib/server/smartapi";
 import { updateProfileContact } from "@/lib/supabase";
 
@@ -91,15 +96,16 @@ export async function PATCH(request: Request) {
   if (body.email !== undefined) patch.email = email.value;
   if (body.mobile_no !== undefined) patch.mobile_no = mobile.value;
 
+  // The row the write returned is the answer — a second read could race another
+  // session check and hand back a profile that does not reflect the edit that
+  // was just made.
   try {
-    await updateProfileContact(session.clientCode, patch);
+    const row = await updateProfileContact(session.clientCode, patch);
+    return NextResponse.json({ profile: profileFromRow(row) });
   } catch (err) {
     return NextResponse.json(
       { detail: err instanceof Error ? err.message : "Profile update failed." },
       { status: 502 },
     );
   }
-
-  const profile = await cachedProfile(session.clientCode);
-  return NextResponse.json({ profile });
 }

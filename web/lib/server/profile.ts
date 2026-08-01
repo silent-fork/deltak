@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readProfile, saveProfile } from "@/lib/supabase";
+import { readProfile, saveProfile, type ProfileRow } from "@/lib/supabase";
 import type { UserProfile } from "@/lib/types";
 
 import { PROFILE_URL, smartApiCall } from "./smartapi";
@@ -73,7 +73,13 @@ export async function fetchProfile(
 }
 
 /**
- * Persist the profile and return it enriched with what Supabase remembers.
+ * Persist the profile and return what the database now holds.
+ *
+ * The returned profile is the merged one, not the broker payload that went in:
+ * where `getProfile` reported nothing — an account with no email on file, a
+ * contact the operator filled in here by hand — the stored value stands. The
+ * HUD therefore renders the same thing a later read would, instead of briefly
+ * showing a blank that the next refresh silently fills back in.
  *
  * Best-effort, like every other write on this path: an operator must never be
  * held out of a terminal because a ledger database was briefly unreachable. A
@@ -87,7 +93,7 @@ export async function rememberProfile(
   try {
     const stored = await saveProfile(profile, fresh);
     if (!stored) return profile;
-    return { ...profile, first_seen_at: stored.first_seen_at, logins: stored.logins };
+    return { ...stored.profile, first_seen_at: stored.first_seen_at, logins: stored.logins };
   } catch {
     return profile;
   }
@@ -103,20 +109,24 @@ export async function rememberProfile(
 export async function cachedProfile(clientCode: string): Promise<UserProfile | null> {
   try {
     const row = await readProfile(clientCode);
-    if (!row) return null;
-    return {
-      client_code: row.client_code,
-      name: row.name,
-      email: row.email,
-      mobile_no: row.mobile_no,
-      broker: row.broker,
-      exchanges: row.exchanges ?? [],
-      products: row.products ?? [],
-      broker_last_login: row.broker_last_login,
-      first_seen_at: row.first_seen_at ?? null,
-      logins: row.logins ?? 0,
-    };
+    return row ? profileFromRow(row) : null;
   } catch {
     return null;
   }
+}
+
+/** A stored row as the HUD's profile shape. */
+export function profileFromRow(row: ProfileRow): UserProfile {
+  return {
+    client_code: row.client_code,
+    name: row.name,
+    email: row.email,
+    mobile_no: row.mobile_no,
+    broker: row.broker,
+    exchanges: row.exchanges ?? [],
+    products: row.products ?? [],
+    broker_last_login: row.broker_last_login,
+    first_seen_at: row.first_seen_at ?? null,
+    logins: row.logins ?? 0,
+  };
 }

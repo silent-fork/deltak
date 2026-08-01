@@ -1,6 +1,7 @@
 import "server-only";
 
 import { TABLE_COLUMNS } from "@/lib/engine/persist";
+import { mergeProfile } from "@/lib/profileMerge";
 import type { UserProfile } from "@/lib/types";
 
 /**
@@ -166,7 +167,7 @@ export async function insertRows(
 
 /* ------------------------------------------------------------ user profile */
 
-interface ProfileRow {
+export interface ProfileRow {
   client_code: string;
   name: string | null;
   email: string | null;
@@ -207,28 +208,30 @@ export async function readProfile(clientCode: string): Promise<ProfileRow | null
  * minutes while a tab is open, and counting those would make the number
  * meaningless.
  *
- * Returns the profile as stored, so the caller can hand the account's history —
- * first seen, logins — back to the HUD in the same round trip.
+ * Returns the row as it now stands — merged, not merely what the broker sent —
+ * so the caller hands the HUD the same profile the database holds rather than
+ * one that disagrees with it until the next read.
  */
 export async function saveProfile(
   profile: UserProfile,
   fresh: boolean,
-): Promise<{ first_seen_at: string | null; logins: number } | null> {
+): Promise<{ profile: UserProfile; first_seen_at: string | null; logins: number } | null> {
   if (!supabaseConfigured || !profile.client_code) return null;
 
   const existing = await readProfile(profile.client_code);
+  const merged = mergeProfile(profile, existing);
   const now = new Date().toISOString();
   const logins = (existing?.logins ?? 0) + (fresh ? 1 : 0);
 
   const row: Record<string, unknown> = {
-    client_code: profile.client_code,
-    name: profile.name,
-    email: profile.email,
-    mobile_no: profile.mobile_no,
-    broker: profile.broker,
-    exchanges: profile.exchanges,
-    products: profile.products,
-    broker_last_login: profile.broker_last_login,
+    client_code: merged.client_code,
+    name: merged.name,
+    email: merged.email,
+    mobile_no: merged.mobile_no,
+    broker: merged.broker,
+    exchanges: merged.exchanges,
+    products: merged.products,
+    broker_last_login: merged.broker_last_login,
     last_seen_at: now,
     logins,
   };
@@ -245,7 +248,7 @@ export async function saveProfile(
       `Supabase profile write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
     );
   }
-  return { first_seen_at: existing?.first_seen_at ?? now, logins };
+  return { profile: merged, first_seen_at: existing?.first_seen_at ?? now, logins };
 }
 
 /**
@@ -260,18 +263,21 @@ export async function saveProfile(
 export async function updateProfileContact(
   clientCode: string,
   patch: { email?: string | null; mobile_no?: string | null },
-): Promise<void> {
+): Promise<ProfileRow> {
   if (!supabaseConfigured || !clientCode) throw new Error("Supabase is not configured.");
 
   const row: Record<string, unknown> = { last_seen_at: new Date().toISOString() };
   if ("email" in patch) row.email = patch.email;
   if ("mobile_no" in patch) row.mobile_no = patch.mobile_no;
 
+  // `return=representation` is what makes a no-match visible: PostgREST answers
+  // a PATCH that matched nothing with 200 and an empty array, so asking for the
+  // rows back is the only way to tell "updated" from "silently did nothing".
   const res = await fetch(
     `${base()}/${PROFILES}?client_code=eq.${encodeURIComponent(clientCode)}`,
     {
       method: "PATCH",
-      headers: headers("return=minimal"),
+      headers: headers("return=representation"),
       body: JSON.stringify(row),
       cache: "no-store",
     },
@@ -281,4 +287,28 @@ export async function updateProfileContact(
       `Supabase profile update failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
     );
   }
+
+  const updated = await res.json();
+  if (Array.isArray(updated) && updated.length) return updated[0] as ProfileRow;
+
+  // No row to patch: the account has signed in but the profile write never
+  // landed — Supabase was unreachable at the time, or this is an older session
+  // from before profiles were stored. Create it rather than reporting success
+  // for a write that changed nothing.
+  const created = await fetch(`${base()}/${PROFILES}?on_conflict=client_code`, {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=representation"),
+    body: JSON.stringify([{ client_code: clientCode, ...row }]),
+    cache: "no-store",
+  });
+  if (!created.ok) {
+    throw new Error(
+      `Supabase profile insert failed (${created.status}): ${(await created.text()).slice(0, 200)}`,
+    );
+  }
+  const rows = await created.json();
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new Error("Supabase accepted the profile write but returned no row.");
+  }
+  return rows[0] as ProfileRow;
 }
