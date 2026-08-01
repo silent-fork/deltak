@@ -3,10 +3,10 @@
 import {
   Activity,
   AlarmClock,
-  Bot,
   FlaskConical,
   Hand,
   Plug,
+  Radar,
   Radio,
   Sunrise,
   Zap,
@@ -278,17 +278,17 @@ export function Header({
             Paper vs Live used to live here; Live has no server-side home yet
             (see the Watchdog section of the README), so surfacing a toggle
             for a mode that isn't really available was its own kind of
-            misleading. This slot is Auto-Driver vs Manual instead — who
-            fires an actionable signal, the one choice that's actually live
-            today. Purely local UI state: unlike a broker mode switch, this
-            never touches Angel One and can never be rejected.
+            misleading. This slot is Autopilot vs Manual instead — who fires
+            an actionable signal, the one choice that's actually live today.
+            Purely local UI state: unlike a broker mode switch, this never
+            touches Angel One and can never be rejected.
           */}
           <button
             onClick={() => engine.setAutomation(automation === "auto" ? "manual" : "auto")}
             title={
               automation === "auto"
-                ? "Auto-Driver — actionable signals execute themselves as paper trades. Click for Manual."
-                : "Manual — you execute every signal by hand from the Signal Deck. Click for Auto-Driver."
+                ? "Autopilot — actionable signals execute themselves as paper trades. Click for Manual."
+                : "Manual — you execute every signal by hand from the Signal Deck. Click for Autopilot."
             }
             className={cn(
               "flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors",
@@ -298,11 +298,11 @@ export function Header({
             )}
           >
             {automation === "auto" ? (
-              <Bot className="h-3 w-3 animate-pulse-ring" />
+              <Radar className="h-3 w-3 animate-pulse-ring" />
             ) : (
               <Hand className="h-3 w-3" />
             )}
-            {automation === "auto" ? "Auto-Driver" : "Manual"}
+            {automation === "auto" ? "Autopilot" : "Manual"}
           </button>
 
           {/*

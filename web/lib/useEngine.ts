@@ -114,13 +114,21 @@ export function useEngine(simulate: boolean) {
   const [session, setSession] = useState<EngineSession>(NO_SESSION);
   const [mode, setMode] = useState<ExecutionMode>("paper");
   /**
-   * Who fires an actionable signal — the browser's own auto-driver, or the
+   * Who fires an actionable signal — the browser's own Autopilot, or the
    * operator clicking Execute. Local, UI-only state: unlike `mode` this never
    * touches the broker, so switching it is instant and never rejected.
    */
   const [automation, setAutomationState] = useState<Automation>("manual");
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [masterReady, setMasterReady] = useState(false);
+  /**
+   * Whether the initial session restore has *settled* — not whether it
+   * succeeded. Before this, "not authenticated" and "haven't checked yet"
+   * were the same `false`, which is what put the sign-in screen on a fully
+   * signed-in operator's tab for one frame on every reload: the page rendered
+   * "not authenticated" as fact before the restore call had even returned.
+   */
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [simulated, setSimulated] = useState(false);
   const [demo, setDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -596,6 +604,10 @@ export function useEngine(simulate: boolean) {
       const [restored] = await Promise.all([restoreSession(), loadMaster()]);
       if (cancelled) return;
       startFeed(restored.authenticated ? restored : sessionRef.current);
+      // Both calls catch their own errors internally, so this always settles —
+      // "checked" is never stuck behind a network failure the way a gate on
+      // `masterReady` alone would be.
+      setSessionChecked(true);
       void tick();
     })();
 
@@ -944,7 +956,7 @@ export function useEngine(simulate: boolean) {
   const setAutomation = useCallback(
     (next: Automation) => {
       setAutomationState(next);
-      log("INFO", `${next === "auto" ? "Auto-Driver engaged — actionable signals execute themselves." : "Manual control — signals wait for Execute."}`);
+      log("INFO", `${next === "auto" ? "Autopilot engaged — actionable signals execute themselves." : "Manual control — signals wait for Execute."}`);
     },
     [log],
   );
@@ -1076,7 +1088,7 @@ export function useEngine(simulate: boolean) {
   );
 
   /**
-   * The auto-driver. When `automation` is `"auto"`, an actionable signal
+   * Autopilot. When `automation` is `"auto"`, an actionable signal
    * fires itself exactly the way a manual Execute click does — same sizing,
    * same portfolio-risk gate, same everything in `executeSignal` above.
    *
@@ -1102,7 +1114,7 @@ export function useEngine(simulate: boolean) {
         .catch((err) => {
           log(
             "INFO",
-            `Auto-Driver entry held back: ${err instanceof Error ? err.message : "unknown error"}`,
+            `Autopilot entry held back: ${err instanceof Error ? err.message : "unknown error"}`,
             u,
           );
         })
@@ -1145,6 +1157,7 @@ export function useEngine(simulate: boolean) {
   return {
     snapshot,
     session,
+    sessionChecked,
     mode,
     automation,
     setAutomation,

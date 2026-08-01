@@ -279,16 +279,16 @@ engine that nothing in the serverless build ever read or wrote. `0004` adds
 `broker_sessions` (the watchdog's encrypted credential store, below); `0005`
 adds `positions.entry_spot`.
 
-## Auto-Driver
+## Autopilot
 
 The header's Paper/Live toggle is gone for now — Live has no server-side home
 yet (see Watchdog, below), so a toggle for a mode that wasn't really available
-was its own kind of misleading. In its place: **Auto-Driver** vs **Manual**,
+was its own kind of misleading. In its place: **Autopilot** vs **Manual**,
 paper mode only, entirely local to the browser tab.
 
 - **Manual** (default) — today's behaviour: an actionable signal waits in the
   Signal Deck until the operator clicks Execute.
-- **Auto-Driver** — the same tick loop that already evaluates every signal
+- **Autopilot** — the same tick loop that already evaluates every signal
   also fires it: an actionable signal opens a paper position itself, through
   the exact same `executeSignal` path a manual click uses (same sizing, same
   portfolio-risk gate). It only ever opens the *first* position on a signal's
@@ -299,12 +299,13 @@ paper mode only, entirely local to the browser tab.
 
 **Scale-out stays in the browser in both modes.** The Weakening-quadrant TP1
 half-exit (`checkWeakeningRotation`) needs live RRG rotation state that only
-exists inside a running tab — it isn't gated by Auto-Driver vs Manual, it just
+exists inside a running tab — it isn't gated by Autopilot vs Manual, it just
 always runs, the same as it always has.
 
-DKMS itself already had a name for this — the Delta-protocol rationale reads
-"auto-driver muted" when both bounds are migrating. Auto-Driver is that same
-concept, just no longer muted the rest of the time.
+DKMS itself already had a name for this idea — the Delta-protocol rationale
+reads "auto-driver muted" when both bounds are migrating. Autopilot is that
+same concept, given its own name in the header: the engine flying the trade
+by itself, rather than muted the rest of the time.
 
 ## Watchdog
 

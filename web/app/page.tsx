@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { BootScreen } from "@/components/BootScreen";
 import { EngineProvider } from "@/components/EngineProvider";
 import { LoginScreen } from "@/components/LoginScreen";
 import { Header } from "@/components/Header";
@@ -57,12 +58,58 @@ export default function TerminalPage() {
     return trail.times.length > 1 ? trail : null;
   }, [rows, market.oiSeries, market.candles]);
 
+  /**
+   * The boot sequence's safety valve. Session check and the scrip master both
+   * always settle (each catches its own errors), but live chain data never
+   * comes with that guarantee — a dead feed or a market that never opens
+   * today would otherwise leave the boot screen spinning forever. Once the
+   * session check has settled, real data gets a few seconds to show up before
+   * this falls through to the dashboard's own per-panel skeletons regardless.
+   */
+  const [dataTimedOut, setDataTimedOut] = useState(false);
+  useEffect(() => {
+    if (!engine.sessionChecked || dataTimedOut) return;
+    const id = setTimeout(() => setDataTimedOut(true), 4000);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.sessionChecked]);
+
+  const dataReady = !!chain?.rows.length;
+  const bootStages = [
+    { label: "Verifying session…", done: engine.sessionChecked },
+    { label: "Loading scrip master…", done: engine.masterReady },
+    { label: "Engaging DKMS engine…", done: dataReady },
+  ];
+
+  // Before the session check settles, "not authenticated" and "haven't
+  // checked yet" must not read as the same thing — that's what put the
+  // sign-in screen on a fully signed-in operator's tab for one frame on every
+  // reload.
+  if (!engine.sessionChecked) {
+    return (
+      <EngineProvider engine={engine}>
+        <BootScreen stages={bootStages} />
+      </EngineProvider>
+    );
+  }
+
   // An empty terminal is worse than no terminal: without a feed there is nothing
   // to render and no circuit breaker can act, so gate on a live session.
   if (!engine.session.authenticated && !demo) {
     return (
       <EngineProvider engine={engine}>
         <LoginScreen simulate={SIMULATE} />
+      </EngineProvider>
+    );
+  }
+
+  // Signed in, but the board hasn't painted anything real yet — one boot
+  // screen instead of a patchwork of independent panel skeletons filling in
+  // over the next second or two.
+  if (!dataReady && !dataTimedOut) {
+    return (
+      <EngineProvider engine={engine}>
+        <BootScreen stages={bootStages} />
       </EngineProvider>
     );
   }
