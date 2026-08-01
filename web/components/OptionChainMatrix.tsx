@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { wallTags, type WallTag } from "@/lib/coaView";
 import type { OptionChain, OptionLeg } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
@@ -157,11 +158,27 @@ export function OptionChainMatrix({
     );
   }, [chain]);
 
-  if (!chain) {
+  // An empty ladder is still loading: the master or the feed has not landed.
+  if (!chain?.rows.length) {
     return (
       <Card className="h-full min-h-0">
-        <CardContent className="flex items-center justify-center text-xs text-zinc-600">
-          Awaiting option chain…
+        <CardHeader className="shrink-0">
+          <CardTitle className="truncate">4-Quadrant Option Chain</CardTitle>
+          <Skeleton className="h-2 w-28" />
+        </CardHeader>
+        <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
+          <SkeletonPanel label="Loading the option chain">
+            <Skeleton className="h-[19px] shrink-0" />
+            {/* A ladder of strikes, each with a wider strike column in the
+                middle — the shape the rows will actually take. */}
+            {Array.from({ length: 14 }, (_, i) => (
+              <div key={i} className="flex shrink-0 items-center gap-1">
+                <Skeleton className="h-3 flex-1" />
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3 flex-1" />
+              </div>
+            ))}
+          </SkeletonPanel>
         </CardContent>
       </Card>
     );

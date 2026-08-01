@@ -133,7 +133,37 @@ export interface ServerSession {
   jwtToken: string;
   refreshToken: string;
   clientCode: string;
+  /**
+   * Market-data token for the browser's own SmartStream socket.
+   *
+   * It lives in the cookie beside the trading JWT so a page refresh can rebuild
+   * the whole session: without it the tab comes back "signed in" but unable to
+   * open a feed, which is a worse state than being signed out. It is handed to
+   * the page either way — it subscribes to quotes and cannot trade — the cookie
+   * is simply where it survives a reload.
+   */
+  feedToken?: string;
+  /** When the session was established, ISO to the second. */
+  loginAt?: string;
 }
+
+/**
+ * How long the cookie may live.
+ *
+ * SmartAPI sessions expire daily, so this is a ceiling rather than a promise:
+ * the session route revalidates against the broker and refreshes or clears the
+ * cookie, and that — not the age of a cookie — is what decides whether the
+ * terminal is signed in.
+ */
+export const SESSION_MAX_AGE = 60 * 60 * 16;
+
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: SESSION_MAX_AGE,
+} as const;
 
 export function encodeSession(s: ServerSession): string {
   return Buffer.from(JSON.stringify(s), "utf8").toString("base64url");

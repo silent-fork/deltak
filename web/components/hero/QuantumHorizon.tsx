@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { coaMetrics } from "@/lib/coaView";
 import type { Candle, OptionChain, SessionStats, SpotQuote } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
@@ -252,9 +253,21 @@ export function QuantumHorizon({
         </div>
 
         {!view ? (
-          <div className="flex h-[108px] items-center justify-center rounded-md border border-zinc-800/70 bg-zinc-950/40 text-[11px] text-zinc-600">
-            Open-interest profile warming up…
-          </div>
+          <SkeletonPanel
+            label="Loading the open-interest profile"
+            className="h-[108px] shrink-0 justify-end rounded-md border border-zinc-800/70 bg-zinc-950/40 p-2"
+          >
+            {/* Bars either side of a centre line — the profile's own shape. */}
+            <div className="flex h-full items-center gap-[3px]">
+              {Array.from({ length: 22 }, (_, i) => (
+                <Skeleton
+                  key={i}
+                  className="flex-1"
+                  style={{ height: `${28 + ((i * 37) % 55)}%` }}
+                />
+              ))}
+            </div>
+          </SkeletonPanel>
         ) : (
           <>
             <div className="relative rounded-md border border-zinc-800/70 bg-zinc-950/50 px-1.5 pb-1 pt-2">
@@ -557,9 +570,9 @@ export function QuantumHorizon({
 
           <div className="relative mt-1 min-h-0 flex-1">
             {!traceView ? (
-              <div className="flex h-full items-center justify-center text-[10px] text-zinc-600">
-                Tracing spot…
-              </div>
+              <SkeletonPanel label="Loading the spot trace" className="h-full">
+                <Skeleton className="h-full min-h-0 w-full rounded" />
+              </SkeletonPanel>
             ) : (
               <svg
                 viewBox={`0 0 ${TW} ${TH}`}

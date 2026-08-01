@@ -15,6 +15,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import type { RrgNode, Signal } from "@/lib/types";
 import { PROTOCOL_META, QUADRANT_META, cn, fmt } from "@/lib/utils";
 
@@ -75,11 +76,17 @@ export function RrgScatter({
   nodes,
   highlightToken,
   signal,
+  settled = false,
+  asOf = null,
 }: {
   nodes: RrgNode[];
   highlightToken?: string | null;
   /** Renders the regime read-out beneath the plot when supplied. */
   signal?: Signal;
+  /** The board is frozen on a finished session — this plot is not rotating. */
+  settled?: boolean;
+  /** Which session it is frozen on, `YYYY-MM-DD`. */
+  asOf?: string | null;
 }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [hovered, setHovered] = useState<RrgNode | null>(null);
@@ -147,7 +154,20 @@ export function RrgScatter({
   return (
     <Card className="min-h-0">
       <CardHeader className="shrink-0">
-        <CardTitle className="truncate">RRG Momentum</CardTitle>
+        <div className="flex min-w-0 items-center gap-2">
+          <CardTitle className="truncate">RRG Momentum</CardTitle>
+          {/* Rotation is a claim about movement. When the market is shut this
+              plot is a photograph of the last session, and says so rather than
+              letting a still frame pass for a live one. */}
+          {settled ? (
+            <span
+              title={`Static — the rotation is the last completed session${asOf ? ` (${asOf})` : ""}, replayed from historical candles. Nothing advances until the next print.`}
+              className="shrink-0 rounded border border-zinc-700 px-1 font-mono text-[8px] uppercase tracking-wider text-zinc-500"
+            >
+              Static{asOf ? ` · ${asOf.slice(5)}` : ""}
+            </span>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           {(["ALL", "CE", "PE"] as Filter[]).map((f) => (
             <button
@@ -170,9 +190,26 @@ export function RrgScatter({
         {/* The plot takes the column's leftover height so the card ends flush. */}
         <div className="min-h-[150px] w-full flex-1">
           {visible.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-[11px] text-zinc-600">
-              RRG nodes warming up…
-            </div>
+            <SkeletonPanel label="Loading rotation nodes" className="h-full">
+              {/* The plot's own geometry — quadrants and a scatter of nodes —
+                  rather than a filled slab where the chart will be. */}
+              <div className="relative h-full min-h-0 w-full rounded-md border border-zinc-800/70">
+                <span className="absolute left-1/2 top-0 h-full w-px bg-zinc-800/60" />
+                <span className="absolute left-0 top-1/2 h-px w-full bg-zinc-800/60" />
+                {[
+                  ["28%", "34%"],
+                  ["62%", "22%"],
+                  ["44%", "58%"],
+                  ["71%", "66%"],
+                ].map(([left, top]) => (
+                  <Skeleton
+                    key={`${left}-${top}`}
+                    className="absolute h-2 w-2 rounded-full"
+                    style={{ left, top }}
+                  />
+                ))}
+              </div>
+            </SkeletonPanel>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 8, right: 14, bottom: 4, left: -14 }}>

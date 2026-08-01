@@ -7,6 +7,7 @@ import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { useEngineContext } from "@/components/EngineProvider";
 import { roundTripCharges } from "@/lib/engine/charges";
 import { fetchMargin } from "@/lib/market/client";
@@ -182,8 +183,19 @@ export function SignalPanel({
 
   if (!signal) {
     return (
-      <CardContent className="flex items-center justify-center text-xs text-zinc-600">
-        Signal engine warming up…
+      <CardContent className="min-h-0 p-2">
+        <SkeletonPanel label="Loading the signal engine">
+          <Skeleton className="h-3 w-32 shrink-0" />
+          <Skeleton className="h-2.5 w-full shrink-0" />
+          <Skeleton className="h-[52px] shrink-0" />
+          <div className="grid shrink-0 grid-cols-4 gap-1">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-[30px]" />
+            ))}
+          </div>
+          <Skeleton className="h-[68px] shrink-0" />
+          <Skeleton className="min-h-[40px] flex-1" />
+        </SkeletonPanel>
       </CardContent>
     );
   }

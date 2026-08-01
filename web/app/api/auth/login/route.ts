@@ -4,6 +4,7 @@ import {
   API_KEY,
   LOGIN_URL,
   SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
   SmartApiError,
   encodeSession,
   smartApiCall,
@@ -79,13 +80,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const loginAt = new Date().toISOString().slice(0, 19);
+
     const res = NextResponse.json({
       authenticated: true,
       client_code: clientCode,
       feed_token: data.feedToken,
       api_key: API_KEY,
       state: data.state ?? body.state ?? null,
-      login_time: new Date().toISOString().slice(0, 19),
+      login_time: loginAt,
     });
 
     res.cookies.set(
@@ -94,15 +97,10 @@ export async function POST(request: Request) {
         jwtToken: data.jwtToken,
         refreshToken: data.refreshToken ?? "",
         clientCode,
+        feedToken: data.feedToken,
+        loginAt,
       }),
-      {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        // SmartAPI sessions expire at midnight IST; this is a generous ceiling.
-        maxAge: 60 * 60 * 16,
-      },
+      SESSION_COOKIE_OPTIONS,
     );
     return res;
   } catch (err) {

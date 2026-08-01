@@ -77,6 +77,29 @@
     pointer-events: none;
   }
 
+  /*
+   * Skeleton shimmer — a slow sweep, not a pulse. The terminal is already full
+   * of things that blink for a reason (tick flashes, armed bands, the panic
+   * rail), and a loading placeholder must not compete with any of them.
+   */
+  .dk-skeleton {
+    position: relative;
+    overflow: hidden;
+  }
+  .dk-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.045),
+      transparent
+    );
+    animation: dk-shimmer 1.6s ease-in-out infinite;
+  }
+
   .dk-grid-bg {
     background-image:
       linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
@@ -112,9 +135,19 @@
   }
 }
 
+@keyframes dk-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dk-scroll {
     scroll-behavior: auto;
+  }
+  /* The shapes carry the meaning; the sweep is decoration. */
+  .dk-skeleton::after {
+    animation: none;
   }
 }
 

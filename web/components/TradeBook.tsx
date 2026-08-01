@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
+import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { useEngineContext } from "@/components/EngineProvider";
 import type { LedgerSnapshot, Position } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
@@ -209,8 +210,17 @@ export function TradeBook({
 
   if (!ledger) {
     return (
-      <CardContent className="flex items-center justify-center text-xs text-zinc-600">
-        Ledger loading…
+      <CardContent className="min-h-0 p-2">
+        <SkeletonPanel label="Loading the ledger">
+          <div className="grid shrink-0 grid-cols-4 gap-1">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-[30px]" />
+            ))}
+          </div>
+          <Skeleton className="h-[26px] shrink-0" />
+          <Skeleton className="h-[64px] shrink-0" />
+          <Skeleton className="h-[64px] shrink-0" />
+        </SkeletonPanel>
       </CardContent>
     );
   }

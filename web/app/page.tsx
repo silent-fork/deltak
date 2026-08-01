@@ -128,7 +128,13 @@ export default function TerminalPage() {
               candles={market.candles}
               stats={market.stats}
             />
-            <RrgScatter nodes={nodes} highlightToken={signal?.token} signal={signal} />
+            <RrgScatter
+              nodes={nodes}
+              highlightToken={signal?.token}
+              signal={signal}
+              settled={engine.settled}
+              asOf={market.stats?.date ?? null}
+            />
           </section>
 
           {/* Board — the chain, and everything that acts on it */}
