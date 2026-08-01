@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { forgetBrokerSession } from "@/lib/server/brokerSession";
 import {
   LOGOUT_URL,
   SESSION_COOKIE,
@@ -30,6 +31,9 @@ export async function POST() {
       jwt: session.jwtToken,
       body: { clientcode: session.clientCode },
     }).catch(() => undefined);
+    // A signed-out account should leave nothing behind for a background job
+    // to decrypt and use.
+    await forgetBrokerSession(session.clientCode);
   }
 
   const res = NextResponse.json({ authenticated: false });

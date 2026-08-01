@@ -31,6 +31,7 @@ import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
 import {
   DEFAULT_CONFIG,
+  nextMidnightIst,
   secondsToDaylightRest,
   secondsToNextOpen,
 } from "../lib/engine/config";
@@ -579,6 +580,25 @@ test("tick store tracks intraday OI change and carries fields forward", () => {
   assert.equal(s.prevLtp("35005"), 100);
   assert.equal(s.get("35005")!.volume, 999);
   assert.equal(s.get("35005")!.close, 95);
+});
+
+test("the next midnight IST is always still ahead, whatever time of day it's asked from", () => {
+  // 06:30 UTC = 12:00 IST on 2026-08-01 — midnight IST that ends the day is
+  // 2026-08-01 18:30 UTC.
+  assert.equal(
+    nextMidnightIst(new Date("2026-08-01T06:30:00Z")).toISOString(),
+    "2026-08-01T18:30:00.000Z",
+  );
+  // A minute before that boundary, and a minute after it: the answer should
+  // jump to the *next* day's midnight the instant the first one passes.
+  assert.equal(
+    nextMidnightIst(new Date("2026-08-01T18:29:00Z")).toISOString(),
+    "2026-08-01T18:30:00.000Z",
+  );
+  assert.equal(
+    nextMidnightIst(new Date("2026-08-01T18:31:00Z")).toISOString(),
+    "2026-08-02T18:30:00.000Z",
+  );
 });
 
 test("the next-open clock skips the weekend", () => {

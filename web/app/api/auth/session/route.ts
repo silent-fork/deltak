@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { rememberBrokerSession } from "@/lib/server/brokerSession";
 import {
   cachedProfile,
   fetchProfile,
@@ -119,6 +120,16 @@ export async function GET() {
     const profile = await fetchProfile(data.jwtToken, session.clientCode)
       .then((p) => rememberProfile(p, false))
       .catch(() => cachedProfile(session.clientCode));
+
+    // Refreshed tokens replace the stored copy the same way they replace the
+    // cookie — a new JWT means yesterday's stored one would already be dead.
+    await rememberBrokerSession({
+      clientCode: session.clientCode,
+      jwtToken: data.jwtToken,
+      refreshToken: data.refreshToken ?? session.refreshToken,
+      at: new Date(`${loginAt}Z`),
+    });
+
     const res = NextResponse.json({
       ...body(feedToken, loginAt),
       profile,

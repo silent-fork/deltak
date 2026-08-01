@@ -240,3 +240,18 @@ export function secondsToNextOpen(at: Date = new Date()): number {
   }
   return 0;
 }
+
+/**
+ * The midnight IST that ends `at`'s IST calendar day — SmartAPI sessions
+ * expire then, whatever time within the day they were issued.
+ *
+ * IST is UTC+5:30 with no daylight saving, so "midnight IST of calendar date
+ * Y-M-D" is always exactly `Y-M-D 18:30` UTC the day before. `istParts` gives
+ * the IST calendar date for *any* instant during that day, so this is always
+ * the boundary still ahead of `at` — never a stale one already passed.
+ */
+export function nextMidnightIst(at: Date = new Date()): Date {
+  const p = istParts(at);
+  const [y, m, d] = p.date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 18, 30, 0));
+}

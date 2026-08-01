@@ -312,3 +312,70 @@ export async function updateProfileContact(
   }
   return rows[0] as ProfileRow;
 }
+
+/* ------------------------------------------------------------ broker session */
+
+/**
+ * One account's Angel One session, encrypted at rest, for background jobs
+ * (the risk watchdog) that need to read market data or manage positions
+ * without a browser tab open. Every column here is ciphertext plus the
+ * AES-GCM nonce and tag needed to open it — never a usable token. Encryption
+ * itself lives in `lib/server/crypto.ts`; this module only ever moves opaque
+ * strings in and out of the table, same as every other table here.
+ */
+export interface BrokerSessionRow {
+  client_code: string;
+  jwt_ciphertext: string;
+  jwt_iv: string;
+  jwt_tag: string;
+  refresh_ciphertext: string | null;
+  refresh_iv: string | null;
+  refresh_tag: string | null;
+  expires_at: string;
+  updated_at: string;
+}
+
+const BROKER_SESSIONS = "broker_sessions";
+
+export async function writeBrokerSession(
+  row: Omit<BrokerSessionRow, "updated_at">,
+): Promise<void> {
+  if (!supabaseConfigured) return;
+  const res = await fetch(`${base()}/${BROKER_SESSIONS}?on_conflict=client_code`, {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify([{ ...row, updated_at: new Date().toISOString() }]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase broker-session write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+export async function readBrokerSession(clientCode: string): Promise<BrokerSessionRow | null> {
+  if (!supabaseConfigured || !clientCode) return null;
+  const search = new URLSearchParams({
+    select: "*",
+    client_code: `eq.${clientCode}`,
+    limit: "1",
+  });
+  const res = await fetch(`${base()}/${BROKER_SESSIONS}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return Array.isArray(body) && body.length ? (body[0] as BrokerSessionRow) : null;
+}
+
+/** Called on logout, and before a fresh session overwrites a stale one. */
+export async function deleteBrokerSession(clientCode: string): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  await fetch(`${base()}/${BROKER_SESSIONS}?client_code=eq.${encodeURIComponent(clientCode)}`, {
+    method: "DELETE",
+    headers: headers("return=minimal"),
+    cache: "no-store",
+  });
+}

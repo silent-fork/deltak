@@ -21,6 +21,7 @@ export const PROFILE_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getProf
 export const LOGOUT_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/logout`;
 export const RMS_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getRMS`;
 export const PLACE_ORDER_URL = `${API_ROOT}/rest/secure/angelbroking/order/v1/placeOrder`;
+export const LTP_URL = `${API_ROOT}/rest/secure/angelbroking/order/v1/getLtpData`;
 export const CANDLE_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getCandleData`;
 export const OI_DATA_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getOIData`;
 export const PCR_URL = `${API_ROOT}/rest/secure/angelbroking/marketData/v1/putCallRatio`;

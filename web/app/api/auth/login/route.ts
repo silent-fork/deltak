@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { rememberBrokerSession } from "@/lib/server/brokerSession";
 import { fetchProfile, rememberProfile } from "@/lib/server/profile";
 import {
   API_KEY,
@@ -108,6 +109,17 @@ export async function POST(request: Request) {
     const profile = await fetchProfile(data.jwtToken, clientCode)
       .then((p) => rememberProfile(p, true))
       .catch(() => null);
+
+    // Encrypted, best-effort, and off entirely unless DK_SESSION_ENC_KEY is
+    // set — see lib/server/brokerSession.ts. This is what lets a background
+    // job read prices or manage positions for this account without a browser
+    // tab open; nothing about the cookie above changes.
+    await rememberBrokerSession({
+      clientCode: profile?.client_code ?? clientCode,
+      jwtToken: data.jwtToken,
+      refreshToken: data.refreshToken,
+      at: new Date(`${loginAt}Z`),
+    });
 
     const res = NextResponse.json({
       authenticated: true,
