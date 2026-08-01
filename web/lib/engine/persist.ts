@@ -33,8 +33,8 @@ export const TABLE_COLUMNS = {
   positions: [
     "client_code", "trade_key", "ledger_id", "mode", "underlying", "token",
     "trading_symbol", "option_type", "strike", "side", "quantity", "lots",
-    "lot_size", "avg_price", "ltp", "stop_loss", "target", "protocol", "status",
-    "unrealised_pnl", "realised_pnl", "pnl_pct", "exit_price", "exit_reason",
+    "lot_size", "avg_price", "ltp", "entry_spot", "stop_loss", "target", "protocol",
+    "status", "unrealised_pnl", "realised_pnl", "pnl_pct", "exit_price", "exit_reason",
     "opened_at", "closed_at",
   ],
   orders: [
@@ -61,6 +61,7 @@ export interface PositionRow {
   lot_size: number;
   avg_price: number;
   ltp: number | null;
+  entry_spot: number | null;
   stop_loss: number | null;
   target: number | null;
   protocol: Protocol | null;
@@ -122,6 +123,7 @@ export function positionRow(p: Position): PositionRow {
     lot_size: p.lot_size,
     avg_price: p.avg_price,
     ltp: p.ltp,
+    entry_spot: p.entry_spot,
     stop_loss: p.stop_loss,
     target: p.target,
     protocol: p.protocol,

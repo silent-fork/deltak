@@ -75,9 +75,7 @@ function archiveRowToPosition(row: ArchiveRow): Position {
     lot_size: asNum(row.lot_size),
     avg_price: asNum(row.avg_price),
     ltp: asNum(row.ltp, asNum(row.avg_price)),
-    // Not a persisted column — an archive row is display-only and never
-    // reaches a risk guard, so there is nothing to corroborate against.
-    entry_spot: null,
+    entry_spot: asNumOrNull(row.entry_spot),
     stop_loss: asNumOrNull(row.stop_loss),
     target: asNumOrNull(row.target),
     unrealised_pnl: asNum(row.unrealised_pnl),

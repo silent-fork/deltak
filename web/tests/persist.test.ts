@@ -100,6 +100,7 @@ test("an open position maps with its live marks and no exit", () => {
   assert.equal(row.lots, 2);
   assert.equal(row.avg_price, 118.5);
   assert.equal(row.ltp, 131.2);
+  assert.equal(row.entry_spot, 24_500);
   assert.equal(row.unrealised_pnl, 1905);
   assert.equal(row.realised_pnl, 0);
   assert.equal(row.pnl_pct, 10.72);
