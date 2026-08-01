@@ -79,7 +79,7 @@ export function SignalDeck({
         <div className="flex min-w-0 items-center gap-1">
           {(
             [
-              ["signal", "Delta-K Signal Engine"],
+              ["signal", "DeltaK Signal Engine"],
               ["book", "Trade Book"],
             ] as const
           ).map(([key, label]) => (

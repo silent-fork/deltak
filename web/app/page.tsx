@@ -207,7 +207,7 @@ export default function TerminalPage() {
         <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
           <span className="flex items-center gap-3">
             <span>
-              Delta-K Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
+              DeltaK Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
             </span>
             {/* Historical reads are an enhancement, never a dependency — say so
                 here rather than raising the degraded banner over them. */}

@@ -18,7 +18,7 @@ import type { RrgEngine } from "./rrg";
  * COA 1.0 reads the *cumulative* open-interest walls: the static Aegis (support)
  * and Zenith (resistance) carried into the session. COA 2.0 reads the *intraday
  * change* in open interest, which is what actually moves during the day and what
- * the Delta-K driver trades — writers adding puts below spot lift Aegis-1,
+ * the DeltaK driver trades — writers adding puts below spot lift Aegis-1,
  * writers adding calls above spot pin Zenith-1.
  */
 

@@ -14,7 +14,7 @@ import type { ScripMaster } from "./scripMaster";
 import { calculateSize } from "./sizing";
 
 /**
- * Delta-K Matrix Strategy signal engine — port of `backend/app/engine/dkms.py`.
+ * DeltaK Matrix Strategy signal engine — port of `backend/app/engine/dkms.py`.
  *
  * Regime selection from COA 2.0 level migration:
  *

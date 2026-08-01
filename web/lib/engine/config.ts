@@ -1,5 +1,5 @@
 /**
- * Delta-K strategy configuration — the TypeScript twin of `backend/app/config.py`.
+ * DeltaK strategy configuration — the TypeScript twin of `backend/app/config.py`.
  *
  * In the serverless build the engine runs *in the browser*, so these are plain
  * constants rather than environment settings. Anything an operator should be

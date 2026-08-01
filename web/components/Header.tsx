@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { EventLogMenu } from "@/components/EventLogMenu";
 import { LoginModal } from "@/components/LoginModal";
 import { UserPill } from "@/components/UserPill";
+import { Wordmark } from "@/components/Wordmark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEngineContext } from "@/components/EngineProvider";
@@ -168,9 +169,7 @@ export function Header({
               <Zap className="h-4 w-4 text-quantum" />
             </div>
             <div className="leading-none">
-              <div className="text-[13px] font-bold tracking-[0.16em] text-zinc-100">
-                DELTA-K
-              </div>
+              <Wordmark className="text-[13px] tracking-[0.16em]" />
               <div className="mt-1 text-[8px] uppercase tracking-[0.22em] text-quantum/70">
                 Terminal · DKMS
               </div>

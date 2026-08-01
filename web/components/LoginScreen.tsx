@@ -4,6 +4,7 @@ import { Loader2, LockKeyhole, ShieldAlert, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
+import { Wordmark } from "@/components/Wordmark";
 import { Input } from "@/components/ui/input";
 import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
 
@@ -91,9 +92,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             <Zap className="h-4 w-4 text-quantum" />
           </div>
           <div className="leading-none">
-            <div className="text-[15px] font-semibold tracking-[0.18em] text-zinc-100">
-              DELTA-K
-            </div>
+            <Wordmark className="text-[15px] font-semibold tracking-[0.18em]" />
             <div className="mt-1 text-[9px] uppercase tracking-[0.24em] text-zinc-500">
               Terminal · DKMS
             </div>

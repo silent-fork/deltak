@@ -2,13 +2,13 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 export const metadata = {
-  title: "Delta-K · Auth Callback",
+  title: "DeltaK · Auth Callback",
 };
 
 /**
  * Landing page for the Redirect URL registered on the Angel One SmartAPI app.
  *
- * Delta-K authenticates through `loginByPassword` (client code + PIN + TOTP),
+ * DeltaK authenticates through `loginByPassword` (client code + PIN + TOTP),
  * so this route is never part of the normal session flow — Angel One simply
  * requires the app registration to carry a valid redirect target. It exists so
  * that URL resolves to something real instead of a 404.
@@ -32,7 +32,7 @@ export default function AuthCallbackPage({
         </div>
 
         <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-          Delta-K Terminal establishes its session with{" "}
+          DeltaK Terminal establishes its session with{" "}
           <span className="font-mono text-zinc-200">loginByPassword</span> —
           client code, PIN and the six-digit TOTP from your authenticator app.
           This redirect target exists only to satisfy the Angel One app
@@ -42,7 +42,7 @@ export default function AuthCallbackPage({
         {authCode ? (
           <div className="mt-4 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
             Angel One returned a publisher auth code
-            {state ? ` (state: ${String(state)})` : ""}. Delta-K does not consume
+            {state ? ` (state: ${String(state)})` : ""}. DeltaK does not consume
             it — sign in from the terminal header instead.
           </div>
         ) : null}

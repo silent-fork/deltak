@@ -18,9 +18,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Delta-K Terminal",
+  title: "DeltaK Terminal",
   description:
-    "Options trading HUD and signal engine — Delta-K Matrix Strategy (DKMS) over NIFTY, BANKNIFTY and FINNIFTY.",
+    "Options trading HUD and signal engine — DeltaK Matrix Strategy (DKMS) over NIFTY, BANKNIFTY and FINNIFTY.",
 };
 
 export const viewport: Viewport = {

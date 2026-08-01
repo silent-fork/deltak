@@ -43,7 +43,7 @@ import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
 
 /**
- * The Delta-K engine, running in the browser.
+ * The DeltaK engine, running in the browser.
  *
  * This replaces `state.py`, `risk.py` and the SSE broadcaster in one hook: the
  * pipeline (feed → chain → RRG → protocol → signal → mark-to-market) runs on a

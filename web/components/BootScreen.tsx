@@ -3,6 +3,7 @@
 import { Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,29 +83,19 @@ export function BootScreen({ stages }: { stages: BootStage[] }) {
       <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-30" />
 
       <div className="relative flex animate-in flex-col items-center gap-9 fade-in zoom-in-95 duration-700">
-        {/* Core emblem — a slow conic ring orbiting the mark, not a static
-            bordered box. */}
-        <div className="relative flex h-[88px] w-[88px] items-center justify-center">
-          <div
-            className="absolute inset-0 animate-spin-slow rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 0%, rgba(0,240,255,0.65) 18%, transparent 40%)",
-            }}
-          />
-          <div className="absolute inset-[3px] rounded-full bg-zinc-950" />
-          <div className="absolute inset-0 rounded-full border border-quantum/15" />
-          <div className="absolute h-14 w-14 rounded-full bg-quantum/10 blur-xl" />
+        {/* Core emblem — the same square mark the header and sign-in screen
+            use, just larger; a glow breathes behind it rather than the mark
+            itself spinning. */}
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10 shadow-quantum">
+          <div className="absolute h-14 w-14 rounded-md bg-quantum/10 blur-xl" />
           <Zap
-            className="relative h-8 w-8 animate-pulse-ring text-quantum"
+            className="relative h-7 w-7 animate-pulse-ring text-quantum"
             style={{ filter: "drop-shadow(0 0 12px rgba(0,240,255,0.65))" }}
           />
         </div>
 
         <div className="text-center leading-none">
-          <div className="text-[24px] font-bold tracking-[0.22em] text-zinc-100">
-            DELTA-K
-          </div>
+          <Wordmark className="text-[24px] tracking-[0.22em]" />
           <div className="mt-2.5 text-[9px] uppercase tracking-[0.34em] text-quantum/60">
             Terminal · DKMS
           </div>

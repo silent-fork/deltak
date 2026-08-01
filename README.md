@@ -1,7 +1,7 @@
-# Delta-K Terminal
+# DeltaK Terminal
 
 An options trading HUD and signal engine for Indian index options, implementing
-the **Delta-K Matrix Strategy (DKMS)** — a hybrid framework pairing Chart of
+the **DeltaK Matrix Strategy (DKMS)** — a hybrid framework pairing Chart of
 Accuracy (COA 1.0 & 2.0) option-chain analysis with a Relative Rotation Graph
 (RRG) multi-strike momentum engine, over Angel One SmartAPI v2.0.
 
@@ -197,7 +197,7 @@ four things:
 
 | Field | What to enter |
 | --- | --- |
-| **Redirect URL** | `https://<your-domain>/auth/callback`. Delta-K uses `loginByPassword`, not the OAuth publisher flow, so this is never exercised — but the form requires a valid URL, and the app serves a real page there. |
+| **Redirect URL** | `https://<your-domain>/auth/callback`. DeltaK uses `loginByPassword`, not the OAuth publisher flow, so this is never exercised — but the form requires a valid URL, and the app serves a real page there. |
 | **Primary Static IP** | The public egress IP the `/api/auth/login` route calls Angel One from — your ISP IP for local runs, Vercel's outbound IP once deployed. This is the field that breaks logins when wrong. |
 | **Secondary Static IP** | Optional failover egress IP. |
 
