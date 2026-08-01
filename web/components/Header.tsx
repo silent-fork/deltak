@@ -5,7 +5,6 @@ import {
   AlarmClock,
   FlaskConical,
   Plug,
-  PlugZap,
   Radio,
   Sunrise,
   Zap,
@@ -14,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { EventLogMenu } from "@/components/EventLogMenu";
 import { LoginModal } from "@/components/LoginModal";
+import { UserPill } from "@/components/UserPill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEngineContext } from "@/components/EngineProvider";
@@ -312,19 +312,20 @@ export function Header({
             {mode === "live" ? "Live" : "Paper"}
           </button>
 
+          {/*
+            The account, not just the connection. "Connected" proved a session
+            existed and said nothing about whose — with a client code, a name
+            and the day's book behind it, this answers both.
+          */}
           {authed ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={async () => {
-                await engine.logout().catch(() => undefined);
-                onRefreshStatus();
-              }}
-              className="h-7 border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-            >
-              <PlugZap className="h-3 w-3" />
-              Connected
-            </Button>
+            <UserPill
+              profile={engine.session.profile}
+              clientCode={engine.session.clientCode ?? ""}
+              loginTime={engine.session.loginTime}
+              mode={mode}
+              ledger={snapshot?.ledger}
+              onSignedOut={onRefreshStatus}
+            />
           ) : (
             <Button
               variant="quantum"

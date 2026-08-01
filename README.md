@@ -26,9 +26,9 @@ Covers **NIFTY 50**, **BANKNIFTY** and **FINNIFTY**.
 └──────────────┬───────────────────────────────┘
                │  /api/auth, /api/order, /api/market/*, /api/persist, /api/history/*
                ▼
-      ┌─────────────────────────── Supabase ──────────────────────────┐
-      │  trading_sessions · orders · positions · signals · risk_events │
-      └────────────────────────────────────────────────────────────────┘
+      ┌──────────────────────── Supabase ───────────────────────┐
+      │  user_profiles · positions · orders · risk_events        │
+      └──────────────────────────────────────────────────────────┘
 ```
 
 There is no separate backend to host. The signal engine (COA, RRG, DKMS,
@@ -232,20 +232,70 @@ behaviour is identical apart from where the order goes.
 
 ---
 
+## The operator
+
+`getProfile` runs immediately after login, and again on every session restore —
+it is also the cheapest proof a JWT is still alive, so the terminal gets an
+identity for free. What comes back (name, email, mobile, broker, enabled
+segments and product types) is written to `user_profiles` and shown in the
+**user pill** at the right of the header: initials, name, client code and a live
+dot, opening onto the full profile, the broker's available margin and the day's
+book, with sign-out.
+
+Nothing in that table is a credential. The order-placing JWT stays in the
+httpOnly cookie the page cannot read, and the profile is fetched server-side.
+
 ## Persistence
 
-Supabase stores sessions, orders, positions, signals and risk events. Writes go
-through a bounded write-behind queue — **the trading loop never waits on the
-database**, and if Supabase is slow or unreachable the engine keeps trading and
-drops the oldest queued rows rather than growing without bound. With
-`SUPABASE_URL` unset, the repository degrades to a no-op.
+Supabase stores the operator's profile, positions, orders and risk events.
+Writes are fire-and-forget — **the trading loop never waits on the database**,
+and if Supabase is slow or unreachable the engine keeps trading. With
+`SUPABASE_URL` unset, persistence degrades to a no-op.
+
+| Table | Written when |
+| --- | --- |
+| `user_profiles` | Every login and session restore, upserted on client code |
+| `positions` | On entry, on every scale-out and exit, and as a checkpoint each minute while a position is open |
+| `orders` | Every executed leg, and every live order the broker *rejected* |
+| `risk_events` | Every circuit-breaker, fill and session notice |
+
+**Active and closed trades are the same row.** A position is upserted on a
+`trade_key` — the account, the ledger id and the moment it opened — so the
+entry, its mark-to-market checkpoints and its exit collapse onto one row that
+moves from `OPEN` to `CLOSED` rather than a trail of duplicates.
+
+Attribution is stamped server-side from the session cookie: a trade is filed
+under the account whose session wrote it, never under whatever the request body
+claims. History reads are scoped the same way, and require a session.
 
 RLS is enabled on every table with **no policies**: anon and authenticated
 clients get nothing. The engine writes with the service-role key, which bypasses
-RLS. This is verified in the migration — an anon role sees zero rows and its
-inserts are rejected.
+RLS, and reads go back through this app's own routes.
 
-Apply the schema with `supabase/migrations/0001_deltak_core_schema.sql`.
+Apply `supabase/migrations/` in order. `0002` adds the profile table and trade
+attribution; `0003` drops `trading_sessions`, `signals`, `engine_settings` and
+the `session_performance` view — schema carried over from the retired FastAPI
+engine that nothing in the serverless build ever read or wrote.
+
+## Human verification
+
+The sign-in form relays a client code, PIN and TOTP to Angel One. In front of it
+sits **Cloudflare Turnstile**, so a public deployment is not a free
+credential-stuffing endpoint against a broker's rate limits and lockouts.
+
+It is non-interactive by design: the widget renders in `interaction-only`
+appearance and `execute` mode, so the operator sees the sign-in button spin and
+nothing more. The token is verified server-side before the login route touches
+Angel One.
+
+- `NEXT_PUBLIC_DK_TURNSTILE_SITE_KEY` — public, rendered into the page
+- `DK_TURNSTILE_SECRET_KEY` — server-side only; setting it is what turns the check on
+- `NEXT_PUBLIC_DK_TURNSTILE_ENABLED=0` — takes the gate out of the path entirely,
+  for local work and end-to-end tests. Both halves read this variable, so the
+  browser and the server never disagree about whether a token is expected.
+
+If Cloudflare itself is unreachable the login proceeds: the check filters
+automated abuse, it is not an authentication factor — the TOTP behind it is.
 
 ---
 
@@ -262,6 +312,9 @@ these environment variables (see `web/.env.example` for the full list):
 | `DK_CLIENT_LOCAL_IP` / `DK_CLIENT_PUBLIC_IP` | Client identity headers Angel One expects on REST calls. |
 | `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key — **server-side only**, never prefixed `NEXT_PUBLIC_` |
+| `NEXT_PUBLIC_DK_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key. Public by design. |
+| `DK_TURNSTILE_SECRET_KEY` | Turnstile secret — **server-side only**. Setting it enables verification. |
+| `NEXT_PUBLIC_DK_TURNSTILE_ENABLED` | `0` to switch the check off for testing. Anything else, including unset, leaves it on. |
 | `NEXT_PUBLIC_SIMULATE` | `1` to force the synthetic feed. |
 
 There is no engine host, no static outbound IP to provision, and no always-on
@@ -284,7 +337,9 @@ whitelisting changes at all.
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/master` | Ingest and cache the scrip master (unauthenticated, edge-cached 1h) |
-| `POST` | `/api/auth/login` | Establish a SmartAPI session (client code, PIN, TOTP) |
+| `POST` | `/api/auth/login` | Establish a SmartAPI session (client code, PIN, TOTP), behind Turnstile; reads and stores the profile |
+| `GET` | `/api/auth/session` | Revalidate the cookie against the broker, refresh across the daily expiry, return the profile |
+| `GET` | `/api/auth/profile` | The signed-in operator, in full. Scoped to the session cookie |
 | `POST` | `/api/auth/logout` | Clear the session cookie |
 | `GET` | `/api/rms` | Available margin for pre-trade leverage checks |
 | `POST` | `/api/market/candles` | Historical candles (`getCandleData`), normalised and sliced to the last trading session |
@@ -293,8 +348,8 @@ whitelisting changes at all.
 | `GET` | `/api/market/pcr` | Cumulative market-wide Put-Call Ratio (`putCallRatio`) |
 | `POST` | `/api/market/buildup` | OI buildup classes (`OIBuildup`) for an expiry bucket |
 | `POST` | `/api/order` | Place a live order via Angel One `placeOrder` |
-| `POST` | `/api/persist` | Append engine records (orders, positions, signals, risk events) to Supabase |
-| `GET` | `/api/history/:resource` | Read persisted sessions, orders, positions, signals or risk events |
+| `POST` | `/api/persist` | Append positions, orders and risk events to Supabase, attributed from the session cookie |
+| `GET` | `/api/history/:resource` | Read back this account's persisted positions, orders or risk events |
 
 The chain, RRG, DKMS signal and paper-mode ledger have no routes — they run
 entirely client-side in `web/lib/useEngine.ts` and never leave the tab.
@@ -321,14 +376,15 @@ web/
   app/
     api/
       master/            scrip master cold bootstrap
-      auth/login,logout/ SmartAPI session exchange
+      auth/                SmartAPI session exchange, restore, profile
       rms/                available margin
       order/              live order placement
-      persist/            Supabase write-behind
-      history/[resource]/ Supabase read-back
+      persist/            Supabase writes, attributed from the cookie
+      history/[resource]/ Supabase read-back, scoped to the account
       market/             historical candles, OI, PCR, OI buildup
     page.tsx, layout.tsx  HUD shell
   components/            HUD panels (chain, RRG scatter, order book, signal panel)
+                         plus the header user pill
   lib/
     engine/
       coa.ts             COA 1.0/2.0 chain builder, Aegis/Zenith
@@ -336,6 +392,7 @@ web/
       dkms.ts            protocol selection and signal generation
       sizing.ts          risk-adjusted lot sizing
       ledger.ts          virtual execution ledger
+      persist.ts         ledger objects → Supabase rows
       risk.ts            circuit breakers
       scripMaster.ts     scrip master parsing
       config.ts          every strategy knob, env-driven
@@ -349,8 +406,12 @@ web/
       parse.ts           payload normalisers, session slicing, PCR mapping
       clock.ts           IST request windows
       client.ts          rate-limited, cached browser client
-    server/smartapi.ts   SmartAPI v2.0 REST client (server-only)
+    server/
+      smartapi.ts        SmartAPI v2.0 REST client (server-only)
+      profile.ts         getProfile → normalise → store
+      turnstile.ts       Cloudflare Turnstile verification
     supabase.ts          Supabase client
+    useTurnstile.ts      the non-interactive challenge, browser side
     useEngine.ts         the engine loop itself — runs in the browser
     useMarketData.ts     historical context polling and ΔOI baselining
   tests/                 engine unit tests

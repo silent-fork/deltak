@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { fetchProfile, rememberProfile } from "@/lib/server/profile";
 import {
   API_KEY,
   LOGIN_URL,
@@ -9,6 +10,7 @@ import {
   encodeSession,
   smartApiCall,
 } from "@/lib/server/smartapi";
+import { clientIp, verifyTurnstile } from "@/lib/server/turnstile";
 
 /**
  * `POST /api/auth/login` — Angel One loginByPassword.
@@ -21,6 +23,12 @@ import {
  *    are market-data scoped: they subscribe to quotes, they cannot trade.
  *
  * The TOTP is single-use and transient — forwarded as-is, never stored.
+ *
+ * A `getProfile` follows the token exchange so the terminal opens knowing who
+ * is at it. That profile is written to Supabase and returned in the body; if
+ * either step fails the login still succeeds, because an operator locked out of
+ * a trading screen by a directory lookup is a worse outcome than a nameless
+ * one.
  */
 
 export const runtime = "nodejs";
@@ -44,11 +52,25 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { client_code?: string; pin?: string; totp?: string; state?: string };
+  let body: {
+    client_code?: string;
+    pin?: string;
+    totp?: string;
+    state?: string;
+    turnstile_token?: string;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ detail: "Malformed request body." }, { status: 400 });
+  }
+
+  // Ahead of the credential check, and ahead of any call to the broker: the
+  // point is to keep automated attempts away from Angel One's rate limits and
+  // lockouts, which only works if nothing reaches Angel One first.
+  const human = await verifyTurnstile(body.turnstile_token, clientIp(request));
+  if (!human.ok) {
+    return NextResponse.json({ detail: human.detail }, { status: human.status ?? 403 });
   }
 
   const clientCode = (body.client_code ?? "").trim();
@@ -82,13 +104,19 @@ export async function POST(request: Request) {
 
     const loginAt = new Date().toISOString().slice(0, 19);
 
+    // Never fatal to the login: `.catch` here is the whole failure policy.
+    const profile = await fetchProfile(data.jwtToken, clientCode)
+      .then((p) => rememberProfile(p, true))
+      .catch(() => null);
+
     const res = NextResponse.json({
       authenticated: true,
-      client_code: clientCode,
+      client_code: profile?.client_code ?? clientCode,
       feed_token: data.feedToken,
       api_key: API_KEY,
       state: data.state ?? body.state ?? null,
       login_time: loginAt,
+      profile,
     });
 
     res.cookies.set(

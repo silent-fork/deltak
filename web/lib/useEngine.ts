@@ -12,6 +12,7 @@ import type {
   Signal,
   SpotQuote,
   Underlying,
+  UserProfile,
 } from "@/lib/types";
 import {
   DEFAULT_CONFIG,
@@ -28,6 +29,7 @@ import { ChainBuilder } from "@/lib/engine/coa";
 import { SignalEngine } from "@/lib/engine/dkms";
 import { RrgEngine } from "@/lib/engine/rrg";
 import { Ledger, applySlippage } from "@/lib/engine/ledger";
+import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
 import { ScripMaster, type MasterPayload } from "@/lib/engine/scripMaster";
 import { planTick } from "@/lib/engine/loop";
 import { runGuards } from "@/lib/engine/risk";
@@ -54,6 +56,15 @@ import { api } from "@/lib/api";
 
 const TICK_INTERVAL_MS = 1000;
 const RESYNC_EVERY_TICKS = 30;
+/**
+ * How often open positions are checkpointed to Supabase.
+ *
+ * Entries and exits write immediately; this is what keeps the marks on a
+ * *running* position from going stale in the table. A minute is the balance:
+ * often enough that a tab closed mid-trade leaves a recent picture behind, rare
+ * enough that a five-position book is one small write a minute.
+ */
+const CHECKPOINT_EVERY_TICKS = 60;
 /** How often an open tab re-checks that its broker session is still alive. */
 const SESSION_CHECK_MS = 15 * 60_000;
 /** Focus fires on every alt-tab; do not spend a profile call on each one. */
@@ -65,6 +76,8 @@ export interface EngineSession {
   feedToken: string | null;
   apiKey: string | null;
   loginTime: string | null;
+  /** Who is signed in. Null while a profile read is failing, never a blocker. */
+  profile: UserProfile | null;
 }
 
 const NO_SESSION: EngineSession = {
@@ -73,6 +86,23 @@ const NO_SESSION: EngineSession = {
   feedToken: null,
   apiKey: null,
   loginTime: null,
+  profile: null,
+};
+
+/*
+ * Persistence is fire-and-forget in both directions: nothing awaits it, and
+ * nothing surfaces its failures to the operator mid-trade. What it must not do
+ * is fail *silently and permanently*, which is what happened while engine
+ * objects were being posted as table rows — hence the mappers.
+ */
+
+const savePositions = (positions: Position[]) => {
+  if (!positions.length) return;
+  void api.persist("positions", positions.map(positionRow)).catch(() => undefined);
+};
+
+const saveOrder = (row: OrderRow) => {
+  void api.persist("orders", [row]).catch(() => undefined);
 };
 
 export type StreamState = StreamStatus;
@@ -113,6 +143,7 @@ export function useEngine(simulate: boolean) {
   const scaledRef = useRef(new Set<string>());
   const daylightDoneRef = useRef(false);
   const resyncRef = useRef(0);
+  const checkpointRef = useRef(CHECKPOINT_EVERY_TICKS);
   /** Seeded-quote count at the last rebuild — the "has anything changed" flag. */
   const lastSeedRef = useRef(-1);
   /** Print count at the last rebuild: the only proof the feed is delivering. */
@@ -205,21 +236,34 @@ export function useEngine(simulate: boolean) {
       const exitSide = pos.side === "BUY" ? "SELL" : "BUY";
       const ltp = ticksRef.current.ltp(pos.token, pos.ltp || pos.avg_price);
 
+      let brokerOrderId: string | null = null;
+
       if (pos.mode === "live" && sessionRef.current.authenticated) {
         try {
-          await api.placeOrder({
+          const res = await api.placeOrder({
             trading_symbol: pos.trading_symbol,
             symbol_token: pos.token,
             transaction_type: exitSide,
             quantity: pos.quantity,
             order_type: "MARKET",
           });
+          brokerOrderId = res.order_id ?? null;
         } catch (err) {
-          log(
-            "INFO",
-            `Exit order rejected: ${err instanceof Error ? err.message : "unknown"}`,
-            pos.underlying,
+          const detail = err instanceof Error ? err.message : "unknown";
+          // A rejected exit leaves a live position the book thinks it wanted
+          // closed. That divergence is the single most important thing in the
+          // record, so it is written even though nothing was filled.
+          saveOrder(
+            orderRow({
+              position: pos,
+              transactionType: exitSide,
+              quantity: pos.quantity,
+              lots: pos.lots,
+              status: "REJECTED",
+              message: `${reason}: ${detail}`,
+            }),
           );
+          log("INFO", `Exit order rejected: ${detail}`, pos.underlying);
           return;
         }
       }
@@ -230,7 +274,19 @@ export function useEngine(simulate: boolean) {
           : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const closed = ledgerRef.current.close(pos.id, fill, reason);
       if (closed) {
-        void api.persist("positions", [closed]).catch(() => undefined);
+        savePositions([closed]);
+        saveOrder(
+          orderRow({
+            position: closed,
+            transactionType: exitSide,
+            quantity: closed.quantity,
+            lots: closed.lots,
+            fillPrice: fill,
+            status: "ACCEPTED",
+            brokerOrderId,
+            message: reason,
+          }),
+        );
         log(
           "INFO",
           `EXIT [${reason}] ${closed.trading_symbol} @ ${fill.toFixed(2)} → PnL ₹${closed.realised_pnl.toLocaleString("en-IN")}`,
@@ -251,17 +307,30 @@ export function useEngine(simulate: boolean) {
 
       const exitSide = pos.side === "BUY" ? "SELL" : "BUY";
       const ltp = ticksRef.current.ltp(pos.token, pos.ltp || pos.avg_price);
+      const quantity = lots * pos.lot_size;
+      let brokerOrderId: string | null = null;
 
       if (pos.mode === "live" && sessionRef.current.authenticated) {
         try {
-          await api.placeOrder({
+          const res = await api.placeOrder({
             trading_symbol: pos.trading_symbol,
             symbol_token: pos.token,
             transaction_type: exitSide,
-            quantity: lots * pos.lot_size,
+            quantity,
             order_type: "MARKET",
           });
-        } catch {
+          brokerOrderId = res.order_id ?? null;
+        } catch (err) {
+          saveOrder(
+            orderRow({
+              position: pos,
+              transactionType: exitSide,
+              quantity,
+              lots,
+              status: "REJECTED",
+              message: `TP1: ${err instanceof Error ? err.message : "unknown"}`,
+            }),
+          );
           return;
         }
       }
@@ -271,7 +340,19 @@ export function useEngine(simulate: boolean) {
           ? ltp
           : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const residual = ledgerRef.current.reduce(pos.id, lots, fill, "TP1");
-      if (residual) void api.persist("positions", [residual]).catch(() => undefined);
+      if (residual) savePositions([residual]);
+      saveOrder(
+        orderRow({
+          position: pos,
+          transactionType: exitSide,
+          quantity,
+          lots,
+          fillPrice: fill,
+          status: "ACCEPTED",
+          brokerOrderId,
+          message: "TP1",
+        }),
+      );
       log(
         "TARGET",
         `TP1 scale-out ${lots} lot(s) of ${pos.trading_symbol} @ ${fill.toFixed(2)}`,
@@ -420,6 +501,22 @@ export function useEngine(simulate: boolean) {
             daylightDoneRef.current = true;
           },
         });
+      }
+
+      /*
+       * Checkpoint the open book.
+       *
+       * Entries and exits are written the moment they happen, which covers the
+       * two ends of a trade but not the middle: a tab closed while three
+       * positions are running would otherwise leave them stored at their entry
+       * marks forever. This keeps the live P&L, last price and any moved stop
+       * current, and upserts on the trade key so it stays one row per trade.
+       */
+      checkpointRef.current -= 1;
+      if (checkpointRef.current <= 0) {
+        checkpointRef.current = CHECKPOINT_EVERY_TICKS;
+        // Nothing moves out of hours, so a settled board has nothing to say.
+        if (!settledRef.current) savePositions(ledger.openPositions);
       }
 
       // Re-subscribe strikes that drifted into range as spot moved.
@@ -627,7 +724,12 @@ export function useEngine(simulate: boolean) {
   /* ------------------------------------------------------------ actions */
 
   const login = useCallback(
-    async (payload: { client_code: string; pin: string; totp: string }) => {
+    async (payload: {
+      client_code: string;
+      pin: string;
+      totp: string;
+      turnstile_token?: string;
+    }) => {
       const res = await api.login(payload);
       const next: EngineSession = {
         authenticated: true,
@@ -635,12 +737,16 @@ export function useEngine(simulate: boolean) {
         feedToken: res.feed_token,
         apiKey: res.api_key,
         loginTime: res.login_time,
+        profile: res.profile ?? null,
       };
       setSession(next);
       sessionRef.current = next;
       // Anything cached from a previous session belonged to a different JWT.
       clearMarketCache();
-      log("INFO", `SmartAPI session established for ${res.client_code}.`);
+      log(
+        "INFO",
+        `SmartAPI session established for ${res.profile?.name ?? res.client_code}.`,
+      );
       startFeed(next);
       return res;
     },
@@ -666,20 +772,43 @@ export function useEngine(simulate: boolean) {
         feedToken: res.feed_token ?? null,
         apiKey: res.api_key ?? null,
         loginTime: res.login_time ?? null,
+        profile: res.profile ?? null,
       };
       setSession(next);
       sessionRef.current = next;
+      const who = res.profile?.name ?? res.client_code;
       log(
         "INFO",
         res.refreshed
-          ? `SmartAPI session refreshed for ${res.client_code} — tokens renewed past expiry.`
-          : `SmartAPI session restored for ${res.client_code}.`,
+          ? `SmartAPI session refreshed for ${who} — tokens renewed past expiry.`
+          : `SmartAPI session restored for ${who}.`,
       );
       return next;
     } catch {
       return NO_SESSION;
     }
   }, [log]);
+
+  /**
+   * Re-read the operator's profile from the broker.
+   *
+   * The HUD already has one from login or restore; this is for the refresh
+   * asked for by hand, after enabling a segment with the broker and wanting the
+   * terminal to agree. Failures are returned as null rather than thrown — the
+   * profile already on screen stays on screen.
+   */
+  const refreshProfile = useCallback(async (): Promise<UserProfile | null> => {
+    try {
+      const { profile } = await api.profile();
+      if (!profile) return null;
+      const next = { ...sessionRef.current, profile };
+      setSession(next);
+      sessionRef.current = next;
+      return profile;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const enterDemo = useCallback(() => {
     demoRef.current = true;
@@ -745,6 +874,7 @@ export function useEngine(simulate: boolean) {
           feedToken: res.feed_token ?? null,
           apiKey: res.api_key ?? null,
           loginTime: res.login_time ?? null,
+          profile: res.profile ?? sessionRef.current.profile,
         };
         setSession(next);
         sessionRef.current = next;
@@ -840,7 +970,19 @@ export function useEngine(simulate: boolean) {
         mode: currentMode,
       });
 
-      void api.persist("positions", [pos]).catch(() => undefined);
+      savePositions([pos]);
+      saveOrder(
+        orderRow({
+          position: pos,
+          transactionType: "BUY",
+          quantity,
+          lots: useLots,
+          fillPrice: fill,
+          status: "ACCEPTED",
+          brokerOrderId,
+          message: `ENTRY ${signal.protocol}`,
+        }),
+      );
       log(
         "INFO",
         `${currentMode.toUpperCase()} BUY ${useLots}×${lotSize} ${signal.trading_symbol} @ ${fill.toFixed(2)}` +
@@ -920,6 +1062,7 @@ export function useEngine(simulate: boolean) {
     market,
     login,
     logout,
+    refreshProfile,
     enterDemo,
     switchMode,
     executeSignal,

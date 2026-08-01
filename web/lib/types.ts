@@ -193,6 +193,29 @@ export interface EngineSnapshot {
   events: RiskEvent[];
 }
 
+/**
+ * The operator behind the terminal, as Angel One's `getProfile` describes them.
+ *
+ * Identity only. Nothing here can trade, and nothing here is a credential — the
+ * tokens that are stay in the httpOnly cookie and never reach this object.
+ */
+export interface UserProfile {
+  client_code: string;
+  name: string | null;
+  email: string | null;
+  mobile_no: string | null;
+  broker: string | null;
+  /** Segments the account is enabled for — NSE, NFO, MCX… */
+  exchanges: string[];
+  /** Product types the account may use — INTRADAY, DELIVERY, MARGIN… */
+  products: string[];
+  /** The broker's own last-login stamp, verbatim: its format is not promised. */
+  broker_last_login: string | null;
+  /** Filled from the persisted row when Supabase has seen this account before. */
+  first_seen_at?: string | null;
+  logins?: number | null;
+}
+
 export interface SessionStatus {
   authenticated: boolean;
   client_code: string | null;

@@ -7,6 +7,7 @@ import { useEngineContext } from "@/components/EngineProvider";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
+import { useTurnstile } from "@/lib/useTurnstile";
 
 export function LoginModal({
   open,
@@ -23,6 +24,9 @@ export function LoginModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const engine = useEngineContext();
+  // The same gate as the sign-in screen: the server checks both paths, so both
+  // paths have to be able to answer.
+  const turnstile = useTurnstile();
 
   const valid =
     clientCode.trim().length >= 3 &&
@@ -35,10 +39,12 @@ export function LoginModal({
     setBusy(true);
     setError(null);
     try {
+      const token = await turnstile.execute();
       await engine.login({
         client_code: clientCode.trim(),
         pin: pin.trim(),
         totp: totp.trim(),
+        ...(token ? { turnstile_token: token } : {}),
       });
       // The TOTP is single-use — never keep it around after submission.
       setTotp("");
@@ -103,6 +109,9 @@ export function LoginModal({
             <span>{error}</span>
           </div>
         ) : null}
+
+        {/* Only ever occupies space if a challenge actually has to be shown. */}
+        <div ref={turnstile.containerRef} className="flex justify-center empty:hidden" />
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[10px] leading-tight text-zinc-600">

@@ -7,6 +7,7 @@ import type {
   PcrResponse,
   Position,
   RiskEvent,
+  UserProfile,
 } from "./types";
 
 /**
@@ -62,6 +63,8 @@ export interface SessionResponse {
   feed_token?: string;
   api_key?: string;
   login_time?: string;
+  /** Who is signed in — from `getProfile`, or the last one stored for them. */
+  profile?: UserProfile | null;
   /** The broker could not be reached; the cookie is being trusted for now. */
   stale?: boolean;
   /** New tokens were minted from the refresh token. */
@@ -77,6 +80,8 @@ export interface LoginResponse {
   api_key: string;
   state: string | null;
   login_time: string;
+  /** Null when the profile call failed — a login is not held up for it. */
+  profile: UserProfile | null;
 }
 
 export const api = {
@@ -87,7 +92,14 @@ export const api = {
    * No api_key in the payload: the SmartAPI key is a deployment secret read from
    * the server environment, so it never crosses the wire on the way in.
    */
-  login: (payload: { client_code: string; pin: string; totp: string; state?: string }) =>
+  login: (payload: {
+    client_code: string;
+    pin: string;
+    totp: string;
+    state?: string;
+    /** Cloudflare Turnstile proof. Absent when verification is switched off. */
+    turnstile_token?: string;
+  }) =>
     request<LoginResponse>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -100,6 +112,10 @@ export const api = {
   session: () => request<SessionResponse>("/api/auth/session"),
 
   logout: () => request<{ authenticated: boolean }>("/api/auth/logout", { method: "POST" }),
+
+  /** The signed-in operator, refreshed on demand. Scoped to the session cookie. */
+  profile: () =>
+    request<{ profile: UserProfile; stale?: boolean }>("/api/auth/profile"),
 
   rms: () =>
     request<{ net: number; available_cash: number; utilised_debits: number }>("/api/rms"),
@@ -117,8 +133,14 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  /** Best-effort append; callers must not await this on a trading path. */
-  persist: (resource: "positions" | "orders" | "events" | "signals", rows: unknown[]) =>
+  /**
+   * Best-effort append; callers must not await this on a trading path.
+   *
+   * Rows must already be in table shape — see `lib/engine/persist.ts`. The
+   * account a trade belongs to is stamped by the route from the session cookie,
+   * so it is neither needed nor accepted here.
+   */
+  persist: (resource: "positions" | "orders" | "events", rows: unknown[]) =>
     request<{ persisted: number }>("/api/persist", {
       method: "POST",
       body: JSON.stringify({ resource, rows }),

@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowRight, Loader2, LockKeyhole, ShieldAlert, Zap } from "lucide-react";
+import { Loader2, LockKeyhole, ShieldAlert, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
 
 /**
  * Sign-in gate.
@@ -44,6 +44,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
   const [totp, setTotp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const turnstile = useTurnstile();
 
   const valid =
     clientCode.trim().length >= 3 && pin.trim().length >= 4 && /^\d{6}$/.test(totp.trim());
@@ -54,10 +55,14 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
     setBusy(true);
     setError(null);
     try {
+      // Nothing is asked of the operator here: the challenge runs behind the
+      // button while it spins, and the token rides along with the credentials.
+      const token = await turnstile.execute();
       await engine.login({
         client_code: clientCode.trim(),
         pin: pin.trim(),
         totp: totp.trim(),
+        ...(token ? { turnstile_token: token } : {}),
       });
       // The TOTP is single-use — never keep it around after submission.
       setTotp("");
@@ -142,17 +147,29 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             </div>
           ) : null}
 
-          <Button
+          {/*
+            Where a challenge would appear, on the rare visit that needs one.
+            `empty:hidden` keeps it from reserving a gap on every other visit.
+          */}
+          <div ref={turnstile.containerRef} className="flex justify-center empty:hidden" />
+
+          {/*
+            A quiet button.
+
+            This used to be the neon-cyan `quantum` variant with a glow and an
+            arrow — the loudest thing on a page whose job is to be calm, and the
+            same treatment the terminal reserves for live trading actions. It is
+            a plain solid control now: the only thing to press on the page does
+            not need decoration to be found.
+          */}
+          <button
             type="submit"
-            variant="quantum"
-            size="lg"
-            className="w-full"
             disabled={!valid || busy}
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 text-[13px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {busy ? "Authenticating" : "Connect"}
-            {!busy ? <ArrowRight className="h-3.5 w-3.5" /> : null}
-          </Button>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin text-zinc-400" /> : null}
+            {busy ? "Authenticating" : "Sign in"}
+          </button>
         </form>
 
         {simulate ? (
@@ -169,6 +186,12 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
           <LockKeyhole className="h-3 w-3 shrink-0" />
           <span>Credentials are relayed to Angel One and never stored.</span>
         </div>
+
+        {turnstileActive ? (
+          <p className="mt-2 text-[9px] uppercase tracking-[0.14em] text-zinc-700">
+            Protected by Cloudflare Turnstile
+          </p>
+        ) : null}
       </div>
     </main>
   );

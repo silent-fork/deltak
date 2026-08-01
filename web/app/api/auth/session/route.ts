@@ -2,6 +2,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import {
+  cachedProfile,
+  fetchProfile,
+  normaliseProfile,
+  rememberProfile,
+  type RawProfile,
+} from "@/lib/server/profile";
+import {
   API_KEY,
   PROFILE_URL,
   REFRESH_URL,
@@ -30,6 +37,9 @@ import {
  *
  * Always 200: "not signed in" is an answer, not a failure, and the page renders
  * a sign-in screen from it rather than an error.
+ *
+ * The profile read that proves the JWT is alive is also the profile the HUD
+ * shows, so it is kept rather than thrown away: one call, both jobs.
  */
 
 export const runtime = "nodejs";
@@ -58,17 +68,31 @@ export async function GET() {
     login_time: loginAt ?? new Date().toISOString().slice(0, 19),
   });
 
-  // Cheapest call that proves the JWT is still good.
+  // Cheapest call that proves the JWT is still good — and the profile the HUD
+  // renders. A restore is not a fresh login, so it touches the row without
+  // counting one.
   try {
-    await smartApiCall(PROFILE_URL, { method: "GET", jwt: session.jwtToken });
-    return NextResponse.json(body(session.feedToken ?? "", session.loginAt ?? null));
+    const raw = await smartApiCall<RawProfile>(PROFILE_URL, {
+      method: "GET",
+      jwt: session.jwtToken,
+    });
+    const profile = await rememberProfile(
+      normaliseProfile(session.clientCode, raw),
+      false,
+    );
+    return NextResponse.json({
+      ...body(session.feedToken ?? "", session.loginAt ?? null),
+      profile,
+    });
   } catch (err) {
     const expired = err instanceof SmartApiError && err.status === 401;
     if (!expired) {
       // The broker is unreachable or throttling. That is not proof the session
       // died, and signing the operator out over it would be its own outage.
+      // The stored profile stands in so the pill does not empty out either.
       return NextResponse.json({
         ...body(session.feedToken ?? "", session.loginAt ?? null),
+        profile: await cachedProfile(session.clientCode),
         stale: true,
       });
     }
@@ -90,7 +114,16 @@ export async function GET() {
 
     const loginAt = new Date().toISOString().slice(0, 19);
     const feedToken = data.feedToken ?? session.feedToken ?? "";
-    const res = NextResponse.json({ ...body(feedToken, loginAt), refreshed: true });
+    // Renewed tokens, same operator: refresh the profile against the new JWT,
+    // but do not count a login the operator did not perform.
+    const profile = await fetchProfile(data.jwtToken, session.clientCode)
+      .then((p) => rememberProfile(p, false))
+      .catch(() => cachedProfile(session.clientCode));
+    const res = NextResponse.json({
+      ...body(feedToken, loginAt),
+      profile,
+      refreshed: true,
+    });
     res.cookies.set(
       SESSION_COOKIE,
       encodeSession({

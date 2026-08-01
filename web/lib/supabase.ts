@@ -1,5 +1,8 @@
 import "server-only";
 
+import { TABLE_COLUMNS } from "@/lib/engine/persist";
+import type { UserProfile } from "@/lib/types";
+
 /**
  * Minimal server-side PostgREST client.
  *
@@ -16,14 +19,17 @@ const KEY_ENV = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
 export const supabaseConfigured = Boolean(URL_ENV && KEY_ENV);
 
-/** Tables the HUD may read. Anything not listed here is rejected outright. */
+/**
+ * Tables the HUD may read back. Anything not listed here is rejected outright.
+ *
+ * `user_profiles` is deliberately absent: it holds an email and a phone number,
+ * and history reads are scoped by client code rather than owned by one. The
+ * profile has its own route, which answers for the signed-in session only.
+ */
 export const READABLE = {
-  sessions: { table: "trading_sessions", order: "started_at.desc" },
   orders: { table: "orders", order: "created_at.desc" },
   positions: { table: "positions", order: "opened_at.desc" },
-  signals: { table: "signals", order: "captured_at.desc" },
   events: { table: "risk_events", order: "ts.desc" },
-  performance: { table: "session_performance", order: "" },
 } as const;
 
 export type Resource = keyof typeof READABLE;
@@ -33,13 +39,24 @@ export const WRITABLE = {
   positions: "positions",
   orders: "orders",
   events: "risk_events",
-  signals: "signals",
 } as const;
 
 export type WritableResource = keyof typeof WRITABLE;
 
+/**
+ * Rows arrive from the browser as engine objects, and PostgREST rejects the
+ * *whole batch* over one unknown key — which is how position writes managed to
+ * fail silently for as long as they did (the ledger's `id` is not the table's).
+ * Projecting onto the known columns means a new engine field can never take
+ * persistence down with it: it is dropped, and everything else still lands.
+ */
+const COLUMNS: Record<WritableResource, readonly string[]> = TABLE_COLUMNS;
+
 export const isResource = (value: string): value is Resource =>
   Object.prototype.hasOwnProperty.call(READABLE, value);
+
+export const isWritable = (value: string): value is WritableResource =>
+  Object.prototype.hasOwnProperty.call(WRITABLE, value);
 
 function headers(prefer?: string): Record<string, string> {
   const h: Record<string, string> = {
@@ -75,20 +92,62 @@ export async function selectFrom(
   return Array.isArray(body) ? body : [];
 }
 
+const pick = (row: Record<string, unknown>, allowed: readonly string[]) => {
+  const out: Record<string, unknown> = {};
+  for (const key of allowed) if (row[key] !== undefined) out[key] = row[key];
+  return out;
+};
+
 /**
- * Append rows. Positions are upserted on their ledger id so repeated
- * mark-to-market checkpoints of the same position collapse to one row.
+ * The identity of one trade, across its whole life.
+ *
+ * A ledger id restarts at `DK-hhmmss-001` in every browser tab, so on its own it
+ * would collide between two operators, or between today's book and tomorrow's.
+ * Pairing it with the account and the moment the position opened makes it
+ * unique, and — because none of the three ever changes once a position exists —
+ * stable: the entry, every mark-to-market checkpoint and the exit all upsert
+ * onto one row rather than appending twenty.
+ *
+ * Composed here rather than in the browser so it cannot be spoofed into
+ * overwriting another account's trade.
+ */
+export const tradeKey = (clientCode: string, ledgerId: string, openedAt: string) =>
+  `${clientCode || "ANON"}|${ledgerId}|${openedAt}`;
+
+/**
+ * Append rows on behalf of one account.
+ *
+ * Positions are upserted on their trade key so repeated checkpoints of the same
+ * position collapse to one row; orders and events are append-only.
  */
 export async function insertRows(
   resource: WritableResource,
   rows: Record<string, unknown>[],
+  clientCode: string,
 ): Promise<number> {
   if (!supabaseConfigured) throw new Error("Supabase is not configured.");
   const table = WRITABLE[resource];
   if (!table) throw new Error(`Resource '${resource}' is not writable.`);
 
+  const owned = rows.map((raw) => {
+    const row = pick(raw, COLUMNS[resource]);
+    // Attribution is stamped from the session cookie, never taken from the
+    // request body: the browser says what it traded, not who it traded as.
+    if (resource === "positions" || resource === "orders") {
+      row.client_code = clientCode || null;
+    }
+    if (resource === "positions") {
+      row.trade_key = tradeKey(
+        clientCode,
+        String(row.ledger_id ?? ""),
+        String(row.opened_at ?? ""),
+      );
+    }
+    return row;
+  });
+
   const upsert = resource === "positions";
-  const params = upsert ? "?on_conflict=session_id,ledger_id" : "";
+  const params = upsert ? "?on_conflict=trade_key" : "";
   const prefer = upsert
     ? "resolution=merge-duplicates,return=minimal"
     : "return=minimal";
@@ -96,11 +155,95 @@ export async function insertRows(
   const res = await fetch(`${base()}/${table}${params}`, {
     method: "POST",
     headers: headers(prefer),
-    body: JSON.stringify(rows),
+    body: JSON.stringify(owned),
     cache: "no-store",
   });
   if (!res.ok) {
     throw new Error(`Supabase write failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
   }
-  return rows.length;
+  return owned.length;
+}
+
+/* ------------------------------------------------------------ user profile */
+
+interface ProfileRow {
+  client_code: string;
+  name: string | null;
+  email: string | null;
+  mobile_no: string | null;
+  broker: string | null;
+  exchanges: string[] | null;
+  products: string[] | null;
+  broker_last_login: string | null;
+  first_seen_at?: string | null;
+  last_login_at?: string | null;
+  logins?: number | null;
+}
+
+const PROFILES = "user_profiles";
+
+/** The stored profile for one account, or null if it has never signed in here. */
+export async function readProfile(clientCode: string): Promise<ProfileRow | null> {
+  if (!supabaseConfigured || !clientCode) return null;
+  const search = new URLSearchParams({
+    select: "*",
+    client_code: `eq.${clientCode}`,
+    limit: "1",
+  });
+  const res = await fetch(`${base()}/${PROFILES}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return Array.isArray(body) && body.length ? (body[0] as ProfileRow) : null;
+}
+
+/**
+ * Write the operator's profile through.
+ *
+ * `fresh` marks an actual sign-in rather than a session revalidation: it moves
+ * `last_login_at` and counts the login. A revalidation happens every fifteen
+ * minutes while a tab is open, and counting those would make the number
+ * meaningless.
+ *
+ * Returns the profile as stored, so the caller can hand the account's history —
+ * first seen, logins — back to the HUD in the same round trip.
+ */
+export async function saveProfile(
+  profile: UserProfile,
+  fresh: boolean,
+): Promise<{ first_seen_at: string | null; logins: number } | null> {
+  if (!supabaseConfigured || !profile.client_code) return null;
+
+  const existing = await readProfile(profile.client_code);
+  const now = new Date().toISOString();
+  const logins = (existing?.logins ?? 0) + (fresh ? 1 : 0);
+
+  const row: Record<string, unknown> = {
+    client_code: profile.client_code,
+    name: profile.name,
+    email: profile.email,
+    mobile_no: profile.mobile_no,
+    broker: profile.broker,
+    exchanges: profile.exchanges,
+    products: profile.products,
+    broker_last_login: profile.broker_last_login,
+    last_seen_at: now,
+    logins,
+  };
+  if (fresh) row.last_login_at = now;
+
+  const res = await fetch(`${base()}/${PROFILES}?on_conflict=client_code`, {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify([row]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase profile write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+  return { first_seen_at: existing?.first_seen_at ?? now, logins };
 }
