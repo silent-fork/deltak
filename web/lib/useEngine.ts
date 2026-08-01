@@ -54,10 +54,6 @@ import { api } from "@/lib/api";
 
 const TICK_INTERVAL_MS = 1000;
 const RESYNC_EVERY_TICKS = 30;
-/** How often an open tab re-checks that its broker session is still alive. */
-const SESSION_CHECK_MS = 15 * 60_000;
-/** Focus fires on every alt-tab; do not spend a profile call on each one. */
-const SESSION_FOCUS_MIN_MS = 5 * 60_000;
 
 export interface EngineSession {
   authenticated: boolean;
@@ -475,11 +471,9 @@ export function useEngine(simulate: boolean) {
 
     let cancelled = false;
     void (async () => {
-      // Both before the feed: the master supplies the tokens to subscribe to,
-      // and the session supplies the credentials to subscribe with.
-      const [restored] = await Promise.all([restoreSession(), loadMaster()]);
+      await loadMaster();
       if (cancelled) return;
-      startFeed(restored.authenticated ? restored : sessionRef.current);
+      startFeed(sessionRef.current);
       void tick();
     })();
 
@@ -632,40 +626,6 @@ export function useEngine(simulate: boolean) {
     [log, startFeed],
   );
 
-  /**
-   * Rebuild the session from the cookie on load.
-   *
-   * The JWT has always outlived the page; the *state* describing it did not, so
-   * a refresh dropped the operator at the sign-in screen with a perfectly good
-   * session sitting in the cookie jar. The route revalidates against the broker
-   * and refreshes across the daily expiry, so what comes back is a session that
-   * actually works, or nothing.
-   */
-  const restoreSession = useCallback(async (): Promise<EngineSession> => {
-    try {
-      const res = await api.session();
-      if (!res.authenticated || !res.client_code) return NO_SESSION;
-      const next: EngineSession = {
-        authenticated: true,
-        clientCode: res.client_code,
-        feedToken: res.feed_token ?? null,
-        apiKey: res.api_key ?? null,
-        loginTime: res.login_time ?? null,
-      };
-      setSession(next);
-      sessionRef.current = next;
-      log(
-        "INFO",
-        res.refreshed
-          ? `SmartAPI session refreshed for ${res.client_code} — tokens renewed past expiry.`
-          : `SmartAPI session restored for ${res.client_code}.`,
-      );
-      return next;
-    } catch {
-      return NO_SESSION;
-    }
-  }, [log]);
-
   const enterDemo = useCallback(() => {
     demoRef.current = true;
     setDemo(true);
@@ -685,72 +645,6 @@ export function useEngine(simulate: boolean) {
     log("INFO", "SmartAPI session terminated.");
     startFeed(NO_SESSION);
   }, [log, startFeed]);
-
-  /**
-   * Keep the session honest while the tab is open.
-   *
-   * SmartAPI tokens die daily, and a terminal left open across the rollover
-   * would otherwise sit there looking connected while every call quietly
-   * failed. Re-checking on a timer — and when the tab is focused, which is what
-   * actually happens after a night away — either renews it from the refresh
-   * token or signs out cleanly and says so.
-   */
-  useEffect(() => {
-    if (!session.authenticated) return;
-    let cancelled = false;
-    let lastCheck = Date.now();
-
-    const check = async () => {
-      lastCheck = Date.now();
-      let res;
-      try {
-        res = await api.session();
-      } catch {
-        return; // A transient failure is not an expiry.
-      }
-      if (cancelled) return;
-
-      if (!res.authenticated) {
-        stopFeeds();
-        clearMarketCache();
-        setSession(NO_SESSION);
-        sessionRef.current = NO_SESSION;
-        setMode("paper");
-        modeRef.current = "paper";
-        log("INFO", "SmartAPI session expired — sign in again to resume the feed.");
-        return;
-      }
-
-      // A refresh mints a new feed token, and the old socket is authenticated
-      // with the old one: reconnect rather than let it die quietly.
-      if (res.refreshed && res.client_code) {
-        const next: EngineSession = {
-          authenticated: true,
-          clientCode: res.client_code,
-          feedToken: res.feed_token ?? null,
-          apiKey: res.api_key ?? null,
-          loginTime: res.login_time ?? null,
-        };
-        setSession(next);
-        sessionRef.current = next;
-        clearMarketCache();
-        startFeed(next);
-        log("INFO", "SmartAPI tokens renewed — feed reconnected.");
-      }
-    };
-
-    const onFocus = () => {
-      if (Date.now() - lastCheck >= SESSION_FOCUS_MIN_MS) void check();
-    };
-
-    const id = setInterval(() => void check(), SESSION_CHECK_MS);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [session.authenticated, startFeed, stopFeeds, log]);
 
   const switchMode = useCallback(
     (next: ExecutionMode) => {

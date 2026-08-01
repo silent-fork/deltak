@@ -54,20 +54,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-/** `/api/auth/session` — the same shape as a login, plus how it was resolved. */
-export interface SessionResponse {
-  authenticated: boolean;
-  client_code?: string;
-  feed_token?: string;
-  api_key?: string;
-  login_time?: string;
-  /** The broker could not be reached; the cookie is being trusted for now. */
-  stale?: boolean;
-  /** New tokens were minted from the refresh token. */
-  refreshed?: boolean;
-  reason?: string | null;
-}
-
 export interface LoginResponse {
   authenticated: boolean;
   client_code: string;
@@ -91,12 +77,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-
-  /**
-   * Whether the httpOnly cookie still represents a live broker session. Called
-   * on load — the JWT survives a refresh even though page state does not.
-   */
-  session: () => request<SessionResponse>("/api/auth/session"),
 
   logout: () => request<{ authenticated: boolean }>("/api/auth/logout", { method: "POST" }),
 
