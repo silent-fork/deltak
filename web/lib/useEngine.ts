@@ -810,6 +810,13 @@ export function useEngine(simulate: boolean) {
     }
   }, []);
 
+  /** Adopt a profile the caller already has — e.g. just back from a contact edit. */
+  const setProfile = useCallback((profile: UserProfile) => {
+    const next = { ...sessionRef.current, profile };
+    setSession(next);
+    sessionRef.current = next;
+  }, []);
+
   const enterDemo = useCallback(() => {
     demoRef.current = true;
     setDemo(true);
@@ -1063,6 +1070,7 @@ export function useEngine(simulate: boolean) {
     login,
     logout,
     refreshProfile,
+    setProfile,
     enterDemo,
     switchMode,
     executeSignal,

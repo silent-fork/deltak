@@ -117,6 +117,19 @@ export const api = {
   profile: () =>
     request<{ profile: UserProfile; stale?: boolean }>("/api/auth/profile"),
 
+  /**
+   * Correct this terminal's stored email or mobile number.
+   *
+   * Angel One's API has no endpoint that accepts either — they come back
+   * read-only from `getProfile` — so this edits only what the terminal keeps.
+   * An empty string clears the field; an omitted key leaves it untouched.
+   */
+  updateProfile: (payload: { email?: string; mobile_no?: string }) =>
+    request<{ profile: UserProfile }>("/api/auth/profile", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
   rms: () =>
     request<{ net: number; available_cash: number; utilised_debits: number }>("/api/rms"),
 

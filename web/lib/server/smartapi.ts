@@ -18,6 +18,7 @@ const API_ROOT = "https://apiconnect.angelone.in";
 export const LOGIN_URL = `${API_ROOT}/rest/auth/angelbroking/user/v1/loginByPassword`;
 export const REFRESH_URL = `${API_ROOT}/rest/auth/angelbroking/jwt/v1/generateTokens`;
 export const PROFILE_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getProfile`;
+export const LOGOUT_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/logout`;
 export const RMS_URL = `${API_ROOT}/rest/secure/angelbroking/user/v1/getRMS`;
 export const PLACE_ORDER_URL = `${API_ROOT}/rest/secure/angelbroking/order/v1/placeOrder`;
 export const CANDLE_URL = `${API_ROOT}/rest/secure/angelbroking/historical/v1/getCandleData`;

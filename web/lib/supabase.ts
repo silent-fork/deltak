@@ -247,3 +247,38 @@ export async function saveProfile(
   }
   return { first_seen_at: existing?.first_seen_at ?? now, logins };
 }
+
+/**
+ * Overwrite the operator's contact details.
+ *
+ * Angel One's own API has no endpoint to change them — `email` and `mobileno`
+ * on `getProfile` are the broker's KYC record, not something SmartAPI accepts
+ * writes for. This edits only this terminal's copy, e.g. to correct what the
+ * broker returned or to add a contact the account was opened without. It never
+ * claims to be pushing the change back to Angel One.
+ */
+export async function updateProfileContact(
+  clientCode: string,
+  patch: { email?: string | null; mobile_no?: string | null },
+): Promise<void> {
+  if (!supabaseConfigured || !clientCode) throw new Error("Supabase is not configured.");
+
+  const row: Record<string, unknown> = { last_seen_at: new Date().toISOString() };
+  if ("email" in patch) row.email = patch.email;
+  if ("mobile_no" in patch) row.mobile_no = patch.mobile_no;
+
+  const res = await fetch(
+    `${base()}/${PROFILES}?client_code=eq.${encodeURIComponent(clientCode)}`,
+    {
+      method: "PATCH",
+      headers: headers("return=minimal"),
+      body: JSON.stringify(row),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Supabase profile update failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { cachedProfile, fetchProfile, rememberProfile } from "@/lib/server/profile";
 import { SESSION_COOKIE, SmartApiError, decodeSession } from "@/lib/server/smartapi";
+import { updateProfileContact } from "@/lib/supabase";
 
 /**
  * `GET /api/auth/profile` — who is signed in, in full.
@@ -14,6 +15,11 @@ import { SESSION_COOKIE, SmartApiError, decodeSession } from "@/lib/server/smart
  *
  * A broker outage falls back to the stored profile rather than a failure: the
  * account's name has not changed just because Angel One is throttling.
+ *
+ * `PATCH` edits the email and mobile number this terminal has on file. Angel
+ * One's API has no write path for either — they are the broker's KYC record —
+ * so this corrects this terminal's copy only, scoped to the session cookie's
+ * account the same way the read is.
  */
 
 export const runtime = "nodejs";
@@ -38,4 +44,61 @@ export async function GET() {
       { status },
     );
   }
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_RE = /^\+?[0-9]{7,15}$/;
+
+/** `""` clears the field; `undefined` leaves it untouched; anything else is validated. */
+function normalise(
+  value: unknown,
+  re: RegExp,
+  label: string,
+): { ok: true; value: string | null } | { ok: false; detail: string } {
+  if (value === undefined) return { ok: true, value: undefined as unknown as null };
+  if (typeof value !== "string") return { ok: false, detail: `${label} must be text.` };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+  if (!re.test(trimmed)) return { ok: false, detail: `That doesn't look like a valid ${label.toLowerCase()}.` };
+  return { ok: true, value: trimmed };
+}
+
+export async function PATCH(request: Request) {
+  const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!session) {
+    return NextResponse.json({ detail: "No active SmartAPI session." }, { status: 401 });
+  }
+
+  let body: { email?: unknown; mobile_no?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ detail: "Malformed request body." }, { status: 400 });
+  }
+
+  const email = normalise(body.email, EMAIL_RE, "Email");
+  if (!email.ok) return NextResponse.json({ detail: email.detail }, { status: 400 });
+
+  const mobile = normalise(body.mobile_no, MOBILE_RE, "Mobile number");
+  if (!mobile.ok) return NextResponse.json({ detail: mobile.detail }, { status: 400 });
+
+  if (body.email === undefined && body.mobile_no === undefined) {
+    return NextResponse.json({ detail: "Nothing to update." }, { status: 400 });
+  }
+
+  const patch: { email?: string | null; mobile_no?: string | null } = {};
+  if (body.email !== undefined) patch.email = email.value;
+  if (body.mobile_no !== undefined) patch.mobile_no = mobile.value;
+
+  try {
+    await updateProfileContact(session.clientCode, patch);
+  } catch (err) {
+    return NextResponse.json(
+      { detail: err instanceof Error ? err.message : "Profile update failed." },
+      { status: 502 },
+    );
+  }
+
+  const profile = await cachedProfile(session.clientCode);
+  return NextResponse.json({ profile });
 }

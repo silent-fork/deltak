@@ -3,13 +3,16 @@
 import {
   BadgeCheck,
   Building2,
+  Check,
   ChevronDown,
   Clock3,
   LogOut,
   Mail,
+  Pencil,
   Phone,
   RefreshCw,
   Wallet,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -76,6 +79,129 @@ function Row({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+/**
+ * A contact field this terminal owns and Angel One does not.
+ *
+ * `getProfile` returns `email` and `mobileno` read-only — there is no SmartAPI
+ * write for either, so this edits only the copy in `user_profiles`. That is
+ * enough to fix a typo the broker returned or add a contact the account was
+ * opened without; it never claims to change anything at the broker.
+ */
+function EditableRow({
+  icon: Icon,
+  label,
+  value,
+  placeholder,
+  mono = true,
+  onSave,
+}: {
+  icon: typeof Mail;
+  label: string;
+  value: string | null;
+  placeholder: string;
+  mono?: boolean;
+  onSave: (next: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    setDraft(value ?? "");
+    setError(null);
+    inputRef.current?.focus();
+    // Only on entering edit mode — re-syncing on every `value` change would
+    // clobber what the operator is mid-typing when a background refresh lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave(draft.trim());
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-baseline justify-between gap-3 py-[3px]">
+        <span className="flex shrink-0 items-center gap-1.5 dk-label text-[9px]">
+          <Icon className="h-3 w-3 shrink-0 text-zinc-600" />
+          {label}
+        </span>
+        <button
+          onClick={() => setEditing(true)}
+          className="group flex min-w-0 items-center gap-1"
+          title={`Edit ${label.toLowerCase()}`}
+        >
+          <span
+            className={cn(
+              "min-w-0 truncate text-right text-[11px] group-hover:text-zinc-100",
+              value ? "text-zinc-300" : "text-zinc-600",
+              mono && "font-mono",
+            )}
+          >
+            {value ?? placeholder}
+          </span>
+          <Pencil className="h-2.5 w-2.5 shrink-0 text-zinc-700 group-hover:text-zinc-400" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-[3px]">
+      <div className="flex items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-1.5 dk-label text-[9px]">
+          <Icon className="h-3 w-3 shrink-0 text-zinc-600" />
+          {label}
+        </span>
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          disabled={busy}
+          placeholder={placeholder}
+          className={cn(
+            "min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-right text-[11px] text-zinc-100 outline-none focus:border-quantum/60 disabled:opacity-50",
+            mono && "font-mono",
+          )}
+        />
+        <button
+          onClick={save}
+          disabled={busy}
+          title="Save"
+          className="shrink-0 rounded p-0.5 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+        >
+          <Check className="h-3 w-3" />
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          disabled={busy}
+          title="Cancel"
+          className="shrink-0 rounded p-0.5 text-zinc-500 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+      {error ? <div className="mt-1 text-right text-[9px] text-rose-400">{error}</div> : null}
     </div>
   );
 }
@@ -275,8 +401,27 @@ export function UserPill({
           </div>
 
           <Section title="Contact">
-            <Row icon={Mail} label="Email" value={profile?.email ?? "—"} mono={false} />
-            <Row icon={Phone} label="Mobile" value={profile?.mobile_no ?? "—"} />
+            <EditableRow
+              icon={Mail}
+              label="Email"
+              value={profile?.email ?? null}
+              placeholder="Add email"
+              mono={false}
+              onSave={async (next) => {
+                const { profile: updated } = await api.updateProfile({ email: next });
+                engine.setProfile(updated);
+              }}
+            />
+            <EditableRow
+              icon={Phone}
+              label="Mobile"
+              value={profile?.mobile_no ?? null}
+              placeholder="Add mobile"
+              onSave={async (next) => {
+                const { profile: updated } = await api.updateProfile({ mobile_no: next });
+                engine.setProfile(updated);
+              }}
+            />
           </Section>
 
           <Section title="Segments enabled">

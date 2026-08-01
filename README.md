@@ -340,7 +340,8 @@ whitelisting changes at all.
 | `POST` | `/api/auth/login` | Establish a SmartAPI session (client code, PIN, TOTP), behind Turnstile; reads and stores the profile |
 | `GET` | `/api/auth/session` | Revalidate the cookie against the broker, refresh across the daily expiry, return the profile |
 | `GET` | `/api/auth/profile` | The signed-in operator, in full. Scoped to the session cookie |
-| `POST` | `/api/auth/logout` | Clear the session cookie |
+| `PATCH` | `/api/auth/profile` | Correct this terminal's stored email or mobile number — SmartAPI has no write path for either |
+| `POST` | `/api/auth/logout` | Invalidate the JWT at Angel One (`logout`, best-effort), then clear the session cookie |
 | `GET` | `/api/rms` | Available margin for pre-trade leverage checks |
 | `POST` | `/api/market/candles` | Historical candles (`getCandleData`), normalised and sliced to the last trading session |
 | `POST` | `/api/market/oi` | Historical open interest (`getOIData`) for a live F&O contract |
