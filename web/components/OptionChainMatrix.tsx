@@ -138,7 +138,11 @@ function LegCells({
               {leg.change_pct >= 0 ? "▲" : "▼"}
               {fmt(Math.abs(leg.change_pct), 1)}%
             </span>
-          ) : null}
+          ) : (
+            <span className="inline-flex shrink-0 items-center rounded-sm bg-zinc-800/50 px-1 py-px font-mono text-[8px] font-semibold leading-none tabular-nums text-zinc-600">
+              flat
+            </span>
+          )}
         </span>
       ) : (
         <span className="font-mono text-xs text-zinc-700">—</span>
