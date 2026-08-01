@@ -60,7 +60,7 @@ function SpotTicker({
     <button
       onClick={onSelect}
       className={cn(
-        "flex h-10 w-[152px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
+        "flex h-9 w-[148px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
         active
           ? "border-quantum/60 bg-quantum/10"
           : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
@@ -159,7 +159,7 @@ export function Header({
         state right. Below lg the instrument rail drops to its own full-width row
         instead of wrapping mid-cluster, so nothing ever sits half-aligned.
       */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
         <div className="flex shrink-0 items-center gap-2.5">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10">
@@ -193,7 +193,7 @@ export function Header({
         {/* Session state */}
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {simulated ? (
-            <Badge className="h-8 border-amber-500/50 bg-amber-500/10 text-amber-300">
+            <Badge className="h-7 border-amber-500/50 bg-amber-500/10 text-amber-300">
               <FlaskConical className="h-3 w-3" />
               Simulated
             </Badge>
@@ -201,7 +201,7 @@ export function Header({
 
           <Badge
             className={cn(
-              "h-8 border-zinc-800",
+              "h-7 border-zinc-800",
               snapshot?.market_open ? "text-emerald-300" : "text-zinc-500",
             )}
           >
@@ -209,7 +209,7 @@ export function Header({
             {snapshot?.market_open ? "Open" : "Closed"}
           </Badge>
 
-          <Badge className={cn("h-8 border-zinc-800", streamTone)}>
+          <Badge className={cn("h-7 border-zinc-800", streamTone)}>
             <Radio
               className={cn("h-3 w-3", streamState === "live" && "animate-pulse-ring")}
             />
@@ -219,7 +219,7 @@ export function Header({
           {/* Exchange wall clock */}
           <span
             title="Exchange wall clock — Asia/Kolkata"
-            className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 font-mono text-[11px] font-semibold tabular-nums text-zinc-200"
+            className="flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 font-mono text-[11px] font-semibold tabular-nums text-zinc-200"
           >
             {clock}
             <span className="text-[8px] font-normal uppercase tracking-wider text-zinc-600">
@@ -231,7 +231,7 @@ export function Header({
           <Badge
             title="Time to the 3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
             className={cn(
-              "h-8 border-zinc-800 font-semibold",
+              "h-7 border-zinc-800 font-semibold",
               seconds === 0
                 ? "text-zinc-500"
                 : seconds < 600
@@ -252,7 +252,7 @@ export function Header({
                 : "LIVE mode — orders route to NSE. Click to return to paper."
             }
             className={cn(
-              "flex h-8 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50",
+              "flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50",
               mode === "live"
                 ? "border-rose-500/60 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
                 : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800",
@@ -275,7 +275,7 @@ export function Header({
                 await engine.logout().catch(() => undefined);
                 onRefreshStatus();
               }}
-              className="h-8 border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+              className="h-7 border border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
             >
               <PlugZap className="h-3 w-3" />
               Connected
@@ -284,7 +284,7 @@ export function Header({
             <Button
               variant="quantum"
               size="sm"
-              className="h-8"
+              className="h-7"
               onClick={() => setLoginOpen(true)}
             >
               <Plug className="h-3 w-3" />

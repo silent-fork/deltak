@@ -6,7 +6,7 @@ import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { wallTags, type WallTag } from "@/lib/coaView";
-import type { ChainRow, OptionChain, OptionLeg } from "@/lib/types";
+import type { OptionChain, OptionLeg } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
 
 /** Tag styling: colour carries the wall, weight carries the generation. */
@@ -174,12 +174,12 @@ export function OptionChainMatrix({
 
   const { levels } = chain;
 
-  // A wall and the ATM anchor regularly land on the same strike; the wall tint
-  // wins and the ATM keeps its own glow, so neither reading is lost.
-  const rowTone = (tags: WallTag[], row: ChainRow) => {
+  // Only the walls tint a row. The horizon is drawn as a line and nothing else:
+  // a band across the middle of the ladder competes with the OI bars it sits on,
+  // and the ATM strike already reads as cyan in the strike column.
+  const rowTone = (tags: WallTag[]) => {
     if (tags.some((t) => t.side === "aegis")) return "bg-emerald-500/[0.06]";
     if (tags.length) return "bg-rose-500/[0.06]";
-    if (row.is_atm) return "bg-quantum/[0.07]";
     return "";
   };
 
@@ -242,7 +242,7 @@ export function OptionChainMatrix({
                   key={row.strike}
                   className={cn(
                     "border-b border-zinc-800/40 transition-colors hover:bg-zinc-800/40",
-                    rowTone(tags, row),
+                    rowTone(tags),
                     row.quantum_horizon && "dk-quantum-horizon",
                     highlighted && "shadow-[inset_0_0_0_1px_rgba(0,240,255,0.5)]",
                   )}

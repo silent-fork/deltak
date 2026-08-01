@@ -31,7 +31,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="shrink-0 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+    <div className="shrink-0 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-0.5">
       <div className="flex items-baseline justify-between gap-2">
         <span title={hint} className="dk-label text-[9px] leading-none">
           {label}
@@ -69,12 +69,12 @@ function OiCurve({
 
   if (values.length < 2) {
     return (
-      <div className="rounded border border-zinc-800/80 px-1.5 py-1">
-        <div className="flex items-baseline justify-between font-mono text-[9px] text-zinc-600">
+      <div className="rounded border border-zinc-800/80 px-1.5 py-0.5">
+        <div className="flex items-baseline justify-between font-mono text-[8px] text-zinc-600">
           <span className="uppercase tracking-wider">{name} OI</span>
           <span>{series.length ? "1 read" : "—"}</span>
         </div>
-        <div className="mt-1 h-[18px] text-[8px] leading-[18px] text-zinc-700">
+        <div className="mt-0.5 h-[12px] text-[8px] leading-[12px] text-zinc-700">
           awaiting history
         </div>
       </div>
@@ -101,9 +101,9 @@ function OiCurve({
       title={`${name}${strike ? ` ${fmt(strike, 0)}` : ""} — ${values.length} readings this session, ${
         building ? "net build" : "net unwind"
       } of ${compact(Math.abs(net))} contracts (historical OI API).`}
-      className="rounded border border-zinc-800/80 px-1.5 py-1"
+      className="rounded border border-zinc-800/80 px-1.5 py-0.5"
     >
-      <div className="flex items-baseline justify-between gap-1 font-mono text-[9px]">
+      <div className="flex items-baseline justify-between gap-1 font-mono text-[8px]">
         <span className="uppercase tracking-wider text-zinc-500">{name} OI</span>
         <span className={building ? "text-zinc-400" : "text-amber-400/90"}>
           {signed(net / 1000, 1)}K
@@ -112,7 +112,7 @@ function OiCurve({
       <svg
         viewBox={`0 0 ${w} ${h}`}
         preserveAspectRatio="none"
-        className="mt-1 h-[18px] w-full"
+        className="mt-0.5 h-[12px] w-full"
         role="img"
         aria-label={`${name} open interest through the session`}
       >
@@ -170,7 +170,7 @@ function WallMigration({
   };
 
   return (
-    <div className="relative flex min-h-[74px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800 bg-zinc-950/50 px-2 pb-1 pt-1.5">
+    <div className="relative flex min-h-[28px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800 bg-zinc-950/50 px-2 pb-1 pt-1">
       <div className="flex shrink-0 items-baseline justify-between">
         <span
           title="Every strike each wall has occupied this session. A wall that steps repeatedly is a wall being rebuilt; a flat line is a bound holding."
@@ -258,7 +258,7 @@ function Wall({
   return (
     <div
       className={cn(
-        "rounded-md border px-2 py-1.5",
+        "rounded-md border px-2 py-1",
         support
           ? "border-emerald-500/25 bg-emerald-500/[0.05]"
           : "border-rose-500/25 bg-rose-500/[0.05]",
@@ -299,10 +299,10 @@ function Wall({
         </span>
       </div>
 
-      <div className="mt-1 flex items-baseline gap-1.5">
+      <div className="mt-0.5 flex items-baseline gap-1.5">
         <span
           className={cn(
-            "font-mono text-[17px] font-semibold leading-none tracking-tight",
+            "font-mono text-[15px] font-semibold leading-none tracking-tight",
             support ? "text-emerald-200" : "text-rose-200",
           )}
         >
@@ -319,7 +319,7 @@ function Wall({
         ) : null}
       </div>
 
-      <div className="mt-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
         {distance === null
           ? "—"
           : `${fmt(Math.abs(distance), 0)} pts ${support ? "below" : "above"}`}
@@ -379,8 +379,8 @@ export function CoaMatrixPanel({
         </span>
       </CardHeader>
 
-      <CardContent className="dk-scroll flex min-h-0 flex-col gap-1.5 overflow-y-auto p-2">
-        <div className="shrink-0 grid grid-cols-2 gap-1.5">
+      <CardContent className="dk-scroll flex min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
+        <div className="shrink-0 grid grid-cols-2 gap-1">
           <Wall
             side="aegis"
             prior={levels.aegis_0}
@@ -410,7 +410,7 @@ export function CoaMatrixPanel({
           }
         >
           <div
-            className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-zinc-900"
+            className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-zinc-900"
             title={`Aegis holds ${compact(depth.aegisOi)} put OI; Zenith holds ${compact(depth.zenithOi)} call OI.`}
           >
             <span
@@ -419,7 +419,7 @@ export function CoaMatrixPanel({
             />
             <span className="flex-1 bg-rose-500/60" />
           </div>
-          <div className="mt-1 flex items-center justify-between font-mono text-[9px]">
+          <div className="mt-0.5 flex items-center justify-between font-mono text-[9px]">
             <span
               className={cn(
                 depth.aegisBuild >= 0 ? "text-emerald-400/80" : "text-amber-400/80",
@@ -442,7 +442,7 @@ export function CoaMatrixPanel({
 
           {/* The same two numbers as a curve — the shape is what says whether
               a wall is being held or quietly abandoned. */}
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <div className="mt-1 grid grid-cols-2 gap-1">
             <OiCurve side="aegis" series={aegisOi} strike={levels.aegis_1} />
             <OiCurve side="zenith" series={zenithOi} strike={levels.zenith_1} />
           </div>
@@ -469,7 +469,7 @@ export function CoaMatrixPanel({
             </span>
           }
         >
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <div className="mt-1 grid grid-cols-2 gap-1">
             {(
               [
                 ["aegis", bands.aegis] as const,
@@ -532,14 +532,14 @@ export function CoaMatrixPanel({
             </span>
           }
         >
-          <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-zinc-900">
+          <div className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-zinc-900">
             <span
               className="bg-emerald-500/70 transition-[width] duration-500"
               style={{ width: `${pressure.supportShare}%` }}
             />
             <span className="flex-1 bg-rose-500/70" />
           </div>
-          <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-zinc-500">
+          <div className="mt-0.5 flex items-center justify-between font-mono text-[9px] text-zinc-500">
             <span className="text-emerald-400/80">
               {compact(pressure.supportBuild)} puts ↓
             </span>
@@ -557,7 +557,7 @@ export function CoaMatrixPanel({
         />
 
         {/* Corridor geometry */}
-        <div className="shrink-0 grid grid-cols-3 gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1.5">
+        <div className="shrink-0 grid grid-cols-3 gap-2 rounded-md border border-zinc-800 bg-zinc-950/50 px-2 py-1">
           {(
             [
               {

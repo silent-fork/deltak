@@ -7,10 +7,9 @@ import { LoginScreen } from "@/components/LoginScreen";
 import { Header } from "@/components/Header";
 import { CoaMatrixPanel } from "@/components/hero/CoaMatrixPanel";
 import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
-import { OiBuildupPanel } from "@/components/OiBuildupPanel";
 import { OptionChainMatrix } from "@/components/OptionChainMatrix";
 import { RrgScatter } from "@/components/RrgScatter";
-import { SignalPanel } from "@/components/SignalPanel";
+import { SignalDeck } from "@/components/SignalDeck";
 import { TradeBook } from "@/components/TradeBook";
 import type { Underlying } from "@/lib/types";
 import { useEngine } from "@/lib/useEngine";
@@ -81,12 +80,13 @@ export default function TerminalPage() {
 
         {/*
           Below xl the terminal is one column that scrolls as a page. From xl it
-          becomes a fixed cockpit: a three-column hero over the chain and the
-          trade book, with only the panels that opt in scrolling internally.
+          becomes a fixed cockpit split two parts hero to three parts board — the
+          hero is context you read at a glance, the board is what you act on, so
+          the board gets the larger share and only opted-in panels scroll.
         */}
-        <div className="dk-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 xl:overflow-hidden">
+        <div className="dk-scroll flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5 xl:overflow-hidden">
           {/* Hero — levels, price, rotation */}
-          <section className="grid shrink-0 grid-cols-1 gap-2 lg:grid-cols-3">
+          <section className="grid shrink-0 grid-cols-1 gap-1.5 lg:grid-cols-3 xl:min-h-0 xl:shrink xl:basis-0 xl:grow-[2]">
             <CoaMatrixPanel
               chain={chain}
               aegisOi={aegisToken ? market.oiSeries[aegisToken] : undefined}
@@ -103,36 +103,36 @@ export default function TerminalPage() {
           </section>
 
           {/* Board — the chain, and everything that acts on it */}
-          <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-3 xl:overflow-hidden">
+          <section className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:basis-0 xl:grow-[3] xl:grid-cols-3 xl:overflow-hidden">
             <div className="flex min-h-[60vh] flex-col xl:col-span-2 xl:min-h-0 xl:overflow-hidden">
               <OptionChainMatrix chain={chain} signalToken={signal?.token} />
             </div>
 
-            <aside className="dk-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto">
-              <SignalPanel
+            {/* Two panels, not four: the signal engine and the buildup board
+                share a tabbed deck, and the book sits open beneath them. */}
+            <aside className="flex min-h-0 flex-col gap-1.5 xl:overflow-hidden">
+              <SignalDeck
                 signal={signal}
                 mode={snapshot?.mode ?? "paper"}
                 onExecuted={() => forceRefresh((n) => n + 1)}
+                buildup={market.buildup}
+                buildupType={market.buildupType}
+                buildupExpiry={market.buildupExpiry}
+                buildupAt={market.buildupAt}
+                marketAvailable={market.available}
+                focus={selected}
+                onBuildupType={market.setBuildupType}
+                onBuildupExpiry={market.setBuildupExpiry}
               />
               <TradeBook
                 ledger={snapshot?.ledger}
                 onChanged={() => forceRefresh((n) => n + 1)}
               />
-              <OiBuildupPanel
-                rows={market.buildup}
-                type={market.buildupType}
-                expiry={market.buildupExpiry}
-                updatedAt={market.buildupAt}
-                available={market.available}
-                focus={selected}
-                onType={market.setBuildupType}
-                onExpiry={market.setBuildupExpiry}
-              />
             </aside>
           </section>
         </div>
 
-        <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-1 text-[9px] uppercase tracking-wider text-zinc-600">
+        <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
           <span className="flex items-center gap-3">
             <span>
               Delta-K Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum

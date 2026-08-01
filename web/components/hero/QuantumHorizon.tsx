@@ -198,7 +198,7 @@ export function QuantumHorizon({
 
   return (
     <Card className="min-h-0 overflow-hidden">
-      <CardContent className="relative flex min-h-0 flex-col gap-2 p-3">
+      <CardContent className="relative flex min-h-0 flex-col gap-1.5 p-2">
         {/* A single soft light source behind the price keeps the panel from
             reading as a flat slab. */}
         <div
@@ -229,7 +229,7 @@ export function QuantumHorizon({
                   <span className="ml-1.5 text-zinc-600">{chain.expiry}</span>
                 ) : null}
               </div>
-              <div className="mt-1 font-mono text-[30px] font-semibold leading-none tracking-tight text-zinc-50">
+              <div className="mt-1 font-mono text-[26px] font-semibold leading-none tracking-tight text-zinc-50">
                 {fmt(quote?.ltp ?? chain?.spot ?? 0)}
               </div>
             </div>
@@ -252,7 +252,7 @@ export function QuantumHorizon({
         </div>
 
         {!view ? (
-          <div className="flex h-[128px] items-center justify-center rounded-md border border-zinc-800/70 bg-zinc-950/40 text-[11px] text-zinc-600">
+          <div className="flex h-[108px] items-center justify-center rounded-md border border-zinc-800/70 bg-zinc-950/40 text-[11px] text-zinc-600">
             Open-interest profile warming up…
           </div>
         ) : (
@@ -280,7 +280,7 @@ export function QuantumHorizon({
               ) : null}
 
               {/* Profile: calls above the axis, puts below */}
-              <div className="relative flex h-[104px] items-stretch gap-[2px]">
+              <div className="relative flex h-[84px] items-stretch gap-[2px]">
                 {view.rows.map((row) => {
                   const call =
                     view.peak > 0 ? (view.value(row.call) / view.peak) * 100 : 0;
@@ -516,7 +516,7 @@ export function QuantumHorizon({
           hero row has left over, so the column fills its card at any viewport
           instead of trailing off into dead space.
         */}
-        <div className="relative flex min-h-[76px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800/70 bg-zinc-950/50 px-2 pb-1 pt-1.5">
+        <div className="relative flex min-h-[58px] flex-1 flex-col overflow-hidden rounded-md border border-zinc-800/70 bg-zinc-950/50 px-2 pb-1 pt-1.5">
           <div className="flex shrink-0 items-baseline justify-between gap-2">
             <span className="flex min-w-0 items-baseline gap-1.5">
               <span className="dk-label text-[9px] leading-none">Spot Trace</span>

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
 import type { ExecutionMode, Signal } from "@/lib/types";
 import { BLOCK_REASONS, PROTOCOL_META, cn, fmt, money } from "@/lib/utils";
@@ -79,11 +79,9 @@ export function SignalPanel({
 
   if (!signal) {
     return (
-      <Card className="shrink-0">
-        <CardContent className="py-6 text-center text-xs text-zinc-600">
-          Signal engine warming up…
-        </CardContent>
-      </Card>
+      <CardContent className="flex items-center justify-center text-xs text-zinc-600">
+        Signal engine warming up…
+      </CardContent>
     );
   }
 
@@ -112,18 +110,9 @@ export function SignalPanel({
   }
 
   return (
-    // Sizes to its content and shrinks (scrolling internally) when the sidebar
-    // is tight, but never grows — slack belongs to the event log, and growing
-    // here would just open a gap above the execution button. The floor keeps
-    // flex from crushing the panel into its own header on a short screen.
-    <Card className="min-h-0 shrink-0 xl:min-h-[190px] xl:flex-[0_1_auto]">
-      <CardHeader className="shrink-0">
-        <CardTitle className="truncate">Delta-K Signal Engine</CardTitle>
-        <Badge className={cn("shrink-0 font-semibold", meta.tone)}>
-          Protocol {meta.name}
-        </Badge>
-      </CardHeader>
-
+    // Body only: the deck that hosts this panel owns the card, the title and
+    // the tab strip, so the engine and the buildup board share one frame.
+    <>
       <CardContent className="dk-scroll min-h-0 space-y-2 overflow-y-auto p-2">
         {/* Regime */}
         <div>
@@ -299,6 +288,6 @@ export function SignalPanel({
           </div>
         ) : null}
       </div>
-    </Card>
+    </>
   );
 }

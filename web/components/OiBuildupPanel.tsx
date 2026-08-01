@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import {
   OI_BUILDUP_EXPIRIES,
   OI_BUILDUP_TYPES,
@@ -81,45 +81,43 @@ export function OiBuildupPanel({
   );
 
   return (
-    <Card className="min-h-0">
-      <CardHeader className="shrink-0">
-        <CardTitle className="truncate">OI Buildup</CardTitle>
-        <div className="flex shrink-0 items-center gap-1">
-          {OI_BUILDUP_EXPIRIES.map((e) => (
-            <button
-              key={e}
-              onClick={() => onExpiry(e)}
-              title={`${e === "NEAR" ? "Nearest" : e === "NEXT" ? "Next" : "Far"} expiry contracts.`}
-              className={cn(
-                "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors",
-                expiry === e
-                  ? "border-quantum/60 bg-quantum/15 text-quantum"
-                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
-              )}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex min-h-0 flex-col gap-1.5 p-2">
-        <div className="grid shrink-0 grid-cols-4 gap-1">
-          {OI_BUILDUP_TYPES.map((t) => (
-            <button
-              key={t}
-              onClick={() => onType(t)}
-              title={TAB[t].blurb}
-              className={cn(
-                "truncate rounded border px-1 py-1 font-mono text-[9px] uppercase tracking-wider transition-colors",
-                type === t
-                  ? TAB[t].tone
-                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
-              )}
-            >
-              {TAB[t].short}
-            </button>
-          ))}
+    // Body only — the deck owns the card and the tab strip.
+    <CardContent className="flex min-h-0 flex-col gap-1.5 p-2">
+      <div className="flex shrink-0 items-center gap-1">
+          <div className="grid flex-1 grid-cols-4 gap-1">
+            {OI_BUILDUP_TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() => onType(t)}
+                title={TAB[t].blurb}
+                className={cn(
+                  "truncate rounded border px-1 py-1 font-mono text-[9px] uppercase tracking-wider transition-colors",
+                  type === t
+                    ? TAB[t].tone
+                    : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
+                )}
+              >
+                {TAB[t].short}
+              </button>
+            ))}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 border-l border-zinc-800 pl-1">
+            {OI_BUILDUP_EXPIRIES.map((e) => (
+              <button
+                key={e}
+                onClick={() => onExpiry(e)}
+                title={`${e === "NEAR" ? "Nearest" : e === "NEXT" ? "Next" : "Far"} expiry contracts.`}
+                className={cn(
+                  "rounded border px-1 py-1 font-mono text-[9px] uppercase tracking-wider transition-colors",
+                  expiry === e
+                    ? "border-quantum/60 bg-quantum/15 text-quantum"
+                    : "border-zinc-800 text-zinc-500 hover:text-zinc-300",
+                )}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
         </div>
 
         <p className="shrink-0 text-[9px] leading-tight text-zinc-500">{meta.blurb}</p>
@@ -211,7 +209,6 @@ export function OiBuildupPanel({
               : "—"}
           </span>
         </div>
-      </CardContent>
-    </Card>
+    </CardContent>
   );
 }

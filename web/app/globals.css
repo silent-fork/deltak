@@ -44,7 +44,7 @@
   }
 
   .dk-panel-header {
-    @apply flex items-center justify-between gap-2 border-b border-zinc-800/70 px-3 py-2;
+    @apply flex items-center justify-between gap-2 border-b border-zinc-800/70 px-2.5 py-1.5;
   }
 
   .dk-label {
