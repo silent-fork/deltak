@@ -17,10 +17,67 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
+/**
+ * Where this deployment actually lives, for the tags that have to be
+ * absolute (og:image, canonical). Vercel stamps its own production URL into
+ * the environment; `NEXT_PUBLIC_DK_SITE_URL` overrides it for a custom
+ * domain, and localhost is the honest fallback for a dev server that has
+ * neither.
+ */
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
+const TITLE = "DeltaK Terminal — Angel One Options Trading HUD";
+const DESCRIPTION =
+  "DeltaK Matrix Strategy (DKMS): a live options trading terminal for Angel One SmartAPI. " +
+  "COA support/resistance wall tracking, RRG relative-strength rotation and signal-driven " +
+  "Autopilot execution across NIFTY, BANKNIFTY and FINNIFTY futures & options.";
+
 export const metadata: Metadata = {
-  title: "DeltaK Terminal",
-  description:
-    "Options trading HUD and signal engine — DeltaK Matrix Strategy (DKMS) over NIFTY, BANKNIFTY and FINNIFTY.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: TITLE,
+    template: "%s · DeltaK Terminal",
+  },
+  description: DESCRIPTION,
+  keywords: [
+    "Angel One",
+    "Angel One SmartAPI",
+    "options trading",
+    "futures and options",
+    "F&O trading",
+    "algo trading India",
+    "NIFTY options",
+    "BANKNIFTY options",
+    "FINNIFTY options",
+    "options trading terminal",
+    "options trading signals",
+    "intraday options strategy",
+    "relative strength rotation",
+    "RRG",
+    "DeltaK",
+    "DKMS",
+    "paper trading",
+    "options chain analysis",
+  ],
+  applicationName: "DeltaK Terminal",
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "DeltaK Terminal",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {
