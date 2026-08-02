@@ -322,12 +322,16 @@ export function UserPill({
   }, [open]);
 
   /*
-   * Margin is read when the panel opens, not on a timer. It is a metered broker
-   * call and nobody watches their free cash tick — asking once, when the
-   * operator actually looks, is the whole requirement.
+   * Margin is read once as soon as the account is known, not on a timer and
+   * not gated behind the dropdown opening. It is a metered broker call, so
+   * "once" still holds — the difference is that "once" now means the moment
+   * the operator is signed in, so the panel has real numbers already sitting
+   * there the first time it's opened, rather than a "Reading margin…" beat
+   * every single time. The explicit Refresh button below is what re-reads it
+   * after that.
    */
   useEffect(() => {
-    if (!open) return;
+    if (!clientCode) return;
     let cancelled = false;
     api
       .rms()
@@ -345,7 +349,7 @@ export function UserPill({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [clientCode]);
 
   const name = profile?.name ?? clientCode ?? "Operator";
   const closed = ledger?.closed_positions.length ?? 0;
