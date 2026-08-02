@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Loader2, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { memo } from "react";
 
+import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   coaMetrics,
@@ -717,21 +718,7 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
         </div>
       </CardContent>
 
-      {/* Translucent, not opaque — the walls and levels underneath are still
-          this instrument's real last read, just about to be replaced by a
-          fresher one. */}
-      {switching ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
-        >
-          <Loader2 className="h-3 w-3 animate-spin text-quantum" />
-          <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
-            Loading {chain.label}…
-          </span>
-        </div>
-      ) : null}
+      {switching ? <PanelBootOverlay label={chain.label} /> : null}
     </Card>
   );
 });

@@ -3,9 +3,11 @@
 import { Loader2 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
+import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { coaMetrics } from "@/lib/coaView";
+import { DEFAULT_CONFIG, INDEX_UNIVERSE } from "@/lib/engine/config";
 import type { Candle, OptionChain, SessionStats, SpotQuote } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
 import { cn, compact, fmt, signed } from "@/lib/utils";
@@ -184,10 +186,21 @@ export const QuantumHorizon = memo(function QuantumHorizon({
      * Counting how many of the legs that exist have actually posted a
      * nonzero read for whichever metric is selected is what tells the two
      * states apart.
+     *
+     * Scoped to the same near-ATM span RRG plots from, not the whole rendered
+     * ladder: `chainDepth` reaches strikes deep enough into the wings that
+     * some of them may never see a print all session, which made this
+     * unreachable in practice and left the boot sequence falling through to
+     * its timeout instead of a genuine "ready". The far wings staying at
+     * zero once the near-ATM legs have posted a real read is the market
+     * being thin there, not this panel still loading.
      */
+    const spec = INDEX_UNIVERSE[chain.underlying];
+    const span = spec ? spec.strikeStep * DEFAULT_CONFIG.rrgNodeSpan : Infinity;
     let matured = 0;
     let expected = 0;
     for (const row of rows) {
+      if (Math.abs(row.strike - chain.atm_strike) > span) continue;
       if (row.call) {
         expected += 1;
         if (value(row.call) > 0) matured += 1;
@@ -770,16 +783,7 @@ export const QuantumHorizon = memo(function QuantumHorizon({
             the profile above are this instrument's real last read too, about
             to be replaced the moment the new underlying's session lands. */}
         {switching ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
-          >
-            <Loader2 className="h-3 w-3 animate-spin text-quantum" />
-            <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
-              Loading {chain?.label ?? quote?.label ?? "session"}…
-            </span>
-          </div>
+          <PanelBootOverlay label={chain?.label ?? quote?.label ?? "session"} />
         ) : null}
       </CardContent>
     </Card>

@@ -11,6 +11,7 @@ import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
 import { OptionChainMatrix } from "@/components/OptionChainMatrix";
 import { RrgScatter } from "@/components/RrgScatter";
 import { SignalDeck } from "@/components/SignalDeck";
+import { DEFAULT_CONFIG, INDEX_UNIVERSE } from "@/lib/engine/config";
 import {
   reconstructWallTrail,
   spotAtFactory,
@@ -142,13 +143,25 @@ export function Terminal() {
    * Quantum Horizon each compute internally to decide when their own
    * "maturing" overlays can drop; the boot screen needs the same bar so it
    * doesn't hand off to the board before those overlays already would.
+   *
+   * Scoped to the same near-ATM span RRG plots from (`rrgNodeSpan`), not the
+   * full rendered ladder (`chainDepth`, roughly double that span each side):
+   * counting every strike out to the wings meant this could go unreached for
+   * strikes that never trade all session, and the gate was falling through
+   * to its own timeout on every load instead of ever actually turning true —
+   * which is exactly what left the board revealing before COA Matrix and
+   * Quantum Horizon had anything real. The wings staying at zero once the
+   * near-ATM legs are quoted is thin liquidity, not this panel still loading.
    */
   const LEG_READY_FRACTION = 0.9;
   const legMaturity = useMemo(() => {
     if (!chain?.rows.length) return { matured: 0, expected: 0 };
+    const spec = INDEX_UNIVERSE[chain.underlying];
+    const span = spec ? spec.strikeStep * DEFAULT_CONFIG.rrgNodeSpan : Infinity;
     let matured = 0;
     let expected = 0;
     for (const row of chain.rows) {
+      if (Math.abs(row.strike - chain.atm_strike) > span) continue;
       if (row.call) {
         expected += 1;
         if (row.call.oi > 0) matured += 1;
