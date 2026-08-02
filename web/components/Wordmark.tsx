@@ -20,7 +20,16 @@ export function Wordmark({
 }) {
   return (
     <span className={cn("font-bold text-zinc-100", className)}>
-      DELTA<span className={cn("text-quantum", glow && "text-glow-quantum")}>K</span>
+      {/*
+        Not `cn()` here: `text-quantum` (colour) and `text-glow-quantum` (a
+        text-shadow utility, not a colour at all) look like the same
+        Tailwind class group to tailwind-merge's heuristic, which silently
+        drops `text-quantum` and leaves the "K" the same colour as "DELTA"
+        with nothing but a shadow around it. Neither sets a property the
+        other touches, so there's nothing to actually merge — this just
+        applies both.
+      */}
+      DELTA<span className={`text-quantum${glow ? " text-glow-quantum" : ""}`}>K</span>
     </span>
   );
 }
