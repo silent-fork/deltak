@@ -67,28 +67,36 @@ const PROTOCOLS = [
     name: "Alpha",
     title: "Equilibrium Range",
     tone: "text-quantum",
+    border: "border-quantum/25",
     body: "Both walls solid. Buys the 2nd ITM Call at Aegis, the 2nd ITM Put at Zenith — a range trade at each bound, nothing in between.",
+    rule: "Engages only inside the invalidation band around a wall — mid-range, it waits.",
   },
   {
     icon: TrendingUp,
     name: "Beta",
     title: "Ascension Vector",
     tone: "text-emerald-400",
+    border: "border-emerald-500/25",
     body: "Support solid, resistance migrating up. ITM Calls on the next micro-dip; put purchases are banned outright under this regime.",
+    rule: "Arms only on a downward micro-dip in spot — Puts are structurally banned, not just discouraged.",
   },
   {
     icon: TrendingDown,
     name: "Gamma",
     title: "Cascade Vector",
     tone: "text-rose-400",
+    border: "border-rose-500/25",
     body: "Resistance solid, support migrating down. ITM Puts arm on the cascade; calls are banned outright under this regime.",
+    rule: "Arms on the cascade itself — Calls are structurally banned, not just discouraged.",
   },
   {
     icon: Waves,
     name: "Delta",
     title: "Volatility Trap",
     tone: "text-zinc-400",
+    border: "border-zinc-700",
     body: "Both bounds migrating at once — a consolidation neither side is defending. The auto-driver mutes itself rather than guess.",
+    rule: "No candidate clears the Zero-OTM/RRG gate here — nothing to execute, by design.",
   },
 ] as const;
 
@@ -172,7 +180,7 @@ export default function HomePage() {
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
-          {["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode", "Live mode", "SmartAPI"].map(
+          {["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode"].map(
             (chip) => (
               <span
                 key={chip}
@@ -182,6 +190,59 @@ export default function HomePage() {
               </span>
             ),
           )}
+        </div>
+      </section>
+
+      {/* Strategy — the centerpiece. Everything else on the page is context
+          around this: DKMS is what DeltaK actually is. */}
+      <section className="relative mx-auto max-w-6xl px-5 pb-10">
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 right-0 h-64 w-64 rounded-full bg-quantum/[0.08] blur-[110px]"
+          />
+
+          <div className="relative text-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-quantum/40 bg-quantum/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-quantum">
+              DeltaK Matrix Strategy
+            </span>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
+              Four protocols. One regime, live.
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
+              Which protocol is armed is read directly off how the Aegis
+              (support) and Zenith (resistance) walls are actually migrating
+              this session — never a setting anyone chooses. Every candidate
+              still has to clear the Zero-OTM rule (longs restricted to the
+              2nd/3rd deepest ITM strike) and the RRG gate (a Lagging quadrant
+              is high-decay and forbidden outright) before it's actionable.
+            </p>
+          </div>
+
+          <div className="relative mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PROTOCOLS.map((p) => (
+              <div
+                key={p.name}
+                className={`rounded-lg border bg-zinc-950/50 p-4 ${p.border}`}
+              >
+                <div className="flex items-center gap-2">
+                  <p.icon className={`h-4 w-4 ${p.tone}`} />
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                    Protocol {p.name}
+                  </span>
+                </div>
+                <h3 className={`mt-2 text-[13px] font-semibold ${p.tone}`}>
+                  {p.title}
+                </h3>
+                <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
+                  {p.body}
+                </p>
+                <p className="mt-2.5 border-t border-zinc-800/70 pt-2 font-mono text-[10.5px] leading-relaxed text-zinc-600">
+                  {p.rule}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -204,35 +265,6 @@ export default function HomePage() {
               </h3>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
                 {f.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Protocols */}
-      <section className="relative mx-auto max-w-6xl px-5 py-10">
-        <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-          Four protocols, one engine
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-[12.5px] leading-relaxed text-zinc-500">
-          Which one is live is decided by how the Aegis and Zenith walls are
-          actually migrating this session — not a setting anyone chooses.
-        </p>
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {PROTOCOLS.map((p) => (
-            <div key={p.name} className="dk-panel rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <p.icon className={`h-4 w-4 ${p.tone}`} />
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                  Protocol {p.name}
-                </span>
-              </div>
-              <h3 className={`mt-2 text-[13px] font-semibold ${p.tone}`}>
-                {p.title}
-              </h3>
-              <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                {p.body}
               </p>
             </div>
           ))}
