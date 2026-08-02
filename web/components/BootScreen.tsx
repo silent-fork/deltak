@@ -83,20 +83,20 @@ export function BootScreen({ stages }: { stages: BootStage[] }) {
       <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-30" />
 
       <div className="relative flex animate-in flex-col items-center gap-9 fade-in zoom-in-95 duration-700">
-        {/* Core emblem — the same square mark the header and sign-in screen
-            use, just larger; a glow breathes behind it rather than the mark
-            itself spinning. */}
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10 shadow-quantum">
-          <div className="absolute h-14 w-14 rounded-md bg-quantum/10 blur-xl" />
-          <Zap
-            className="relative h-7 w-7 animate-pulse-ring text-quantum"
-            style={{ filter: "drop-shadow(0 0 12px rgba(0,240,255,0.65))" }}
-          />
+        {/* Core emblem — the same square mark the sign-in screen uses, just a
+            little larger for a screen with nothing else on it. Static, not
+            pulsing: the boot sequence's own progress bar and status copy
+            already say something is moving. */}
+        <div className="relative flex h-11 w-11 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
+          <Zap className="relative h-5 w-5 text-quantum" />
         </div>
 
         <div className="text-center leading-none">
-          <Wordmark className="text-[24px] tracking-[0.22em]" />
-          <div className="mt-2.5 text-[9px] uppercase tracking-[0.34em] text-quantum/60">
+          {/* No text-shadow on the "K" here — a breathing background and a
+              glowing letter both fighting for attention is the opposite of
+              the calm this screen is going for. */}
+          <Wordmark className="text-[17px] font-semibold tracking-[0.18em]" glow={false} />
+          <div className="mt-2 text-[9px] uppercase tracking-[0.24em] text-zinc-500">
             Terminal · DKMS
           </div>
         </div>

@@ -10,10 +10,17 @@ import { cn } from "@/lib/utils";
  * Sizing is the caller's: pass the same text-size/tracking classes each
  * component already used its own wordmark with.
  */
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({
+  className,
+  glow = true,
+}: {
+  className?: string;
+  /** Drop the "K"'s text-shadow — a quieter mark for a screen with its own ambient glow already going on. */
+  glow?: boolean;
+}) {
   return (
     <span className={cn("font-bold text-zinc-100", className)}>
-      DELTA<span className="text-quantum text-glow-quantum">K</span>
+      DELTA<span className={cn("text-quantum", glow && "text-glow-quantum")}>K</span>
     </span>
   );
 }
