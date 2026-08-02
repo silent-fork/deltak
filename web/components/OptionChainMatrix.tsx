@@ -218,6 +218,11 @@ export const OptionChainMatrix = memo(function OptionChainMatrix({
                 <Skeleton className="h-3 flex-1" />
               </div>
             ))}
+            {/* The fixed row count above only ever fills a fixed height — on
+                anything taller than a short window it left the bottom of the
+                card as bare background instead of "still loading". This
+                takes whatever is left. */}
+            <Skeleton className="min-h-[19px] flex-1 rounded-md" />
           </SkeletonPanel>
         </CardContent>
       </Card>
