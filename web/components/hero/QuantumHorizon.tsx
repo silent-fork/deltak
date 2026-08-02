@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,9 @@ import { coaMetrics } from "@/lib/coaView";
 import type { Candle, OptionChain, SessionStats, SpotQuote } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
 import { cn, compact, fmt, signed } from "@/lib/utils";
+
+/** Same bar the RRG loader uses — the last sliver of legs may never quote. */
+const PROFILE_READY_FRACTION = 0.9;
 
 /**
  * Live tail of the spot trace.
@@ -169,11 +173,35 @@ export const QuantumHorizon = memo(function QuantumHorizon({
     const zenithView =
       zenith !== null ? { strike: zenith, pos: posOf(zenith) } : null;
 
+    /**
+     * Every leg on the rail carries a bar the instant the strike itself
+     * exists, whether or not the feed has actually quoted its OI or volume
+     * yet — a bar sitting at 0% height while its number is still a real
+     * quote arriving reads identically to a leg genuinely has nothing.
+     * Counting how many of the legs that exist have actually posted a
+     * nonzero read for whichever metric is selected is what tells the two
+     * states apart.
+     */
+    let matured = 0;
+    let expected = 0;
+    for (const row of rows) {
+      if (row.call) {
+        expected += 1;
+        if (value(row.call) > 0) matured += 1;
+      }
+      if (row.put) {
+        expected += 1;
+        if (value(row.put) > 0) matured += 1;
+      }
+    }
+
     return {
       rows,
       peak,
       value,
       posOf,
+      matured,
+      expected,
       spotPos: posOf(chain.spot),
       atmPos: posOf(chain.atm_strike),
       aegis: aegisView,
@@ -192,6 +220,16 @@ export const QuantumHorizon = memo(function QuantumHorizon({
       putVol: rows.reduce((a, r) => a + (r.put?.volume ?? 0), 0),
     };
   }, [chain, metric]);
+
+  /**
+   * Both the profile and the trace below it read off the same chain, so
+   * one flag covers both: the trace's own wall lines come from the same
+   * `coaMetrics(chain)` call the profile does, and a rail that is still
+   * mostly zero-height bars is exactly a chain whose wall levels aren't
+   * settled yet either.
+   */
+  const maturing =
+    !!view && view.expected > 0 && view.matured < Math.ceil(view.expected * PROFILE_READY_FRACTION);
 
   /**
    * The feed can only quote a change once it has sent a previous close, which
@@ -453,6 +491,22 @@ export const QuantumHorizon = memo(function QuantumHorizon({
                   </span>
                 </span>
               </div>
+
+              {/* Translucent, not opaque — the bars already up are real
+                  reads, not placeholders, so only the still-zero ones
+                  should read as "not here yet". */}
+              {maturing ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
+                >
+                  <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
+                    Quoting strikes · {view.matured}/{view.expected}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {/* Corridor rail — Aegis, spot, Zenith at a glance */}
@@ -688,6 +742,23 @@ export const QuantumHorizon = memo(function QuantumHorizon({
               >
                 Zenith
               </span>
+            ) : null}
+
+            {/* The trace's own wall lines come from the same chain the
+                profile above is still filling in, so it carries the same
+                "not settled yet" scrim rather than looking finished while
+                the panel above it plainly isn't. */}
+            {traceView && maturing ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="absolute inset-0 flex items-center justify-center gap-1.5 rounded bg-zinc-950/55 backdrop-blur-[1px]"
+              >
+                <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+                <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
+                  Quoting strikes · {view?.matured}/{view?.expected}
+                </span>
+              </div>
             ) : null}
           </div>
         </div>
