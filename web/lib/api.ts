@@ -2,11 +2,13 @@ import type {
   BatchResponse,
   BuildupResponse,
   CandleResponse,
+  ExecutionMode,
   MarginResponse,
   OiResponse,
   PcrResponse,
   Position,
   RiskEvent,
+  Signal,
   UserProfile,
 } from "./types";
 
@@ -199,4 +201,41 @@ export const api = {
     request<Position[] | RiskEvent[] | unknown[]>(
       `/api/history/${resource}?${new URLSearchParams(params).toString()}`,
     ),
+
+  /** The read-only mobile companion — pairing from the desktop, reading back on the phone. */
+  mobile: {
+    /** Desktop mints a fresh QR. Requires the one active trading session. */
+    pair: () =>
+      request<{ claim_url: string; expires_at: string; qr_svg: string }>("/api/mobile/pair", {
+        method: "POST",
+      }),
+    /** Desktop's throttled mirror of its own signal state — fire-and-forget. */
+    push: (snapshot: unknown) =>
+      request<{ ok: boolean }>("/api/mobile/push", {
+        method: "POST",
+        body: JSON.stringify(snapshot),
+      }),
+    /** What the paired phone polls — never touches Angel One. */
+    state: () => request<MobileStateResponse>("/api/mobile/state"),
+    logout: () => request<{ paired: boolean }>("/api/mobile/logout", { method: "POST" }),
+  },
 };
+
+/** `GET /api/mobile/state` — the desktop's last pushed signal mirror, plus this account's positions. */
+export interface MobileStateResponse {
+  client_code: string;
+  signal: {
+    ts: string;
+    mode: ExecutionMode;
+    market_open: boolean;
+    signals: Record<string, Signal>;
+    ledger: {
+      open_pnl: number;
+      realised_pnl: number;
+      total_pnl: number;
+      open_count: number;
+    };
+  } | null;
+  signal_updated_at: string | null;
+  positions: Position[];
+}

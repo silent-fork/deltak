@@ -276,6 +276,55 @@ It also **fails open** the same way persistence does — without
 record a session id, so every session is trivially "active" and this
 enforcement is simply off.
 
+## Mobile companion
+
+A phone visiting `/terminal` never sees Angel One's client-code/PIN/TOTP
+form — by construction, not by a hidden route. The page branches on user
+agent (`lib/server/device.ts`) before anything else renders: a mobile UA gets
+either a "scan this on your desktop" screen or, once paired, a read-only
+companion; a desktop UA gets today's terminal, unchanged.
+
+Pairing is a QR the phone's own camera app scans directly — there is no
+in-app scanner and no camera permission this app ever asks for:
+
+1. An already-signed-in desktop taps **Pair Mobile** in the header, which
+   `POST`s `/api/mobile/pair`. That mints a random, two-minute claim ticket in
+   `mobile_pairings` and renders it server-side as an SVG QR (via `qrcode`,
+   used only inside this one Node route handler — nothing about QR
+   generation ships to the browser bundle) encoding
+   `/api/mobile/pair/claim?token=…`.
+2. The phone's camera opens that URL directly. `GET /api/mobile/pair/claim`
+   is a route handler, not a page — claiming is a mutation (the ticket is
+   deleted, single-use, atomically via `DELETE … RETURNING`), and only a
+   route handler is guaranteed to run exactly once per actual visit, unlike
+   a Server Component render that Next may prefetch. A valid ticket mints a
+   `mobile_sessions` row and sets a long-lived, httpOnly `dk_mobile` cookie;
+   either way it redirects to a clean `/terminal`.
+3. From then on the phone reads two things, both through
+   `GET /api/mobile/state`, and never anything else:
+   - **`live_signals`** — the desktop tab's own signal/ledger snapshot,
+     pushed on a five-second throttle from `useEngine.ts` via
+     `POST /api/mobile/push` (gated by a plain session-cookie check, not the
+     single-active-session lookup — this is a low-stakes mirror, not an
+     order).
+   - **`positions`** — the same table `/api/history` already reads, scoped to
+     the paired account's client code — open positions and recent closed
+     trades.
+
+   `/api/mobile/state` never imports `lib/server/smartapi.ts`. The mobile
+   companion cannot call Angel One even by accident, because nothing in its
+   one route holds a JWT to call it with.
+
+A phone can unpair itself (`POST /api/mobile/logout`, revokes its
+`mobile_sessions` row) to force a fresh QR next time. Multiple phones may be
+paired to one account at once — unlike `client_sessions`, this isn't a
+single-active-session arbiter, just a read-only viewer.
+
+Same posture as everything else here: RLS on, no policies, service-role key
+only; fails open the same way — without Supabase configured, pairing simply
+has nowhere to write and the desktop's Pair Mobile button surfaces that as
+an ordinary request error.
+
 ## Persistence
 
 Supabase stores the operator's profile, positions, orders and risk events.

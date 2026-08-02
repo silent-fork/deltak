@@ -77,6 +77,8 @@ const HEARTBEAT_MS = 5_000;
 const CHECKPOINT_EVERY_TICKS = 60;
 /** How often an open tab re-checks that its broker session is still alive. */
 const SESSION_CHECK_MS = 15 * 60_000;
+/** How often this tab mirrors its signal state for a paired phone to read. */
+const MOBILE_PUSH_MS = 5_000;
 /** Focus fires on every alt-tab; do not spend a profile call on each one. */
 const SESSION_FOCUS_MIN_MS = 5 * 60_000;
 
@@ -229,6 +231,9 @@ export function useEngine(simulate: boolean) {
   const lastRenderAtRef = useRef(0);
   /** Skip repainting a tab nobody is looking at; the engine keeps running. */
   const hiddenRef = useRef(false);
+
+  /** Gates the mobile-companion push to once per `MOBILE_PUSH_MS`, not once a tick. */
+  const lastMobilePushRef = useRef(0);
 
   const streamRef = useRef<SmartStreamClient | null>(null);
   const simRef = useRef<SimulatedFeed | null>(null);
@@ -1074,6 +1079,35 @@ export function useEngine(simulate: boolean) {
       window.removeEventListener("focus", onFocus);
     };
   }, [session.authenticated, startFeed, stopFeeds, log]);
+
+  /**
+   * Mirror this tab's signal state to Supabase, for a paired phone to read
+   * back — see `lib/server/mobile.ts`. `snapshot` updates every tick, but a
+   * phone glancing at "what's armed right now" does not need once-a-second
+   * freshness, so a ref gates the actual network call to once per
+   * `MOBILE_PUSH_MS` regardless of how often this effect re-runs. Fires
+   * whether or not any phone is actually paired to read it, same as every
+   * other best-effort write here.
+   */
+  useEffect(() => {
+    if (!session.authenticated || !snapshot) return;
+    if (Date.now() - lastMobilePushRef.current < MOBILE_PUSH_MS) return;
+    lastMobilePushRef.current = Date.now();
+    void api
+      .mobile.push({
+        ts: snapshot.ts,
+        mode: snapshot.mode,
+        market_open: snapshot.market_open,
+        signals: snapshot.signals,
+        ledger: {
+          open_pnl: snapshot.ledger.open_pnl,
+          realised_pnl: snapshot.ledger.realised_pnl,
+          total_pnl: snapshot.ledger.total_pnl,
+          open_count: snapshot.ledger.open_positions.length,
+        },
+      })
+      .catch(() => undefined);
+  }, [snapshot, session.authenticated]);
 
   const switchMode = useCallback(
     (next: ExecutionMode) => {

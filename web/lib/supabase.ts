@@ -459,3 +459,145 @@ export async function deleteClientSession(clientCode: string): Promise<void> {
     cache: "no-store",
   });
 }
+
+/* -------------------------------------------------------------- mobile companion */
+
+const MOBILE_PAIRINGS = "mobile_pairings";
+const MOBILE_SESSIONS = "mobile_sessions";
+const LIVE_SIGNALS = "live_signals";
+
+/** A fresh QR claim ticket replaces whatever this account's last one was. */
+export async function createMobilePairing(
+  clientCode: string,
+  token: string,
+  expiresAt: string,
+): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  // Nothing here needs to survive: a new QR makes any pairing this account
+  // hasn't claimed yet moot, and an expired one is dead weight either way.
+  await fetch(
+    `${base()}/${MOBILE_PAIRINGS}?client_code=eq.${encodeURIComponent(clientCode)}`,
+    { method: "DELETE", headers: headers("return=minimal"), cache: "no-store" },
+  ).catch(() => undefined);
+
+  const res = await fetch(`${base()}/${MOBILE_PAIRINGS}`, {
+    method: "POST",
+    headers: headers("return=minimal"),
+    body: JSON.stringify([{ token, client_code: clientCode, expires_at: expiresAt }]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase mobile-pairing write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+/**
+ * Burn a claim ticket and hand back the account it was minted for.
+ *
+ * The delete's own filter — unexpired, matching token — is what makes this
+ * atomic and single-use: two requests racing on the same token both issue
+ * the same `DELETE … RETURNING`, and PostgREST hands the row back to
+ * exactly one of them. An expired-but-unclaimed row simply deletes with an
+ * empty return, which reads the same as "never existed" to the caller.
+ */
+export async function claimMobilePairing(token: string): Promise<string | null> {
+  if (!supabaseConfigured || !token) return null;
+  const search = new URLSearchParams({
+    token: `eq.${token}`,
+    expires_at: `gt.${new Date().toISOString()}`,
+  });
+  const res = await fetch(`${base()}/${MOBILE_PAIRINGS}?${search.toString()}`, {
+    method: "DELETE",
+    headers: headers("return=representation"),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length
+    ? ((rows[0] as { client_code: string }).client_code ?? null)
+    : null;
+}
+
+export async function createMobileSession(clientCode: string, sessionId: string): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  const res = await fetch(`${base()}/${MOBILE_SESSIONS}`, {
+    method: "POST",
+    headers: headers("return=minimal"),
+    body: JSON.stringify([{ session_id: sessionId, client_code: clientCode }]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase mobile-session write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+/** The client code a paired phone's cookie belongs to, or null if revoked, expired, or never was. */
+export async function readMobileSession(sessionId: string): Promise<string | null> {
+  if (!supabaseConfigured || !sessionId) return null;
+  const search = new URLSearchParams({
+    select: "client_code",
+    session_id: `eq.${sessionId}`,
+    revoked_at: "is.null",
+    limit: "1",
+  });
+  const res = await fetch(`${base()}/${MOBILE_SESSIONS}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return Array.isArray(body) && body.length
+    ? ((body[0] as { client_code: string }).client_code ?? null)
+    : null;
+}
+
+/** "Sign out this device" — the phone's own cookie stops resolving to anything. */
+export async function revokeMobileSession(sessionId: string): Promise<void> {
+  if (!supabaseConfigured || !sessionId) return;
+  await fetch(`${base()}/${MOBILE_SESSIONS}?session_id=eq.${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    headers: headers("return=minimal"),
+    body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+    cache: "no-store",
+  });
+}
+
+/** Overwritten on every throttled push from the desktop tab — a mirror, not a log. */
+export async function writeLiveSignal(clientCode: string, snapshot: unknown): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  const res = await fetch(`${base()}/${LIVE_SIGNALS}?on_conflict=client_code`, {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify([{ client_code: clientCode, snapshot, updated_at: new Date().toISOString() }]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase live-signal write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+export async function readLiveSignal(
+  clientCode: string,
+): Promise<{ snapshot: unknown; updated_at: string } | null> {
+  if (!supabaseConfigured || !clientCode) return null;
+  const search = new URLSearchParams({
+    select: "snapshot,updated_at",
+    client_code: `eq.${clientCode}`,
+    limit: "1",
+  });
+  const res = await fetch(`${base()}/${LIVE_SIGNALS}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return Array.isArray(body) && body.length
+    ? (body[0] as { snapshot: unknown; updated_at: string })
+    : null;
+}
