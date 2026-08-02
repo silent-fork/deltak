@@ -347,6 +347,99 @@ function Wall({
   );
 }
 
+interface Band {
+  level: number;
+  lo: number;
+  hi: number;
+  armed: boolean;
+}
+
+/** Floor so a trigger band tighter than this still reads as a visible cap, not a sliver. */
+const MIN_CAP_PCT = 6;
+
+/**
+ * The Aegis/Zenith trigger zones as one corridor strip rather than two
+ * disconnected number boxes. Each band sits, by definition, right at its own
+ * end of the Aegis–Zenith range — Aegis anchors the 0% mark, Zenith the
+ * 100% — so mapping them onto that same scale is not a stylistic choice, it
+ * is what they actually are: two thin caps at the ends of the range, with a
+ * dead middle where Alpha has nothing to engage. Spot's own position slides
+ * between them on the same scale the "Position" tile already computes.
+ */
+function EngageCorridor({
+  aegisLevel,
+  zenithLevel,
+  spot,
+  aegisBand,
+  zenithBand,
+}: {
+  aegisLevel: number | null;
+  zenithLevel: number | null;
+  spot: number;
+  aegisBand: Band | null;
+  zenithBand: Band | null;
+}) {
+  const corridor =
+    aegisLevel !== null && zenithLevel !== null ? zenithLevel - aegisLevel : null;
+
+  const pct = (v: number | null) => {
+    if (v === null || aegisLevel === null || !corridor) return null;
+    return Math.min(100, Math.max(0, ((v - aegisLevel) / corridor) * 100));
+  };
+
+  const spotPct = spot > 0 ? pct(spot) : null;
+  // Each cap is drawn from the corridor's own edge in to the band's far
+  // side, with a floor so a band tighter than the tolerance still shows.
+  const aegisCapEnd = aegisBand ? Math.max(MIN_CAP_PCT, pct(aegisBand.hi) ?? 0) : 0;
+  const zenithCapStart = zenithBand
+    ? Math.min(100 - MIN_CAP_PCT, pct(zenithBand.lo) ?? 100)
+    : 100;
+
+  return (
+    <div className="mt-1.5">
+      <div className="relative h-[18px] overflow-hidden rounded-full bg-zinc-900/80">
+        {aegisBand ? (
+          <div
+            title={`Aegis engage zone ${fmt(aegisBand.lo, 0)}–${fmt(aegisBand.hi, 0)}${aegisBand.armed ? " — armed" : ""}`}
+            className={cn(
+              "absolute inset-y-0 left-0 rounded-l-full transition-[width,background-color] duration-500",
+              aegisBand.armed
+                ? "bg-emerald-500/70 animate-pulse-ring"
+                : "bg-emerald-500/15",
+            )}
+            style={{ width: `${aegisCapEnd}%` }}
+          />
+        ) : null}
+        {zenithBand ? (
+          <div
+            title={`Zenith engage zone ${fmt(zenithBand.lo, 0)}–${fmt(zenithBand.hi, 0)}${zenithBand.armed ? " — armed" : ""}`}
+            className={cn(
+              "absolute inset-y-0 right-0 rounded-r-full transition-[width,background-color] duration-500",
+              zenithBand.armed ? "bg-rose-500/70 animate-pulse-ring" : "bg-rose-500/15",
+            )}
+            style={{ width: `${100 - zenithCapStart}%` }}
+          />
+        ) : null}
+        {spotPct !== null ? (
+          <span
+            title={`Spot ${fmt(spot, 0)}`}
+            className="absolute top-1/2 h-3 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum"
+            style={{ left: `${spotPct}%`, boxShadow: "0 0 6px rgba(0,240,255,0.8)" }}
+          />
+        ) : null}
+      </div>
+      <div className="mt-1 flex items-center justify-between font-mono text-[9px]">
+        <span className={aegisBand?.armed ? "text-emerald-300" : "text-zinc-500"}>
+          {aegisBand ? `${fmt(aegisBand.lo, 0)}–${fmt(aegisBand.hi, 0)}` : "—"}
+        </span>
+        <span className={zenithBand?.armed ? "text-rose-300" : "text-zinc-500"}>
+          {zenithBand ? `${fmt(zenithBand.lo, 0)}–${fmt(zenithBand.hi, 0)}` : "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** Memoized: identical props (the common case on a tick that changed nothing
  * upstream) means an identical wall read-out — skip the re-render. */
 export const CoaMatrixPanel = memo(function CoaMatrixPanel({
@@ -488,10 +581,15 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
           </div>
         </Section>
 
-        {/* The proximity bands the signal engine actually tests */}
+        {/* The proximity bands the signal engine actually tests — drawn as
+            where they actually sit: two thin trigger caps at the ends of the
+            Aegis–Zenith corridor, with spot's own position marked between
+            them. The gap in the middle *is* the point — Alpha only engages
+            at a bound, so the dead space is the mid-range this instrument
+            spends most of its time in. */}
         <Section
           label="Engage Bands"
-          hint={`Protocol Alpha engages only within ${DEFAULT_CONFIG.invalidationPct}% of a wall. These are the live trigger zones.`}
+          hint={`Protocol Alpha engages only within ${DEFAULT_CONFIG.invalidationPct}% of a wall. These are the live trigger zones, mapped across the Aegis–Zenith corridor.`}
           right={
             <span
               className={cn(
@@ -509,48 +607,13 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
             </span>
           }
         >
-          <div className="mt-1 grid grid-cols-2 gap-1">
-            {(
-              [
-                ["aegis", bands.aegis] as const,
-                ["zenith", bands.zenith] as const,
-              ]
-            ).map(([side, b]) => {
-              const support = side === "aegis";
-              return (
-                <div
-                  key={side}
-                  className={cn(
-                    "rounded border px-1.5 py-1 font-mono text-[9px]",
-                    b?.armed
-                      ? support
-                        ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-200"
-                        : "border-rose-400/60 bg-rose-500/10 text-rose-200"
-                      : "border-zinc-800 text-zinc-500",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="uppercase tracking-wider">
-                      {support ? "Aegis" : "Zenith"}
-                    </span>
-                    <span
-                      className={cn(
-                        "h-1 w-1 rounded-full",
-                        b?.armed
-                          ? support
-                            ? "bg-emerald-400 animate-pulse-ring"
-                            : "bg-rose-400 animate-pulse-ring"
-                          : "bg-zinc-700",
-                      )}
-                    />
-                  </div>
-                  <div className="mt-1 truncate">
-                    {b ? `${fmt(b.lo, 0)}–${fmt(b.hi, 0)}` : "—"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <EngageCorridor
+            aegisLevel={levels.aegis_1}
+            zenithLevel={levels.zenith_1}
+            spot={chain.spot}
+            aegisBand={bands.aegis}
+            zenithBand={bands.zenith}
+          />
         </Section>
 
         {/* Where the session's writing is going */}
