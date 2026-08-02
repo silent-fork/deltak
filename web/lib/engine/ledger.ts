@@ -1,4 +1,5 @@
 import type {
+  Automation,
   ExecutionMode,
   LedgerSnapshot,
   OptionType,
@@ -90,6 +91,7 @@ export class Ledger {
     /** Index spot at entry — lets a risk guard tell a real move from theta noise. */
     entrySpot?: number | null;
     mode: ExecutionMode;
+    automation?: Automation;
   }): Position {
     const pos: Position = {
       id: this.nextId(),
@@ -117,6 +119,7 @@ export class Ledger {
       exit_reason: null,
       status: "OPEN",
       mode: params.mode,
+      automation: params.automation ?? "manual",
     };
     this.positions.set(pos.id, pos);
     const cost = this.legCharges(pos.side, pos.avg_price, pos.quantity);

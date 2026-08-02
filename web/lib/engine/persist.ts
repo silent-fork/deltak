@@ -1,4 +1,4 @@
-import type { ExecutionMode, OptionType, Position, Protocol, Side } from "@/lib/types";
+import type { Automation, ExecutionMode, OptionType, Position, Protocol, Side } from "@/lib/types";
 
 /**
  * Engine objects → Supabase rows.
@@ -35,7 +35,7 @@ export const TABLE_COLUMNS = {
     "trading_symbol", "option_type", "strike", "side", "quantity", "lots",
     "lot_size", "avg_price", "ltp", "entry_spot", "stop_loss", "target", "protocol",
     "status", "unrealised_pnl", "realised_pnl", "pnl_pct", "exit_price", "exit_reason",
-    "opened_at", "closed_at",
+    "opened_at", "closed_at", "automation",
   ],
   orders: [
     "client_code", "mode", "underlying", "token", "trading_symbol",
@@ -73,6 +73,7 @@ export interface PositionRow {
   exit_reason: string | null;
   opened_at: string;
   closed_at: string | null;
+  automation: Automation;
 }
 
 export interface OrderRow {
@@ -137,6 +138,7 @@ export function positionRow(p: Position): PositionRow {
     // with no open time would collide with every other one that had none.
     opened_at: utcStamp(p.opened_at) ?? new Date().toISOString(),
     closed_at: utcStamp(p.closed_at),
+    automation: p.automation,
   };
 }
 

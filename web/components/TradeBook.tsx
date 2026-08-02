@@ -123,6 +123,21 @@ function PositionCard({
                 {p.protocol}
               </span>
             ) : null}
+            <span
+              title={
+                p.automation === "auto"
+                  ? "Opened by Autopilot"
+                  : "Opened by a manual Execute click"
+              }
+              className={cn(
+                "rounded border px-1",
+                p.automation === "auto"
+                  ? "border-quantum/40 text-quantum"
+                  : "border-zinc-800 text-zinc-500",
+              )}
+            >
+              {p.automation === "auto" ? "AUTO" : "MANUAL"}
+            </span>
             {closed && p.exit_reason ? (
               <span className="rounded border border-zinc-800 px-1 text-zinc-400">
                 {EXIT_REASON[p.exit_reason] ?? p.exit_reason}

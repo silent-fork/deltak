@@ -75,10 +75,16 @@ export const SignalDeck = memo(function SignalDeck({
   const openCount = merged.openRows.length;
   const totalPnl = merged.openPnl + merged.bookedPnl;
 
-  // A fill turns the deck to the book: the moment a position exists, managing
-  // it is the live question, and the panic control must not be behind a tab
-  // nobody thought to open.
-  const hasOpen = (ledger?.open_positions.length ?? 0) > 0;
+  // A fill turns the deck to the book: the moment a position exists for the
+  // underlying on screen, managing it is the live question, and the panic
+  // control must not be behind a tab nobody thought to open. Scoped to this
+  // signal's own underlying, not the whole ledger — otherwise a fill on
+  // BANKNIFTY would yank the deck away from a NIFTY signal the operator was
+  // still reading, unmounting it and losing its execution banner for nothing
+  // that happened to NIFTY.
+  const hasOpen = signal
+    ? (ledger?.open_positions.some((p) => p.underlying === signal.underlying) ?? false)
+    : false;
   useEffect(() => {
     if (hasOpen) setDeck("book");
   }, [hasOpen]);
@@ -140,6 +146,7 @@ export const SignalDeck = memo(function SignalDeck({
           mode={mode}
           chain={chain}
           onExecuted={onExecuted}
+          ledger={ledger}
         />
       ) : (
         <TradeBook

@@ -1,7 +1,7 @@
 "use client";
 
-import { Ban, Crosshair, Loader2, Minus, Moon, Plus, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Ban, Crosshair, Lock, Loader2, Minus, Moon, Plus, Zap } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +13,21 @@ import { roundTripCharges } from "@/lib/engine/charges";
 import { fetchMargin } from "@/lib/market/client";
 import type {
   ExecutionMode,
+  LedgerSnapshot,
   MarginEstimate,
   OptionChain,
   Signal,
 } from "@/lib/types";
-import { BLOCK_REASONS, PROTOCOL_META, cn, compact, fmt, money } from "@/lib/utils";
+import {
+  BLOCK_REASONS,
+  PROTOCOL_META,
+  cn,
+  compact,
+  fmt,
+  money,
+  pnlTone,
+  signedMoney,
+} from "@/lib/utils";
 
 /**
  * The first three rationale lines restate the COA levels, PCR and spot, which
@@ -60,12 +70,15 @@ export function SignalPanel({
   mode,
   chain,
   onExecuted,
+  ledger,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
   /** The chain the signal came from — for the contract's own book detail. */
   chain?: OptionChain;
   onExecuted: () => void;
+  /** Whether this signal's own contract already has a position open on it. */
+  ledger?: LedgerSnapshot;
 }) {
   const [lots, setLots] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,6 +96,37 @@ export function SignalPanel({
     setLots(null);
     setResult(null);
   }, [signal?.token, signal?.protocol]);
+
+  /**
+   * A position already open on this exact contract — the one thing the
+   * signal itself never knows about, since `SignalEngine.evaluate()` is a
+   * pure function of the chain and has no view of the ledger. Locks the
+   * Execute button so a re-actionable signal (or an impatient click) can't
+   * stack a second entry on top of the one Autopilot or a prior click already
+   * took; the max-position/portfolio-risk ceilings in `executeSignal` are the
+   * backstop, not the intended path.
+   */
+  const openPosition = useMemo(
+    () => ledger?.open_positions.find((p) => p.token === signal?.token) ?? null,
+    [ledger, signal?.token],
+  );
+
+  /**
+   * Autopilot fires against whichever underlying qualifies, on its own timer
+   * — an operator watching this exact signal would otherwise see nothing
+   * happen beyond the risk-event log. Surfacing it here reuses the same
+   * banner a manual execute leaves behind, keyed off `ts` so a fill is shown
+   * once, not on every tick that follows it.
+   */
+  const shownAutoFillRef = useRef(0);
+  useEffect(() => {
+    if (!signal) return;
+    const fill = engine.autoFills[signal.underlying];
+    if (fill && fill.ts !== shownAutoFillRef.current) {
+      shownAutoFillRef.current = fill.ts;
+      setResult({ ok: fill.ok, message: `Autopilot — ${fill.message}` });
+    }
+  }, [engine.autoFills, signal]);
 
   const rationale = useMemo(
     () => (signal?.rationale ?? []).filter((line) => !COA_PROSE.test(line)),
@@ -497,7 +541,29 @@ export function SignalPanel({
             </span>
           </div>
         ) : null}
-        {signal.actionable ? (
+        {openPosition ? (
+          /*
+           * The signal keeps recomputing against the same contract every
+           * tick whether or not it's already been traded — this is the only
+           * thing on the panel that says so, in place of the Execute button a
+           * re-actionable signal would otherwise still be offering.
+           */
+          <div className="flex items-start gap-2 rounded border border-quantum/30 bg-quantum/5 px-2 py-2 text-[10px] leading-snug text-zinc-400">
+            <Lock className="mt-px h-3.5 w-3.5 shrink-0 text-quantum/70" />
+            <span>
+              <span className="font-semibold uppercase tracking-wider text-quantum/90">
+                Position open
+              </span>
+              {" — "}
+              {openPosition.lots} lot{openPosition.lots === 1 ? "" : "s"} via{" "}
+              {openPosition.automation === "auto" ? "Autopilot" : "manual entry"} ·{" "}
+              <span className={pnlTone(openPosition.unrealised_pnl)}>
+                {signedMoney(openPosition.unrealised_pnl, 0)}
+              </span>
+              . Close it from the Trade Book before re-entering.
+            </span>
+          </div>
+        ) : signal.actionable ? (
           /*
            * Deliberately quiet. A paper fill is a routine act and a full-width
            * neon slab reads as an alarm — the eye should go to the geometry

@@ -146,6 +146,8 @@ export interface Position {
   exit_reason: string | null;
   status: "OPEN" | "CLOSED";
   mode: ExecutionMode;
+  /** Whether Autopilot or an operator's Execute click opened this position. */
+  automation: Automation;
 }
 
 export interface LedgerSnapshot {

@@ -58,6 +58,10 @@ export function archiveRowToPosition(row: ArchiveRow): Position {
     exit_reason: asStrOrNull(row.exit_reason),
     status: row.status === "CLOSED" ? "CLOSED" : "OPEN",
     mode: (row.mode as Position["mode"]) ?? "paper",
+    // Rows written before this column existed have nothing to read here —
+    // "manual" is the correct default, since that was every fill's origin
+    // before Autopilot could open a position at all.
+    automation: row.automation === "auto" ? "auto" : "manual",
   };
 }
 

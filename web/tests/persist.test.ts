@@ -44,6 +44,7 @@ const openPosition: Position = {
   exit_reason: null,
   status: "OPEN",
   mode: "paper",
+  automation: "manual",
 };
 
 const closedPosition: Position = {

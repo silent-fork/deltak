@@ -1060,7 +1060,7 @@ export function useEngine(simulate: boolean) {
   );
 
   const executeSignal = useCallback(
-    async (underlying: string, lots?: number) => {
+    async (underlying: string, lots?: number, automation: Automation = "manual") => {
       const signal = signalsRef.current[underlying];
       if (!signal?.token || !signal.trading_symbol || !signal.sizing) {
         throw new Error("Signal has no executable node.");
@@ -1069,6 +1069,15 @@ export function useEngine(simulate: boolean) {
       if (useLots <= 0) throw new Error("Sizing resolved to zero lots.");
 
       const ledger = ledgerRef.current;
+      // One signal, one open position: re-firing the same contract before it's
+      // closed is how a manual click (or a signal that stays actionable for
+      // minutes) would otherwise stack several entries on the same node before
+      // the position-count/portfolio-risk ceilings below ever engaged.
+      if (ledger.openPositions.some((p) => p.token === signal.token)) {
+        throw new Error(
+          `Order rejected: a position is already open on ${signal.trading_symbol}.`,
+        );
+      }
       const openCount = ledger.openPositions.length;
       if (openCount >= cfgRef.current.maxConcurrentPositions) {
         throw new Error(
@@ -1142,6 +1151,7 @@ export function useEngine(simulate: boolean) {
         protocol: signal.protocol,
         entrySpot: chainsRef.current[underlying]?.spot ?? null,
         mode: currentMode,
+        automation,
       });
 
       savePositions([pos]);
@@ -1159,7 +1169,7 @@ export function useEngine(simulate: boolean) {
       );
       log(
         "INFO",
-        `${currentMode.toUpperCase()} BUY ${useLots}×${lotSize} ${signal.trading_symbol} @ ${fill.toFixed(2)}` +
+        `${automation === "auto" ? "AUTOPILOT " : ""}${currentMode.toUpperCase()} BUY ${useLots}×${lotSize} ${signal.trading_symbol} @ ${fill.toFixed(2)}` +
           (brokerOrderId ? ` — order ${brokerOrderId}` : ""),
         underlying,
       );
@@ -1197,6 +1207,16 @@ export function useEngine(simulate: boolean) {
    * of hours (and not simulated) there is no live price to fill against.
    */
   const autoInFlightRef = useRef<Set<string>>(new Set());
+  /**
+   * The only trace an Autopilot fill otherwise leaves in the HUD is a log
+   * line — the signal panel itself never says a word, since only the manual
+   * `execute()` in `SignalPanel` sets its local confirmation banner. Keyed by
+   * underlying so `SignalPanel` can look up the one for whichever signal it's
+   * currently showing and surface the same banner a manual click would have.
+   */
+  const [autoFills, setAutoFills] = useState<
+    Record<string, { ok: boolean; message: string; ts: number }>
+  >({});
   useEffect(() => {
     if (automation !== "auto" || !snapshot) return;
     if (!snapshot.market_open && !simulated) return;
@@ -1208,7 +1228,13 @@ export function useEngine(simulate: boolean) {
       if (snapshot.ledger.open_positions.some((p) => p.token === signal.token)) continue;
 
       autoInFlightRef.current.add(u);
-      void executeSignal(u)
+      void executeSignal(u, undefined, "auto")
+        .then((res) => {
+          setAutoFills((prev) => ({
+            ...prev,
+            [u]: { ok: res.ok, message: res.message, ts: Date.now() },
+          }));
+        })
         .catch((err) => {
           log(
             "INFO",
@@ -1281,6 +1307,7 @@ export function useEngine(simulate: boolean) {
     enterDemo,
     switchMode,
     executeSignal,
+    autoFills,
     exitPosition,
     scaleOutPosition,
     panicFlatten,
