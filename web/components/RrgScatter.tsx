@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftRight, TrendingDown, TrendingUp, Waves } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -16,10 +17,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
-import type { RrgNode, Signal } from "@/lib/types";
+import type { Protocol, RrgNode, Signal } from "@/lib/types";
 import { PROTOCOL_META, QUADRANT_META, cn, fmt } from "@/lib/utils";
 
 type Filter = "ALL" | "CE" | "PE";
+
+/** One glance at the shape of the regime, ahead of reading its name. */
+const PROTOCOL_ICON: Record<Protocol, typeof ArrowLeftRight> = {
+  ALPHA: ArrowLeftRight,
+  BETA: TrendingUp,
+  GAMMA: TrendingDown,
+  DELTA: Waves,
+};
 
 const QUADRANT_BANDS = [
   { key: "LEADING", x: [100, 200], y: [100, 200], fill: "#10b981" },
@@ -338,34 +347,58 @@ export const RrgScatter = memo(function RrgScatter({
           )}
         </div>
 
-        {/* Regime read-out — which protocol the quadrant picture has selected */}
+        {/* Regime read-out — which protocol the quadrant picture has selected.
+            The medallion reuses `protocol.tone` wholesale (border, fill and
+            text all come from that one class string), so the icon picks up
+            the regime's colour for free instead of a second colour map. */}
         {signal && protocol ? (
-          <div className="mt-1.5 rounded-md border border-zinc-800 bg-zinc-950/50 p-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-[10px] font-semibold text-zinc-200">
-                {protocol.title}
-              </span>
-              <Badge className={cn("shrink-0 font-semibold", protocol.tone)}>
-                {protocol.name}
-              </Badge>
-            </div>
-            <p className="mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-500">
-              {protocol.blurb}
-            </p>
-            <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-zinc-800/70 pt-1.5">
-              <span className="truncate font-mono text-[10px] text-zinc-300">
-                {signal.trading_symbol ?? "No target node"}
-              </span>
-              <span
-                className={cn(
-                  "shrink-0 font-mono text-[9px] font-semibold uppercase tracking-wider",
-                  signal.actionable ? "text-emerald-300" : "text-zinc-500",
-                )}
-              >
-                {signal.actionable ? "armed" : "standby"}
-              </span>
-            </div>
-          </div>
+          (() => {
+            const Icon = PROTOCOL_ICON[signal.protocol];
+            return (
+              <div className="mt-1.5 rounded-md border border-zinc-800 bg-zinc-950/50 p-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
+                      protocol.tone,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-zinc-200">
+                    {protocol.title}
+                  </span>
+                  <Badge className={cn("shrink-0 font-semibold", protocol.tone)}>
+                    {protocol.name}
+                  </Badge>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[9px] leading-snug text-zinc-500">
+                  {protocol.blurb}
+                </p>
+                <div className="mt-1.5 flex items-center justify-between gap-2 border-t border-zinc-800/70 pt-1.5">
+                  <span className="min-w-0 truncate font-mono text-[10px] text-zinc-300">
+                    {signal.trading_symbol ?? "No target node"}
+                  </span>
+                  <span
+                    className={cn(
+                      "flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider",
+                      signal.actionable
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                        : "border-zinc-700 bg-zinc-900/60 text-zinc-500",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        signal.actionable ? "bg-emerald-400 animate-pulse-ring" : "bg-zinc-600",
+                      )}
+                    />
+                    {signal.actionable ? "Armed" : "Standby"}
+                  </span>
+                </div>
+              </div>
+            );
+          })()
         ) : null}
       </CardContent>
     </Card>
