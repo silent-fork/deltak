@@ -185,7 +185,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
           </button>
 
           {turnstileActive ? (
-            <p className="-mt-2 text-center text-[9px] uppercase tracking-[0.14em] text-zinc-700">
+            <p className="-mt-2 text-[9px] uppercase tracking-[0.14em] text-zinc-700">
               Protected by Cloudflare Turnstile
             </p>
           ) : null}
