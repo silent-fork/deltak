@@ -206,7 +206,7 @@ export const OptionChainMatrix = memo(function OptionChainMatrix({
           <CardTitle className="truncate">4-Quadrant Option Chain</CardTitle>
           <Skeleton className="h-2 w-28" />
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-hidden p-2">
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
           <SkeletonPanel label="Loading the option chain">
             <Skeleton className="h-[19px] shrink-0" />
             {/* A ladder of strikes, each with a wider strike column in the
