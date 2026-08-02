@@ -137,7 +137,7 @@ export default async function ExpiryCalendarPage() {
       <section className="relative mx-auto max-w-4xl px-5 pb-4 pt-6 text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
           <CalendarDays className="h-3 w-3" />
-          Free tool · no sign-in
+          Straight from the exchange · refreshed hourly
         </span>
         <h1 className="mt-4 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
           NIFTY, BANKNIFTY &amp; FINNIFTY options expiry calendar

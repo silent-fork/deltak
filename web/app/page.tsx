@@ -340,7 +340,7 @@ export default function HomePage() {
             <CalendarDays className="h-3 w-3" />
             NIFTY / BANKNIFTY / FINNIFTY expiry calendar
           </Link>{" "}
-          — free, no sign-in required
+          — straight from Angel One&apos;s scrip master
         </p>
         {/* A literal tricolour swatch rather than relying on an emoji flag
             rendering consistently across platforms — three real stripes,
