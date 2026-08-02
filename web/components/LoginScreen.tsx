@@ -44,6 +44,13 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
   const [pin, setPin] = useState("");
   const [totp, setTotp] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * What the button is waiting on, not just whether it's waiting. The
+   * Turnstile challenge and the SmartAPI round trip are two different waits
+   * with two different failure modes, and naming which one is live is more
+   * honest than one "Authenticating" spinner covering both.
+   */
+  const [phase, setPhase] = useState<"verifying" | "authenticating" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const turnstile = useTurnstile();
 
@@ -58,7 +65,9 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
     try {
       // Nothing is asked of the operator here: the challenge runs behind the
       // button while it spins, and the token rides along with the credentials.
+      setPhase("verifying");
       const token = await turnstile.execute();
+      setPhase("authenticating");
       await engine.login({
         client_code: clientCode.trim(),
         pin: pin.trim(),
@@ -73,6 +82,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       setTotp("");
     } finally {
       setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -167,8 +177,18 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 text-[13px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin text-zinc-400" /> : null}
-            {busy ? "Authenticating" : "Sign in"}
+            {phase === "verifying"
+              ? "Verifying you're human"
+              : phase === "authenticating"
+                ? "Authenticating"
+                : "Sign in"}
           </button>
+
+          {turnstileActive ? (
+            <p className="-mt-2 text-center text-[9px] uppercase tracking-[0.14em] text-zinc-700">
+              Protected by Cloudflare Turnstile
+            </p>
+          ) : null}
         </form>
 
         {simulate ? (
@@ -185,12 +205,6 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
           <LockKeyhole className="h-3 w-3 shrink-0" />
           <span>Credentials are relayed to Angel One and never stored.</span>
         </div>
-
-        {turnstileActive ? (
-          <p className="mt-2 text-[9px] uppercase tracking-[0.14em] text-zinc-700">
-            Protected by Cloudflare Turnstile
-          </p>
-        ) : null}
       </div>
     </main>
   );
