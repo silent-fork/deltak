@@ -188,6 +188,7 @@ export default function TerminalPage() {
               signal={signal}
               settled={engine.settled}
               asOf={market.stats?.date ?? null}
+              chain={chain}
             />
           </section>
 

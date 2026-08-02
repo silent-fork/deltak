@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, TrendingDown, TrendingUp, Waves } from "lucide-react";
+import { ArrowLeftRight, Loader2, TrendingDown, TrendingUp, Waves } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -17,8 +17,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
-import type { Protocol, RrgNode, Signal } from "@/lib/types";
+import { DEFAULT_CONFIG, INDEX_UNIVERSE } from "@/lib/engine/config";
+import type { OptionChain, Protocol, RrgNode, Signal } from "@/lib/types";
 import { PROTOCOL_META, QUADRANT_META, cn, fmt } from "@/lib/utils";
+
+/** A translucent loader stays up until this much of the expected node count has matured. */
+const RRG_READY_FRACTION = 0.9;
 
 type Filter = "ALL" | "CE" | "PE";
 
@@ -94,6 +98,7 @@ export const RrgScatter = memo(function RrgScatter({
   signal,
   settled = false,
   asOf = null,
+  chain,
 }: {
   nodes: RrgNode[];
   highlightToken?: string | null;
@@ -103,6 +108,8 @@ export const RrgScatter = memo(function RrgScatter({
   settled?: boolean;
   /** Which session it is frozen on, `YYYY-MM-DD`. */
   asOf?: string | null;
+  /** For sizing the "still maturing" read-out against how many nodes this chain can actually produce. */
+  chain?: OptionChain;
 }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [hovered, setHovered] = useState<RrgNode | null>(null);
@@ -111,6 +118,34 @@ export const RrgScatter = memo(function RrgScatter({
     () => (filter === "ALL" ? nodes : nodes.filter((n) => n.option_type === filter)),
     [nodes, filter],
   );
+
+  /**
+   * How many nodes this chain can ultimately produce — every quoted leg
+   * within the same strike window `useEngine` builds the rotation from —
+   * against how many have actually matured into a node so far. A live RRG
+   * node needs a lookback window of real prints before its RS-Ratio means
+   * anything, so a fresh session (or a fresh underlying) fills in over the
+   * next minute rather than all at once, and a thin strike may never quote
+   * at all — hence a 90% bar, not 100%, so one dead leg doesn't hold the
+   * loader up forever.
+   */
+  const expected = useMemo(() => {
+    if (!chain?.rows.length || !chain.atm_strike) return 0;
+    const spec = INDEX_UNIVERSE[chain.underlying];
+    if (!spec) return 0;
+    const span = spec.strikeStep * DEFAULT_CONFIG.rrgNodeSpan;
+    let count = 0;
+    for (const row of chain.rows) {
+      if (Math.abs(row.strike - chain.atm_strike) > span) continue;
+      if (row.call && row.call.ltp > 0) count += 1;
+      if (row.put && row.put.ltp > 0) count += 1;
+    }
+    return count;
+  }, [chain]);
+
+  // A static replay lands its whole session at once — nothing to wait on.
+  const maturing =
+    !settled && expected > 0 && nodes.length < Math.ceil(expected * RRG_READY_FRACTION);
 
   // Symmetric domain around the 100 origin so the quadrants stay square.
   const domain = useMemo(() => {
@@ -131,7 +166,10 @@ export const RrgScatter = memo(function RrgScatter({
   }, [visible]);
 
   // Tails get noisy past a couple of dozen nodes; keep the trace readable.
-  const withTails = visible.length <= 18;
+  // A node still maturing has a trail of one or two prints, not history —
+  // a handful of those half-formed lines is exactly the visual noise the
+  // 18-node cap below exists to avoid, so the same rule applies here.
+  const withTails = visible.length <= 18 && !maturing;
   /**
    * How much trail to draw.
    *
@@ -217,7 +255,7 @@ export const RrgScatter = memo(function RrgScatter({
 
       <CardContent className="dk-scroll flex min-h-0 flex-col overflow-y-auto p-2">
         {/* The plot takes the column's leftover height so the card ends flush. */}
-        <div className="min-h-[150px] w-full flex-1">
+        <div className="relative min-h-[150px] w-full flex-1">
           {visible.length === 0 ? (
             <SkeletonPanel label="Loading rotation nodes" className="h-full">
               {/* The plot's own geometry — quadrants and a scatter of nodes —
@@ -297,6 +335,24 @@ export const RrgScatter = memo(function RrgScatter({
               </ScatterChart>
             </ResponsiveContainer>
           )}
+
+          {/* Translucent, not opaque — nodes are already real and placed
+              correctly, so blacking them out would be lying about how much
+              is actually known. This just says the picture isn't finished
+              yet, while `withTails` above keeps the half-formed trails that
+              would otherwise be the loudest thing on screen out of view. */}
+          {visible.length > 0 && maturing ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
+            >
+              <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+              <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
+                Maturing nodes · {nodes.length}/{expected}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         {/* Axis legend + hovered node readout */}
