@@ -41,7 +41,7 @@ import { SimulatedFeed } from "@/lib/stream/simFeed";
 import { useMarketData, type MarketData } from "@/lib/useMarketData";
 import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
-import { track } from "@/lib/analytics";
+import { setAnalyticsContext, track } from "@/lib/analytics";
 
 /**
  * The DeltaK engine, running in the browser.
@@ -146,6 +146,27 @@ export function useEngine(simulate: boolean) {
    * detail at a time is what keeps the metered endpoints inside their limits.
    */
   const [focus, setFocus] = useState<Underlying>("NIFTY");
+
+  // Keeps every analytics event tagged with the session facts that matter
+  // most for segmenting a trading terminal's usage, without re-sending them
+  // from every individual call site.
+  useEffect(() => {
+    setAnalyticsContext({
+      authenticated: session.authenticated,
+      automation,
+      focused_underlying: focus,
+    });
+  }, [session.authenticated, automation, focus]);
+
+  /**
+   * Which index gets watched most is itself worth seeing, not just the
+   * ambient tag on other events — hence a discrete event here too, on top
+   * of `focused_underlying` riding along on everything else above.
+   */
+  const setFocusTracked = useCallback((next: Underlying) => {
+    setFocus(next);
+    track("focus_change", { underlying: next });
+  }, []);
 
   // Engine internals live in refs so the 1 Hz loop never re-creates them.
   const cfgRef = useRef<EngineConfig>({ ...DEFAULT_CONFIG });
@@ -1071,6 +1092,7 @@ export function useEngine(simulate: boolean) {
     (next: Automation) => {
       setAutomationState(next);
       log("INFO", `${next === "auto" ? "Autopilot engaged — actionable signals execute themselves." : "Manual control — signals wait for Execute."}`);
+      track("automation_switch", { automation: next });
     },
     [log],
   );
@@ -1325,7 +1347,7 @@ export function useEngine(simulate: boolean) {
     /** The board is frozen on a finished session — nothing is being recomputed. */
     settled: settledRef.current,
     focus,
-    setFocus,
+    setFocus: setFocusTracked,
     market,
     login,
     logout,
