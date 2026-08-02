@@ -135,7 +135,7 @@ export default function HomePage() {
           href="/terminal"
           className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
         >
-          Enter Terminal
+          Terminal
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </header>
@@ -160,9 +160,9 @@ export default function HomePage() {
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href="/terminal"
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum shadow-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
           >
-            Enter Terminal
+            Terminal
             <ArrowRight className="h-4 w-4" />
           </Link>
           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
@@ -276,9 +276,9 @@ export default function HomePage() {
           </p>
           <Link
             href="/terminal"
-            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum shadow-quantum transition-colors hover:bg-quantum/25"
+            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
           >
-            Enter Terminal
+            Terminal
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
