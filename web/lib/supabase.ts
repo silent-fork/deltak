@@ -412,3 +412,50 @@ export async function deleteBrokerSession(clientCode: string): Promise<void> {
     cache: "no-store",
   });
 }
+
+/* ------------------------------------------------------------ client session */
+
+const CLIENT_SESSIONS = "client_sessions";
+
+/** Overwrite the account's active session id — what makes the previous window's stale. */
+export async function writeClientSession(clientCode: string, sessionId: string): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  const res = await fetch(`${base()}/${CLIENT_SESSIONS}?on_conflict=client_code`, {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify([{ client_code: clientCode, session_id: sessionId, updated_at: new Date().toISOString() }]),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Supabase client-session write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+}
+
+/** The session id currently on file for an account, or null if none is stored. */
+export async function readClientSessionId(clientCode: string): Promise<string | null> {
+  if (!supabaseConfigured || !clientCode) return null;
+  const search = new URLSearchParams({
+    select: "session_id",
+    client_code: `eq.${clientCode}`,
+    limit: "1",
+  });
+  const res = await fetch(`${base()}/${CLIENT_SESSIONS}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return Array.isArray(body) && body.length ? ((body[0] as { session_id: string }).session_id ?? null) : null;
+}
+
+/** Called on explicit sign-out, so a fresh login is what starts the next session, not a leftover row. */
+export async function deleteClientSession(clientCode: string): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  await fetch(`${base()}/${CLIENT_SESSIONS}?client_code=eq.${encodeURIComponent(clientCode)}`, {
+    method: "DELETE",
+    headers: headers("return=minimal"),
+    cache: "no-store",
+  });
+}

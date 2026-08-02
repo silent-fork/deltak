@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { claimActiveSession } from "@/lib/server/activeSession";
 import { rememberBrokerSession } from "@/lib/server/brokerSession";
 import { fetchProfile, rememberProfile } from "@/lib/server/profile";
 import {
@@ -121,6 +122,12 @@ export async function POST(request: Request) {
       at: new Date(`${loginAt}Z`),
     });
 
+    // Claimed *after* the broker confirms the login, so a rejected TOTP never
+    // signs out a session that was still legitimately active elsewhere. This
+    // is what makes this window the one, single active session — any other
+    // window for this client code fails its next `/api/auth/session` check.
+    const sessionId = await claimActiveSession(profile?.client_code ?? clientCode);
+
     const res = NextResponse.json({
       authenticated: true,
       client_code: profile?.client_code ?? clientCode,
@@ -139,6 +146,7 @@ export async function POST(request: Request) {
         clientCode,
         feedToken: data.feedToken,
         loginAt,
+        sessionId,
       }),
       SESSION_COOKIE_OPTIONS,
     );

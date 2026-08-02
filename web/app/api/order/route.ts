@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { isActiveSession } from "@/lib/server/activeSession";
 import {
   PLACE_ORDER_URL,
   SESSION_COOKIE,
@@ -15,6 +16,12 @@ import {
  * The order-placing JWT is read from the httpOnly cookie, never from the request
  * body, so a compromised page script cannot trade with a token it stole: it has
  * no token to steal.
+ *
+ * Checked against `client_sessions` on every call, rather than left to the
+ * next `/api/auth/session` poll: that poll can be up to fifteen minutes
+ * stale, which is fifteen minutes a superseded window could still place live
+ * orders. A live trade is the one consequence of two open windows this app
+ * cannot let ride out a polling interval.
  */
 
 export const runtime = "nodejs";
@@ -27,6 +34,13 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json(
       { detail: "Live orders require an active SmartAPI session." },
+      { status: 401 },
+    );
+  }
+
+  if (!(await isActiveSession(session.clientCode, session.sessionId))) {
+    return NextResponse.json(
+      { detail: "This session was signed out — this account is signed in from another window." },
       { status: 401 },
     );
   }

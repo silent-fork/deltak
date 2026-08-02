@@ -147,6 +147,12 @@ export interface ServerSession {
   feedToken?: string;
   /** When the session was established, ISO to the second. */
   loginAt?: string;
+  /**
+   * This window's claim on `client_sessions` — the single-active-session
+   * arbiter. Absent on a cookie written before that feature existed, which
+   * `isActiveSession` treats as unverifiable rather than superseded.
+   */
+  sessionId?: string;
 }
 
 /**

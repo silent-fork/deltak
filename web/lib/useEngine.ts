@@ -1034,7 +1034,12 @@ export function useEngine(simulate: boolean) {
         sessionRef.current = NO_SESSION;
         setMode("paper");
         modeRef.current = "paper";
-        log("INFO", "SmartAPI session expired — sign in again to resume the feed.");
+        log(
+          "INFO",
+          res.reason === "superseded"
+            ? "Signed out — this account was signed in from another window."
+            : "SmartAPI session expired — sign in again to resume the feed.",
+        );
         return;
       }
 

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { isActiveSession } from "@/lib/server/activeSession";
 import { rememberBrokerSession } from "@/lib/server/brokerSession";
 import {
   cachedProfile,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/server/profile";
 import {
   API_KEY,
+  LOGOUT_URL,
   PROFILE_URL,
   REFRESH_URL,
   SESSION_COOKIE,
@@ -39,6 +41,12 @@ import {
  * Always 200: "not signed in" is an answer, not a failure, and the page renders
  * a sign-in screen from it rather than an error.
  *
+ * Checked before any of that: whether this cookie is still the account's
+ * *active* session. A login elsewhere overwrites `client_sessions` with a new
+ * id, and a cookie carrying the old one now fails `isActiveSession` — cheaper
+ * than a broker round trip, and it is what actually enforces single-active-
+ * session rather than merely relying on Angel One's own token lifetime.
+ *
  * The profile read that proves the JWT is alive is also the profile the HUD
  * shows, so it is kept rather than thrown away: one call, both jobs.
  */
@@ -59,6 +67,21 @@ export async function GET() {
   const jar = await cookies();
   const session = decodeSession(jar.get(SESSION_COOKIE)?.value);
   if (!session) return signedOut();
+
+  if (!(await isActiveSession(session.clientCode, session.sessionId))) {
+    // Best-effort: invalidate this window's own JWT at the broker too, so a
+    // cached copy of it can't keep trading past the point this cookie was
+    // told it's done. The window that superseded it already wrote its own
+    // token to `broker_sessions` on login — nothing here touches that.
+    await smartApiCall(LOGOUT_URL, {
+      method: "POST",
+      jwt: session.jwtToken,
+      body: { clientcode: session.clientCode },
+    }).catch(() => undefined);
+    const res = signedOut("superseded");
+    res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+    return res;
+  }
 
   const body = (feedToken: string, loginAt: string | null) => ({
     authenticated: true,
@@ -158,6 +181,7 @@ export async function GET() {
         clientCode: session.clientCode,
         feedToken,
         loginAt,
+        sessionId: session.sessionId,
       }),
       SESSION_COOKIE_OPTIONS,
     );

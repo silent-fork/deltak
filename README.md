@@ -245,6 +245,37 @@ book, with sign-out.
 Nothing in that table is a credential. The order-placing JWT stays in the
 httpOnly cookie the page cannot read, and the profile is fetched server-side.
 
+## Single active session
+
+Angel One issues a fresh JWT on every `loginByPassword` call without
+invalidating whichever one it handed out last, so two browser windows signed
+in as the same client code would otherwise both keep trading until their
+cookies separately expire. `client_sessions` closes that gap: one row per
+client code holding whichever session id is current. Login overwrites it —
+that overwrite *is* the sign-out of whatever window held the previous id.
+
+- **`POST /api/auth/login`** mints a new session id, writes it to
+  `client_sessions` (last write wins) and stamps it into the httpOnly cookie
+  alongside the JWT.
+- **`GET /api/auth/session`** — already polled every fifteen minutes and on
+  tab focus (see The operator, above) — checks the cookie's session id
+  against the row before anything else. A mismatch means a newer login
+  happened elsewhere: this window's JWT is invalidated at the broker
+  (best-effort), its cookie is cleared, and it comes back
+  `{ authenticated: false, reason: "superseded" }`, which the HUD shows as
+  "signed in from another window" rather than the generic expiry message.
+- **`POST /api/order`** repeats the same check synchronously, so a superseded
+  window can't place a live trade during the fifteen-minute gap before its
+  next session poll — the one consequence of two open windows that can't wait
+  out a polling interval.
+- **`POST /api/auth/logout`** deletes the row on explicit sign-out.
+
+Same posture as `broker_sessions`: RLS on, no policies, service-role key only.
+It also **fails open** the same way persistence does — without
+`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` configured there is nowhere to
+record a session id, so every session is trivially "active" and this
+enforcement is simply off.
+
 ## Persistence
 
 Supabase stores the operator's profile, positions, orders and risk events.
@@ -277,7 +308,8 @@ attribution; `0003` drops `trading_sessions`, `signals`, `engine_settings` and
 the `session_performance` view — schema carried over from the retired FastAPI
 engine that nothing in the serverless build ever read or wrote. `0004` adds
 `broker_sessions` (the watchdog's encrypted credential store, below); `0005`
-adds `positions.entry_spot`.
+adds `positions.entry_spot`; `0010` adds `client_sessions` (single
+active session, above).
 
 ## Autopilot
 

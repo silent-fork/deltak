@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { forgetActiveSession } from "@/lib/server/activeSession";
 import { forgetBrokerSession } from "@/lib/server/brokerSession";
 import {
   LOGOUT_URL,
@@ -34,6 +35,9 @@ export async function POST() {
     // A signed-out account should leave nothing behind for a background job
     // to decrypt and use.
     await forgetBrokerSession(session.clientCode);
+    // And nothing behind to compare a next login against — that row's only
+    // job is telling a *different*, still-open window it's been superseded.
+    await forgetActiveSession(session.clientCode);
   }
 
   const res = NextResponse.json({ authenticated: false });
