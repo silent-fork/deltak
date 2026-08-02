@@ -25,7 +25,15 @@ export function classifyQuadrant(
   return rsMomentum >= 100 ? "IMPROVING" : "LAGGING";
 }
 
-const clip = (v: number) => Math.max(100 - AXIS_CLIP, Math.min(100 + AXIS_CLIP, v));
+/**
+ * Soft-bounded rather than hard-clamped: a hard `Math.max`/`Math.min` pins
+ * every node beyond the edge to the exact same coordinate, so a strongly
+ * leading node and a wildly leading node land on top of each other and read
+ * as identical. `tanh` approaches the same ±`AXIS_CLIP` bound asymptotically
+ * without ever flattening it — nodes stay visually ordered by how extreme
+ * they actually are, all the way to the edge.
+ */
+const clip = (v: number) => 100 + AXIS_CLIP * Math.tanh((v - 100) / AXIS_CLIP);
 
 function ratioToMean(series: number[]): number {
   if (series.length === 0) return 100;
@@ -38,6 +46,8 @@ interface NodeState {
   rs: number[];
   tail: RrgPoint[];
   samples: number;
+  /** The last price a `samples` increment was actually earned by. */
+  lastPrice: number | null;
   last: RrgPoint | null;
 }
 
@@ -53,7 +63,7 @@ export class RrgEngine {
   private state(token: string): NodeState {
     let s = this.nodes.get(token);
     if (!s) {
-      s = { rs: [], tail: [], samples: 0, last: null };
+      s = { rs: [], tail: [], samples: 0, lastPrice: null, last: null };
       this.nodes.set(token, s);
     }
     return s;
@@ -65,7 +75,22 @@ export class RrgEngine {
       return s.last ?? { rs_ratio: 100, rs_momentum: 100 };
     }
 
-    s.samples += 1;
+    /**
+     * The caller advances every node once a second whenever *anything* in
+     * the whole tick universe printed, not when this particular contract
+     * did — an untraded strike's `price` is simply carried forward, so most
+     * calls here repeat the same value rather than deliver new information.
+     * Counting those as samples let a leg that hasn't traded in a minute
+     * still reach `MIN_SAMPLES` on the clock alone, and get plotted with the
+     * same confidence as one that is actually printing. Only a genuine price
+     * change earns a sample; the window below still advances every call, so
+     * the ratio's mean stays a real rolling average rather than one padded
+     * with copies of a stale print.
+     */
+    if (s.lastPrice === null || price !== s.lastPrice) {
+      s.samples += 1;
+      s.lastPrice = price;
+    }
     s.rs.push((100 * price) / benchmark);
     const cap = Math.max(this.window, this.momentumLookback + 1);
     if (s.rs.length > cap) s.rs.shift();

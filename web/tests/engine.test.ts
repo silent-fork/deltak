@@ -157,6 +157,18 @@ test("zero inputs never throw", () => {
   assert.equal(new RrgEngine().update("T1", 0, 0).rs_ratio, 100);
 });
 
+test("a stale, repeated print does not advance maturity", () => {
+  const e = new RrgEngine(10, 2, 5);
+  // The 1 Hz loop advances every node whenever anything in the whole tick
+  // universe printed, not only when this contract itself did — an untraded
+  // strike's price is simply carried forward call after call.
+  for (let i = 0; i < 10; i++) e.update("T1", 100, 20_000);
+  assert.ok(!e.matured("T1"));
+  // One genuine change earns exactly one sample, not a jump to matured.
+  e.update("T1", 101, 20_000);
+  assert.ok(!e.matured("T1"));
+});
+
 /* --------------------------------------------------------------------- COA */
 
 test("itm depth and nearest strike", () => {
