@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Bot,
+  CalendarDays,
   Layers,
   LockKeyhole,
   Radar,
@@ -13,6 +14,8 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
+import Link from "next/link";
+
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -328,6 +331,16 @@ export default function HomePage() {
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
           loss. Paper mode only, for now — every fill here is simulated.
+        </p>
+        <p className="mt-3">
+          <Link
+            href="/tools/expiry-calendar"
+            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
+          >
+            <CalendarDays className="h-3 w-3" />
+            NIFTY / BANKNIFTY / FINNIFTY expiry calendar
+          </Link>{" "}
+          — free, no sign-in required
         </p>
         {/* A literal tricolour swatch rather than relying on an emoji flag
             rendering consistently across platforms — three real stripes,
