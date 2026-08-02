@@ -13,8 +13,7 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
-import Link from "next/link";
-
+import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
 /**
@@ -139,13 +138,14 @@ export default function HomePage() {
           </div>
           <Wordmark className="text-[15px] tracking-[0.18em]" />
         </div>
-        <Link
+        <CtaLink
           href="/terminal"
+          location="nav"
           className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
         >
           Terminal
           <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        </CtaLink>
       </header>
 
       {/* Hero */}
@@ -168,13 +168,14 @@ export default function HomePage() {
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
+          <CtaLink
             href="/terminal"
+            location="hero"
             className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
           >
             Terminal
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </CtaLink>
           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
             <LockKeyhole className="h-3 w-3" />
             Free — sign in with your own Angel One account
@@ -308,13 +309,14 @@ export default function HomePage() {
             guards — against simulated fills, no live order ever placed,
             for as long as you want to watch it work.
           </p>
-          <Link
+          <CtaLink
             href="/terminal"
+            location="closing"
             className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
           >
             Terminal
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </CtaLink>
         </div>
       </section>
 

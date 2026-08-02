@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useEngineContext } from "@/components/EngineProvider";
 import { Wordmark } from "@/components/Wordmark";
 import { Input } from "@/components/ui/input";
+import { track } from "@/lib/analytics";
 import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
 
 /**
@@ -62,6 +63,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
+    track("login_attempt");
     try {
       // Nothing is asked of the operator here: the challenge runs behind the
       // button while it spins, and the token rides along with the credentials.
@@ -77,9 +79,13 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       // The TOTP is single-use — never keep it around after submission.
       setTotp("");
       setPin("");
+      track("login_success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setTotp("");
+      // No error detail here — a login failure reason is exactly the kind of
+      // thing that shouldn't ride along into a third-party analytics event.
+      track("login_failed");
     } finally {
       setBusy(false);
       setPhase(null);

@@ -41,6 +41,7 @@ import { SimulatedFeed } from "@/lib/stream/simFeed";
 import { useMarketData, type MarketData } from "@/lib/useMarketData";
 import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
+import { track } from "@/lib/analytics";
 
 /**
  * The DeltaK engine, running in the browser.
@@ -346,6 +347,13 @@ export function useEngine(simulate: boolean) {
           `EXIT [${reason}] ${closed.trading_symbol} @ ${fill.toFixed(2)} → PnL ₹${closed.realised_pnl.toLocaleString("en-IN")}`,
           closed.underlying,
         );
+        track("position_closed", {
+          reason,
+          underlying: closed.underlying,
+          protocol: closed.protocol,
+          mode: closed.mode,
+          pnl: closed.realised_pnl,
+        });
       }
     },
     [log],
@@ -412,6 +420,12 @@ export function useEngine(simulate: boolean) {
         `TP1 scale-out ${lots} lot(s) of ${pos.trading_symbol} @ ${fill.toFixed(2)}`,
         pos.underlying,
       );
+      track("position_scaled_out", {
+        underlying: pos.underlying,
+        protocol: pos.protocol,
+        mode: pos.mode,
+        lots,
+      });
     },
     [bookExit, log],
   );
@@ -965,6 +979,7 @@ export function useEngine(simulate: boolean) {
     modeRef.current = "paper";
     log("INFO", "SmartAPI session terminated.");
     startFeed(NO_SESSION);
+    track("sign_out");
   }, [log, startFeed]);
 
   /**
@@ -1047,6 +1062,7 @@ export function useEngine(simulate: boolean) {
       setMode(next);
       modeRef.current = next;
       log("INFO", `Execution mode switched to ${next.toUpperCase()}.`);
+      track("mode_switch", { mode: next });
     },
     [log],
   );
@@ -1184,6 +1200,14 @@ export function useEngine(simulate: boolean) {
         );
       }
 
+      track("signal_executed", {
+        automation,
+        protocol: signal.protocol,
+        underlying,
+        mode: currentMode,
+        lots: useLots,
+      });
+
       return {
         ok: true,
         message:
@@ -1269,7 +1293,10 @@ export function useEngine(simulate: boolean) {
   const panicFlatten = useCallback(async () => {
     const open = ledgerRef.current.openPositions;
     for (const pos of open) await bookExit(pos, "PANIC");
-    if (open.length) log("PANIC", `Flatten [PANIC] executed across ${open.length} position(s).`);
+    if (open.length) {
+      log("PANIC", `Flatten [PANIC] executed across ${open.length} position(s).`);
+      track("panic_flatten", { positions: open.length });
+    }
   }, [bookExit, log]);
 
   const resetPaper = useCallback(() => {
