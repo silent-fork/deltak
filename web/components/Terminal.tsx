@@ -81,7 +81,22 @@ export function Terminal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.sessionChecked]);
 
-  const dataReady = !!chain?.rows.length;
+  /**
+   * Every panel but RRG gates its own paint on this same tick's data, just on
+   * different thresholds: COA Matrix and the option chain both need one built
+   * strike row, Quantum Horizon's profile needs two (a single strike can't
+   * plot a spread), and the signal deck needs a signal — which only exists
+   * once the engine has evaluated *a* chain for this underlying, so it never
+   * lags `chain` by more than the same tick. Combining them is what makes one
+   * boot screen stand in for all four instead of each painting on its own
+   * schedule a second or two apart.
+   *
+   * RRG is deliberately left out: it has its own translucent "maturing"
+   * overlay for the long tail of nodes that seed in over several ticks, and
+   * gating the whole board on that would hold the boot screen up long after
+   * everything else is real.
+   */
+  const dataReady = !!chain && chain.rows.length >= 2 && !!signal;
   const bootStages = [
     { done: engine.sessionChecked },
     { done: engine.masterReady },
