@@ -67,6 +67,9 @@ export const metadata: Metadata = {
   ],
   applicationName: "DeltaK Terminal",
   robots: { index: true, follow: true },
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
     url: "/",
@@ -88,6 +91,29 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+/**
+ * `SoftwareApplication` structured data — the one shot at a rich result a
+ * sign-in-gated SPA has. Free of fabricated ratings/reviews on purpose:
+ * Google's guidelines treat invented review markup as spam, and this app has
+ * none to report honestly.
+ */
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "DeltaK",
+  alternateName: "Quantum Horizon",
+  description: DESCRIPTION,
+  url: SITE_URL,
+  applicationCategory: "FinanceApplication",
+  applicationSubCategory: "Options Trading Terminal",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "INR",
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -96,6 +122,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-zinc-950 font-sans antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         {children}
         <SpeedInsights />
         <Analytics />
