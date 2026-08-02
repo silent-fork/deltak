@@ -59,6 +59,12 @@ function SpotTicker({
 }) {
   const flash = useTickFlash(quote.ltp);
   const up = quote.change >= 0;
+  // Every underlying gets an entry in `spots` the moment a session exists,
+  // whether or not its own spot token has printed yet — an unfocused index
+  // can sit here for a beat with nothing but the zero the store falls back
+  // to. Showing that as ₹0.00 in emerald or rose reads as "this crashed to
+  // zero," which is a different and false claim from "not quoted yet."
+  const quoted = quote.ltp > 0;
 
   return (
     <button
@@ -73,7 +79,7 @@ function SpotTicker({
       <span
         className={cn(
           "h-6 w-[3px] shrink-0 rounded-full",
-          up ? "bg-emerald-500" : "bg-rose-500",
+          quoted ? (up ? "bg-emerald-500" : "bg-rose-500") : "bg-zinc-700",
           flash && "animate-pulse-ring",
         )}
       />
@@ -83,23 +89,28 @@ function SpotTicker({
         </span>
         <span
           className={cn(
-            "mt-1 block rounded font-mono text-[13px] font-semibold leading-none text-zinc-100",
+            "mt-1 block rounded font-mono text-[13px] font-semibold leading-none",
+            quoted ? "text-zinc-100" : "text-zinc-600",
             flash === "up" && "animate-tick-up",
             flash === "down" && "animate-tick-down",
           )}
         >
-          {fmt(quote.ltp)}
+          {quoted ? fmt(quote.ltp) : "Quoting…"}
         </span>
       </span>
-      <span
-        className={cn(
-          "shrink-0 text-right font-mono text-[9px] leading-tight",
-          up ? "text-emerald-400" : "text-rose-400",
-        )}
-      >
-        <span className="block">{signed(quote.change)}</span>
-        <span className="block opacity-80">{signed(quote.change_pct)}%</span>
-      </span>
+      {quoted ? (
+        <span
+          className={cn(
+            "shrink-0 text-right font-mono text-[9px] leading-tight",
+            up ? "text-emerald-400" : "text-rose-400",
+          )}
+        >
+          <span className="block">{signed(quote.change)}</span>
+          <span className="block opacity-80">{signed(quote.change_pct)}%</span>
+        </span>
+      ) : (
+        <span className="shrink-0 font-mono text-[9px] text-zinc-700">—</span>
+      )}
     </button>
   );
 }

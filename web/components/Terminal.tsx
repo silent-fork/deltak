@@ -53,6 +53,9 @@ export function Terminal() {
    * every underlying every second regardless of which one is on screen. A
    * translucent scrim over just those two panels covers that gap instead of
    * the rest of the board looking like it forgot anything.
+   *
+   * The same gap exists once more, on the very first reveal — see the second
+   * effect below.
    */
   const [switchingFocus, setSwitchingFocus] = useState(false);
   const priorFocusRef = useRef(selected);
@@ -63,6 +66,18 @@ export function Terminal() {
     // nothing to wait on, so nothing should spin.
     if (changed && market.available) setSwitchingFocus(true);
   }, [selected, market.available]);
+  // The same gap exists once, on the very first reveal: `market.available`
+  // flips true the moment a real session lands, and its candles/OI series
+  // start their own fetch right then — a beat behind the tick-driven
+  // `dataReady` gate above. Reusing the same scrim here means the board's
+  // first paint and an underlying switch look like the same, already-solved
+  // problem instead of two.
+  const priorMarketAvailableRef = useRef(market.available);
+  useEffect(() => {
+    const becameAvailable = !priorMarketAvailableRef.current && market.available;
+    priorMarketAvailableRef.current = market.available;
+    if (becameAvailable && market.candles.length === 0) setSwitchingFocus(true);
+  }, [market.available, market.candles.length]);
   useEffect(() => {
     if (!switchingFocus) return;
     if (market.candles.length > 0) {

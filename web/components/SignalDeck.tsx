@@ -74,6 +74,16 @@ export const SignalDeck = memo(function SignalDeck({
   const merged = useMemo(() => mergeBook(ledger, archive), [ledger, archive]);
   const openCount = merged.openRows.length;
   const totalPnl = merged.openPnl + merged.bookedPnl;
+  /**
+   * `mergeBook` treats a not-yet-loaded archive the same as an empty one, so
+   * for the moment before Supabase answers, a position open only there —
+   * from a different tab or session, not this one's live ledger — is simply
+   * missing, and the count/total jump upward the instant the fetch lands.
+   * The live-ledger count is right immediately in the common case (a
+   * position opened in this tab), so this dims rather than hides it: an
+   * honest "still confirming" instead of either a wrong number or none.
+   */
+  const archiveReady = archive !== null;
 
   // A fill turns the deck to the book: the moment a position exists for the
   // underlying on screen, managing it is the live question, and the panic
@@ -117,7 +127,17 @@ export const SignalDeck = memo(function SignalDeck({
               {/* An open position is loud on the tab that manages it, whichever
                   half of the deck you are looking at. */}
               {key === "book" && openCount > 0 ? (
-                <span className="rounded bg-rose-500/20 px-1 font-mono text-[9px] text-rose-300">
+                <span
+                  title={
+                    archiveReady
+                      ? undefined
+                      : "Still confirming against Supabase — this count may still rise."
+                  }
+                  className={cn(
+                    "rounded bg-rose-500/20 px-1 font-mono text-[9px] text-rose-300 transition-opacity",
+                    !archiveReady && "opacity-50",
+                  )}
+                >
                   {openCount}
                 </span>
               ) : null}
@@ -133,7 +153,16 @@ export const SignalDeck = memo(function SignalDeck({
           ) : null
         ) : (
           <span
-            className={cn("shrink-0 font-mono text-xs font-bold", pnlTone(totalPnl))}
+            title={
+              archiveReady
+                ? undefined
+                : "Still confirming against Supabase — this total may still move."
+            }
+            className={cn(
+              "shrink-0 font-mono text-xs font-bold transition-opacity",
+              pnlTone(totalPnl),
+              !archiveReady && "opacity-50",
+            )}
           >
             {signedMoney(totalPnl)}
           </span>
