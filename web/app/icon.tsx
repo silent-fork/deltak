@@ -28,8 +28,19 @@ export default function Icon() {
             width: 26,
             height: 26,
             borderRadius: 7,
-            border: "1.5px solid rgba(0,240,255,0.6)",
-            background: "rgba(0,240,255,0.14)",
+            // A solid, fully-opaque border rather than a translucent one —
+            // "prominent" here means the ring itself is the thing carrying
+            // contrast, not a background wash behind it. The fill is lighter
+            // still: barely a tint, since the border and the bolt's own
+            // stroke (below) are doing the actual work of standing out.
+            border: "1.5px solid #00f0ff",
+            background: "rgba(0,240,255,0.08)",
+            // A thin dark ring just outside the cyan border — the same
+            // "dark edge on a colored line" treatment as the bolt's stroke,
+            // applied to the square too, so both concentric shapes hold
+            // their edge against a bright background instead of just the
+            // inner one.
+            boxShadow: "0 0 0 1px #083344",
           }}
         >
           {/*
@@ -44,7 +55,7 @@ export default function Icon() {
             <path
               d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"
               fill="#00f0ff"
-              stroke="#09090b"
+              stroke="#083344"
               strokeWidth="1"
               strokeLinejoin="round"
             />

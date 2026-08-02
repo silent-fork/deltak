@@ -73,11 +73,21 @@ export default function OpengraphImage() {
               height: 76,
               borderRadius: 16,
               border: "3px solid #00f0ff",
-              background: "#09090b",
+              background: "rgba(0,240,255,0.08)",
+              // Same treatment as the favicon: a thin dark-teal ring outside
+              // the cyan border, not black — flat black against the cyan
+              // read as a harsh cutout rather than a deliberate edge.
+              boxShadow: "0 0 0 2px #083344",
             }}
           >
             <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
+              <path
+                d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"
+                fill="#00f0ff"
+                stroke="#083344"
+                strokeWidth="1"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
           <div
