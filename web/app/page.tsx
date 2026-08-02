@@ -1,260 +1,299 @@
-"use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { BootScreen } from "@/components/BootScreen";
-import { EngineProvider } from "@/components/EngineProvider";
-import { LoginScreen } from "@/components/LoginScreen";
-import { Header } from "@/components/Header";
-import { CoaMatrixPanel } from "@/components/hero/CoaMatrixPanel";
-import { QuantumHorizon } from "@/components/hero/QuantumHorizon";
-import { OptionChainMatrix } from "@/components/OptionChainMatrix";
-import { RrgScatter } from "@/components/RrgScatter";
-import { SignalDeck } from "@/components/SignalDeck";
 import {
-  reconstructWallTrail,
-  spotAtFactory,
-} from "@/lib/market/migration";
-import type { Underlying } from "@/lib/types";
-import { useEngine } from "@/lib/useEngine";
+  ArrowLeftRight,
+  ArrowRight,
+  Bot,
+  Layers,
+  LockKeyhole,
+  Radar,
+  Repeat2,
+  ShieldAlert,
+  Table2,
+  TrendingDown,
+  TrendingUp,
+  Waves,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
 
-const SIMULATE = process.env.NEXT_PUBLIC_SIMULATE === "1";
+import { Wordmark } from "@/components/Wordmark";
 
-export default function TerminalPage() {
-  const engine = useEngine(SIMULATE);
-  // Selection lives in the engine: the historical fetches are scoped to it.
-  const selected = engine.focus;
-  const setSelected = engine.setFocus;
-  const [, forceRefresh] = useState(0);
-  /**
-   * One stable identity for "something outside the engine loop happened, redraw."
-   * Handed to the memoized panels below as-is — a fresh arrow function on every
-   * render would defeat their `React.memo` the moment any of them took it as a
-   * prop, since a new function is never `===` the last one.
-   */
-  const bumpRefresh = useCallback(() => forceRefresh((n) => n + 1), []);
+/**
+ * The homepage.
+ *
+ * Everything past this point in the app lives behind a broker sign-in and
+ * renders client-side — a search crawler reading "/terminal" gets nothing
+ * but a login form and a boot skeleton, no matter how good Googlebot's JS
+ * execution has gotten. This route is the one page in the whole product
+ * whose job is to actually say, in plain server-rendered text, what DeltaK
+ * is and does — the terminal itself only has to prove it.
+ */
 
-  const { snapshot, streamStatus, simulated, demo, error, market } = engine;
+const FEATURES = [
+  {
+    icon: Layers,
+    title: "COA Matrix",
+    body: "Tracks Aegis (support) and Zenith (resistance) across two generations — the cumulative open-interest wall and the one today's writers are actually building — and tells you the moment one is abandoned for another strike.",
+  },
+  {
+    icon: Radar,
+    title: "Quantum Horizon",
+    body: "A live ITM/OTM open-interest profile drawn as a literal horizon through the chain: everything left of it is in-the-money for calls, everything right in-the-money for puts, updated tick by tick at spot.",
+  },
+  {
+    icon: Repeat2,
+    title: "RRG Momentum",
+    body: "Every strike's relative-rotation graph — RS-Ratio against RS-Momentum — sorted into Leading, Improving, Weakening and Lagging quadrants, so a fading node gets scaled out before it becomes a loss.",
+  },
+  {
+    icon: Table2,
+    title: "4-Quadrant Option Chain",
+    body: "Calls and puts read outward from the strike column, each leg carrying its own RRG quadrant, RS-Ratio, volume, open interest and bid/ask spread — the whole ladder, not a quote you have to click into.",
+  },
+  {
+    icon: Bot,
+    title: "Autopilot execution",
+    body: "An actionable signal fires itself the instant every gate agrees — protocol, Zero-OTM strike, RRG quadrant — or waits for a manual Execute click. Same sizing, same risk gates, either way.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "Risk guards",
+    body: "Stop-loss, target and a Daylight Rest window run whether or not a tab is open, with a portfolio-level at-risk ceiling across every open position — not just a per-trade stop.",
+  },
+] as const;
 
-  const chain = snapshot?.chains[selected];
-  const signal = snapshot?.signals[selected];
-  const nodes = snapshot?.rrg[selected] ?? [];
-  const quote = snapshot?.spots[selected];
+const PROTOCOLS = [
+  {
+    icon: ArrowLeftRight,
+    name: "Alpha",
+    title: "Equilibrium Range",
+    tone: "text-quantum",
+    body: "Both walls solid. Buys the 2nd ITM Call at Aegis, the 2nd ITM Put at Zenith — a range trade at each bound, nothing in between.",
+  },
+  {
+    icon: TrendingUp,
+    name: "Beta",
+    title: "Ascension Vector",
+    tone: "text-emerald-400",
+    body: "Support solid, resistance migrating up. ITM Calls on the next micro-dip; put purchases are banned outright under this regime.",
+  },
+  {
+    icon: TrendingDown,
+    name: "Gamma",
+    title: "Cascade Vector",
+    tone: "text-rose-400",
+    body: "Resistance solid, support migrating down. ITM Puts arm on the cascade; calls are banned outright under this regime.",
+  },
+  {
+    icon: Waves,
+    name: "Delta",
+    title: "Volatility Trap",
+    tone: "text-zinc-400",
+    body: "Both bounds migrating at once — a consolidation neither side is defending. The auto-driver mutes itself rather than guess.",
+  },
+] as const;
 
-  /**
-   * The walls' actual path through the session, rebuilt from the open-interest
-   * series already in hand. The engine's own trail only covers the time this
-   * tab has been open, so this replaces it whenever history reaches further.
-   *
-   * Every hook stays above the sign-in gate below — a hook that runs only once
-   * the terminal is unlocked changes the hook count mid-life and tears React's
-   * state apart at exactly the moment the operator signs in.
-   */
-  const rows = chain?.rows;
-  const historicalTrail = useMemo(() => {
-    if (!rows?.length || !market.candles.length) return null;
-    const trail = reconstructWallTrail(
-      rows.map((r) => ({
-        strike: r.strike,
-        callToken: r.call?.token,
-        putToken: r.put?.token,
-      })),
-      market.oiSeries,
-      spotAtFactory(market.candles),
-    );
-    return trail.times.length > 1 ? trail : null;
-  }, [rows, market.oiSeries, market.candles]);
+const STEPS = [
+  {
+    n: "01",
+    title: "Sign in with SmartAPI",
+    body: "Client code, PIN and a six-digit TOTP — the same loginByPassword flow you'd use on Angel One directly. Nothing is stored beyond the session.",
+  },
+  {
+    n: "02",
+    title: "The engine reads the tape",
+    body: "COA wall migration, RRG rotation and OI buildup recompute every second the market's open, across NIFTY, BANKNIFTY and FINNIFTY.",
+  },
+  {
+    n: "03",
+    title: "A signal arms",
+    body: "Protocol, the Zero-OTM strike rule and the RRG quadrant all have to agree before anything is actionable — one dissent and it stays on standby.",
+  },
+  {
+    n: "04",
+    title: "Autopilot fires, or you do",
+    body: "An armed signal executes itself in Autopilot, or waits for a manual click — same sizing and risk gates either way, in Paper or Live mode.",
+  },
+] as const;
 
-  /**
-   * The boot sequence's safety valve. Session check and the scrip master both
-   * always settle (each catches its own errors), but live chain data never
-   * comes with that guarantee — a dead feed or a market that never opens
-   * today would otherwise leave the boot screen spinning forever. Once the
-   * session check has settled, real data gets a few seconds to show up before
-   * this falls through to the dashboard's own per-panel skeletons regardless.
-   */
-  const [dataTimedOut, setDataTimedOut] = useState(false);
-  useEffect(() => {
-    if (!engine.sessionChecked || dataTimedOut) return;
-    const id = setTimeout(() => setDataTimedOut(true), 4000);
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.sessionChecked]);
-
-  const dataReady = !!chain?.rows.length;
-  const bootStages = [
-    { done: engine.sessionChecked },
-    { done: engine.masterReady },
-    { done: dataReady },
-  ];
-
-  // Before the session check settles, "not authenticated" and "haven't
-  // checked yet" must not read as the same thing — that's what put the
-  // sign-in screen on a fully signed-in operator's tab for one frame on every
-  // reload.
-  if (!engine.sessionChecked) {
-    return (
-      <EngineProvider engine={engine}>
-        <BootScreen stages={bootStages} />
-      </EngineProvider>
-    );
-  }
-
-  // An empty terminal is worse than no terminal: without a feed there is nothing
-  // to render and no circuit breaker can act, so gate on a live session.
-  if (!engine.session.authenticated && !demo) {
-    return (
-      <EngineProvider engine={engine}>
-        <LoginScreen simulate={SIMULATE} />
-      </EngineProvider>
-    );
-  }
-
-  // Signed in, but the board hasn't painted anything real yet — one boot
-  // screen instead of a patchwork of independent panel skeletons filling in
-  // over the next second or two.
-  if (!dataReady && !dataTimedOut) {
-    return (
-      <EngineProvider engine={engine}>
-        <BootScreen stages={bootStages} />
-      </EngineProvider>
-    );
-  }
-
-  // The wall contracts, so the COA panel can draw each wall's OI history.
-  const rowAt = (strike: number | null | undefined) =>
-    strike === null || strike === undefined
-      ? undefined
-      : chain?.rows.find((r) => r.strike === strike);
-  const aegisToken = rowAt(chain?.levels.aegis_1)?.put?.token;
-  const zenithToken = rowAt(chain?.levels.zenith_1)?.call?.token;
-
-  const degraded = streamStatus === "error" || (!!error && !snapshot?.feed_connected);
-
+export default function HomePage() {
   return (
-    <EngineProvider engine={engine}>
-      <div className="dk-grid-bg flex h-dvh flex-col overflow-hidden">
-        <Header
-          snapshot={snapshot}
-          streamState={streamStatus}
-          simulated={simulated}
-          selected={selected}
-          events={snapshot?.events ?? []}
-          onSelect={(u) => setSelected(u as Underlying)}
-          onRefreshStatus={bumpRefresh}
-        />
+    <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.07] blur-[140px]"
+      />
 
-        {degraded ? (
-          <div className="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1 text-[11px] text-amber-300">
-            <span>
-              {error ??
-                "Market feed disconnected — the data below is frozen. Circuit breakers cannot act without ticks."}
-            </span>
-            <button
-              onClick={() => void engine.reloadMaster()}
-              className="rounded border border-amber-500/50 px-2 py-0.5 text-[10px] uppercase tracking-wider hover:bg-amber-500/20"
-            >
-              Retry
-            </button>
+      {/* Nav */}
+      <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
+            <Zap className="h-4 w-4 text-quantum" />
           </div>
-        ) : null}
+          <Wordmark className="text-[15px] tracking-[0.18em]" />
+        </div>
+        <Link
+          href="/terminal"
+          className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
+        >
+          Enter Terminal
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </header>
 
-        {/*
-          Below xl the terminal is one column that scrolls as a page. From xl it
-          becomes a fixed cockpit split two parts hero to three parts board — the
-          hero is context you read at a glance, the board is what you act on, so
-          the board gets the larger share and only opted-in panels scroll.
-        */}
-        <div className="dk-scroll flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto p-1.5 xl:overflow-hidden">
-          {/* Hero — levels, price, rotation */}
-          <section className="grid shrink-0 grid-cols-1 gap-1.5 lg:grid-cols-3 xl:min-h-0 xl:shrink xl:basis-0 xl:grow-[2]">
-            <CoaMatrixPanel
-              chain={chain}
-              aegisOi={aegisToken ? market.oiSeries[aegisToken] : undefined}
-              zenithOi={zenithToken ? market.oiSeries[zenithToken] : undefined}
-              marketPcr={market.pcr[selected] ?? null}
-              aegisTrail={historicalTrail?.aegis}
-              zenithTrail={historicalTrail?.zenith}
-            />
-            <QuantumHorizon
-              chain={chain}
-              quote={quote}
-              candles={market.candles}
-              stats={market.stats}
-            />
-            <RrgScatter
-              nodes={nodes}
-              highlightToken={signal?.token}
-              signal={signal}
-              settled={engine.settled}
-              asOf={market.stats?.date ?? null}
-              chain={chain}
-            />
-          </section>
+      {/* Hero */}
+      <section className="relative mx-auto max-w-4xl px-5 pb-16 pt-10 text-center sm:pt-16">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
+          DeltaK Matrix Strategy · DKMS
+        </span>
 
-          {/* Board — the chain, and everything that acts on it */}
-          <section className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:basis-0 xl:grow-[3] xl:grid-cols-3 xl:overflow-hidden">
-            <div className="flex min-h-[60vh] flex-col xl:col-span-2 xl:min-h-0 xl:overflow-hidden">
-              <OptionChainMatrix chain={chain} signalToken={signal?.token} />
-            </div>
+        <h1 className="mt-6 text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-5xl">
+          An Angel One options terminal built around the{" "}
+          <span className="text-quantum text-glow-quantum">Quantum Horizon</span>
+        </h1>
 
-            {/* One panel: the signal engine and the trade book, tabbed. */}
-            <aside className="flex min-h-0 flex-col xl:overflow-hidden">
-              <SignalDeck
-                signal={signal}
-                mode={snapshot?.mode ?? "paper"}
-                chain={chain}
-                onExecuted={bumpRefresh}
-                ledger={snapshot?.ledger}
-                onLedgerChanged={bumpRefresh}
-              />
-            </aside>
-          </section>
+        <p className="mx-auto mt-5 max-w-2xl text-balance text-[15px] leading-relaxed text-zinc-400 sm:text-base">
+          DeltaK reads COA support/resistance walls, RRG relative-strength rotation
+          and live open-interest across NIFTY, BANKNIFTY and FINNIFTY futures &amp;
+          options — and either arms a trade for you to take, or takes it itself.
+        </p>
+
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link
+            href="/terminal"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum shadow-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
+          >
+            Enter Terminal
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
+            <LockKeyhole className="h-3 w-3" />
+            Free — sign in with your own Angel One account
+          </span>
         </div>
 
-        <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
-          <span className="flex items-center gap-3">
-            <span>
-              DeltaK Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
-            </span>
-            {/* Historical reads are an enhancement, never a dependency — say so
-                here rather than raising the degraded banner over them. */}
-            {market.error ? (
-              <span className="text-amber-500/80" title={market.error}>
-                Historical data degraded
+        <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
+          {["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode", "Live mode", "SmartAPI"].map(
+            (chip) => (
+              <span
+                key={chip}
+                className="rounded border border-zinc-800 bg-zinc-900/60 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-zinc-500"
+              >
+                {chip}
               </span>
-            ) : null}
-          </span>
-          <span className="flex items-center gap-3">
-            <span>Tokens {engine.trackedTokens}</span>
-            <span>Ticks {engine.tickUpdates}</span>
-            <span
-              title="Contracts whose COA 2.0 ΔOI is measured against the exchange's own session-open open interest, rather than the first frame this tab received."
+            ),
+          )}
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="relative mx-auto max-w-6xl px-5 py-10">
+        <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          What the engine reads
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="dk-panel rounded-lg p-4 transition-colors hover:border-zinc-700"
             >
-              OI base {engine.oiBaselines}
-            </span>
-            {engine.settled ? (
-              <span
-                title="Nothing is being recomputed: the exchange is closed and the board is frozen on the last session. The rotation windows and wall trail hold their replayed history until the next print."
-                className="text-quantum/70"
-              >
-                Settled
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/30 bg-quantum/10">
+                <f.icon className="h-4 w-4 text-quantum" />
+              </div>
+              <h3 className="mt-3 text-[13px] font-semibold text-zinc-100">
+                {f.title}
+              </h3>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
+                {f.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Protocols */}
+      <section className="relative mx-auto max-w-6xl px-5 py-10">
+        <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          Four protocols, one engine
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-center text-[12.5px] leading-relaxed text-zinc-500">
+          Which one is live is decided by how the Aegis and Zenith walls are
+          actually migrating this session — not a setting anyone chooses.
+        </p>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PROTOCOLS.map((p) => (
+            <div key={p.name} className="dk-panel rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <p.icon className={`h-4 w-4 ${p.tone}`} />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                  Protocol {p.name}
+                </span>
+              </div>
+              <h3 className={`mt-2 text-[13px] font-semibold ${p.tone}`}>
+                {p.title}
+              </h3>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
+                {p.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="relative mx-auto max-w-4xl px-5 py-10">
+        <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+          How it works
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {STEPS.map((s) => (
+            <div key={s.n} className="flex gap-3 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-4">
+              <span className="shrink-0 font-mono text-xl font-bold text-quantum/40">
+                {s.n}
               </span>
-            ) : null}
-            {market.replayed > 0 ? (
-              <span
-                title="Contracts whose last session was replayed from historical candles because the market is closed — prices and rotation are Friday's, not live."
-                className="text-zinc-500"
-              >
-                Replay {market.replayed}
-              </span>
-            ) : null}
-            <span>Risk {engine.riskPct}%</span>
-            {/* The clock lives in the header, in IST — one authoritative time. */}
-            <span>{snapshot?.mode === "live" ? "Live routing" : "Paper ledger"}</span>
-          </span>
-        </footer>
-      </div>
-    </EngineProvider>
+              <div className="min-w-0">
+                <h3 className="text-[13px] font-semibold text-zinc-100">
+                  {s.title}
+                </h3>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-500">
+                  {s.body}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative mx-auto max-w-3xl px-5 py-14 text-center">
+        <div className="dk-panel rounded-xl px-6 py-10">
+          <h2 className="text-xl font-bold text-zinc-50 sm:text-2xl">
+            Sign in and watch the walls move
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-zinc-500">
+            Paper mode runs the whole engine — COA, RRG, Autopilot, risk
+            guards — against simulated fills, no live order ever placed,
+            for as long as you want to watch it work.
+          </p>
+          <Link
+            href="/terminal"
+            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum shadow-quantum transition-colors hover:bg-quantum/25"
+          >
+            Enter Terminal
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+
+      <footer className="relative mx-auto max-w-6xl px-5 pb-8 pt-4 text-center text-[10px] leading-relaxed text-zinc-600">
+        <p>
+          DeltaK Matrix Strategy (DKMS) · COA 1.0 / 2.0 wall tracking · RRG
+          multi-strike momentum · Angel One SmartAPI
+        </p>
+        <p className="mt-1">
+          Not investment advice. Options trading carries substantial risk of
+          loss — Paper mode is there to be used.
+        </p>
+      </footer>
+    </main>
   );
 }

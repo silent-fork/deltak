@@ -48,7 +48,7 @@ export default function AuthCallbackPage({
         ) : null}
 
         <Link
-          href="/"
+          href="/terminal"
           className="mt-6 inline-flex h-9 items-center rounded-md border border-quantum/60 bg-quantum/15 px-4 text-xs font-medium uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
         >
           Return to terminal
