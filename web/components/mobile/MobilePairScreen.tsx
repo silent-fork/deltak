@@ -56,9 +56,9 @@ export function MobilePairScreen({ expired }: { expired?: boolean }) {
         </ol>
       </div>
 
-      <p className="relative mt-6 flex items-center gap-1.5 text-[10.5px] uppercase tracking-wider text-zinc-600">
-        <ShieldCheck className="h-3 w-3 text-zinc-600" />
-        Read-only · no Angel One sign-in ever happens on this device
+      <p className="relative mt-6 flex max-w-[16rem] items-center justify-center gap-1.5 text-center text-[10.5px] uppercase tracking-wider text-zinc-600">
+        <ShieldCheck className="h-3 w-3 shrink-0 text-zinc-600" />
+        No Angel One sign-in ever happens on this device
       </p>
     </main>
   );
