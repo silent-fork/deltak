@@ -28,8 +28,13 @@ export default function Icon() {
             width: 26,
             height: 26,
             borderRadius: 7,
-            border: "2px solid rgba(0,240,255,0.55)",
-            background: "rgba(0,240,255,0.14)",
+            // A solid dark tile, not the translucent cyan wash the same mark
+            // uses inside the app — there it always sits on the terminal's
+            // own dark background; a favicon has to hold its own against a
+            // light tab bar or bookmarks bar, so the square carries its
+            // background with it rather than depending on the page's.
+            border: "1.5px solid #00f0ff",
+            background: "#09090b",
           }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
