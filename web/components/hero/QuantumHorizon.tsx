@@ -69,12 +69,15 @@ export const QuantumHorizon = memo(function QuantumHorizon({
   quote,
   candles = [],
   stats = null,
+  switching = false,
 }: {
   chain: OptionChain | undefined;
   quote: SpotQuote | undefined;
   /** Today's one-minute bars from `getCandleData`, oldest first. */
   candles?: Candle[];
   stats?: SessionStats | null;
+  /** The underlying just changed and its candle session hasn't landed yet. */
+  switching?: boolean;
 }) {
   const [metric, setMetric] = useState<"oi" | "volume">("oi");
   const flash = useTickFlash(quote?.ltp ?? 0);
@@ -762,6 +765,22 @@ export const QuantumHorizon = memo(function QuantumHorizon({
             ) : null}
           </div>
         </div>
+
+        {/* Covers the whole panel, not just the trace — the spot price and
+            the profile above are this instrument's real last read too, about
+            to be replaced the moment the new underlying's session lands. */}
+        {switching ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
+          >
+            <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+            <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
+              Loading {chain?.label ?? quote?.label ?? "session"}…
+            </span>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

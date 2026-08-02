@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
 import { EngineProvider } from "@/components/EngineProvider";
@@ -40,6 +40,41 @@ export function Terminal() {
   const signal = snapshot?.signals[selected];
   const nodes = snapshot?.rrg[selected] ?? [];
   const quote = snapshot?.spots[selected];
+
+  /**
+   * COA Matrix and Quantum Horizon both draw part of their picture from the
+   * historical enrichment `useMarketData` keeps only for the focused
+   * underlying — switching drops its candles and OI series the instant the
+   * focus changes (a trace spliced across two instruments is worse than no
+   * trace), so those two panels would otherwise flash back to their
+   * "awaiting history" placeholders for however long the refetch takes, even
+   * though the chain, the signal and the RRG nodes for the new underlying
+   * were already live the moment the header switched it — the engine ticks
+   * every underlying every second regardless of which one is on screen. A
+   * translucent scrim over just those two panels covers that gap instead of
+   * the rest of the board looking like it forgot anything.
+   */
+  const [switchingFocus, setSwitchingFocus] = useState(false);
+  const priorFocusRef = useRef(selected);
+  useEffect(() => {
+    const changed = priorFocusRef.current !== selected;
+    priorFocusRef.current = selected;
+    // Demo/simulated sessions never populate `market` in the first place —
+    // nothing to wait on, so nothing should spin.
+    if (changed && market.available) setSwitchingFocus(true);
+  }, [selected, market.available]);
+  useEffect(() => {
+    if (!switchingFocus) return;
+    if (market.candles.length > 0) {
+      setSwitchingFocus(false);
+      return;
+    }
+    // Safety valve, same reasoning as the boot sequence's: a slow or dead
+    // history fetch must not leave the scrim up over a panel that is
+    // otherwise perfectly fine to read.
+    const id = setTimeout(() => setSwitchingFocus(false), 5000);
+    return () => clearTimeout(id);
+  }, [switchingFocus, market.candles.length]);
 
   /**
    * The walls' actual path through the session, rebuilt from the open-interest
@@ -225,12 +260,14 @@ export function Terminal() {
               marketPcr={market.pcr[selected] ?? null}
               aegisTrail={historicalTrail?.aegis}
               zenithTrail={historicalTrail?.zenith}
+              switching={switchingFocus}
             />
             <QuantumHorizon
               chain={chain}
               quote={quote}
               candles={market.candles}
               stats={market.stats}
+              switching={switchingFocus}
             />
             <RrgScatter
               nodes={nodes}

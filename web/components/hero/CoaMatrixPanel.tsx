@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Minus } from "lucide-react";
 import { memo } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -449,6 +449,7 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
   marketPcr = null,
   aegisTrail,
   zenithTrail,
+  switching = false,
 }: {
   chain: OptionChain | undefined;
   /** Session OI history for the contract defending each wall. */
@@ -463,6 +464,8 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
    */
   aegisTrail?: number[];
   zenithTrail?: number[];
+  /** The underlying just changed and its OI history hasn't landed yet. */
+  switching?: boolean;
 }) {
   // Levels derived from an empty ladder are not levels, they are placeholders.
   if (!chain?.rows.length) {
@@ -497,7 +500,7 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
   const settled = wallMerged("aegis", levels) && wallMerged("zenith", levels);
 
   return (
-    <Card className="min-h-0">
+    <Card className="relative min-h-0">
       <CardHeader className="shrink-0">
         <CardTitle className="truncate">COA Matrix</CardTitle>
         <span
@@ -713,6 +716,22 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
           ))}
         </div>
       </CardContent>
+
+      {/* Translucent, not opaque — the walls and levels underneath are still
+          this instrument's real last read, just about to be replaced by a
+          fresher one. */}
+      {switching ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute inset-0 z-10 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
+        >
+          <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+          <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
+            Loading {chain.label}…
+          </span>
+        </div>
+      ) : null}
     </Card>
   );
 });
