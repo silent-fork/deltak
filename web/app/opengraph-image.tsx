@@ -2,14 +2,17 @@ import { ImageResponse } from "next/og";
 
 /**
  * The card a shared link actually shows — Slack, X, WhatsApp, iMessage all
- * read this file by convention rather than any tag in `<head>`. Same mark
- * and palette as the boot screen and sign-in screen, so a shared link and an
- * opened tab read as the same product.
+ * read this file by convention rather than any tag in `<head>`. Built as a
+ * compressed echo of the homepage hero (same badge, headline shape, grid
+ * background and index chips) rather than a generic centred-logo card, so a
+ * shared link and the page it opens read as the same product.
  */
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
-  "DeltaK Terminal — Angel One options trading HUD for NIFTY, BANKNIFTY and FINNIFTY futures & options";
+  "DeltaK — Quantum Horizon options trading terminal for Angel One, across NIFTY, BANKNIFTY and FINNIFTY futures & options";
+
+const CHIPS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode"];
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -23,6 +26,9 @@ export default function OpengraphImage() {
           alignItems: "center",
           justifyContent: "center",
           background: "#09090b",
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
           position: "relative",
         }}
       >
@@ -30,51 +36,99 @@ export default function OpengraphImage() {
           style={{
             position: "absolute",
             display: "flex",
-            width: 720,
-            height: 720,
+            width: 760,
+            height: 760,
             borderRadius: 9999,
-            background: "rgba(0,240,255,0.10)",
-            filter: "blur(140px)",
+            background: "rgba(0,240,255,0.09)",
+            filter: "blur(150px)",
           }}
         />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+        {/* Badge — same shape as the homepage hero's */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            border: "1px solid #27272a",
+            background: "rgba(24,24,27,0.7)",
+            borderRadius: 9999,
+            padding: "10px 24px",
+            fontSize: 22,
+            letterSpacing: 3,
+            textTransform: "uppercase",
+            color: "#a1a1aa",
+          }}
+        >
+          DeltaK Matrix Strategy · DKMS
+        </div>
+
+        {/* Brand row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 34 }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 92,
-              height: 92,
-              borderRadius: 18,
-              border: "3px solid rgba(0,240,255,0.5)",
-              background: "rgba(0,240,255,0.12)",
+              width: 76,
+              height: 76,
+              borderRadius: 16,
+              border: "3px solid #00f0ff",
+              background: "#09090b",
             }}
           >
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
               <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
             </svg>
           </div>
-          <div style={{ display: "flex", fontSize: 88, fontWeight: 700, color: "#f4f4f5" }}>
-            DELTA
-            <span style={{ color: "#00f0ff" }}>K</span>
+          <div
+            style={{
+              display: "flex",
+              fontSize: 78,
+              fontWeight: 700,
+              color: "#f4f4f5",
+              letterSpacing: -1,
+            }}
+          >
+            <span style={{ display: "flex" }}>DELTA</span>
+            <span style={{ display: "flex", color: "#00f0ff" }}>K</span>
           </div>
         </div>
 
-        <div style={{ display: "flex", marginTop: 30, fontSize: 32, color: "#a1a1aa" }}>
-          Angel One Options Trading Terminal
-        </div>
+        {/* Headline — the same claim the homepage hero opens with */}
         <div
           style={{
             display: "flex",
-            marginTop: 18,
-            fontSize: 22,
-            letterSpacing: 3,
-            textTransform: "uppercase",
-            color: "#71717a",
+            marginTop: 30,
+            fontSize: 34,
+            fontWeight: 600,
+            color: "#e4e4e7",
+            textAlign: "center",
           }}
         >
-          NIFTY · BANKNIFTY · FINNIFTY · Futures &amp; Options
+          An Angel One options terminal built around the&nbsp;
+          <span style={{ display: "flex", color: "#00f0ff" }}>Quantum Horizon</span>
+        </div>
+
+        {/* Chips — same four the hero leads with, trimmed to what matters */}
+        <div style={{ display: "flex", gap: 14, marginTop: 34 }}>
+          {CHIPS.map((chip) => (
+            <div
+              key={chip}
+              style={{
+                display: "flex",
+                border: "1px solid #27272a",
+                background: "rgba(24,24,27,0.6)",
+                borderRadius: 8,
+                padding: "10px 18px",
+                fontSize: 20,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                color: "#71717a",
+              }}
+            >
+              {chip}
+            </div>
+          ))}
         </div>
       </div>
     ),
