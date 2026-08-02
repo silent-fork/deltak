@@ -119,7 +119,7 @@ const STEPS = [
   {
     n: "04",
     title: "Autopilot fires, or you do",
-    body: "An armed signal executes itself in Autopilot, or waits for a manual click — same sizing and risk gates either way, in Paper or Live mode.",
+    body: "An armed signal executes itself in Autopilot, or waits for a manual click — same sizing and risk gates either way, against simulated fills in Paper mode.",
   },
 ] as const;
 
@@ -156,7 +156,9 @@ export default function HomePage() {
 
         <h1 className="mt-6 text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-5xl">
           An Angel One options terminal built around the{" "}
-          <span className="text-quantum text-glow-quantum">Quantum Horizon</span>
+          <span className="text-quantum [text-shadow:0_0_6px_rgba(0,240,255,0.3)]">
+            Quantum Horizon
+          </span>
         </h1>
 
         <p className="mx-auto mt-5 max-w-2xl text-balance text-[15px] leading-relaxed text-zinc-400 sm:text-base">
@@ -323,7 +325,21 @@ export default function HomePage() {
         </p>
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
-          loss — Paper mode is there to be used.
+          loss. Paper mode only, for now — every fill here is simulated.
+        </p>
+        {/* A literal tricolour swatch rather than relying on an emoji flag
+            rendering consistently across platforms — three real stripes,
+            same restraint as the rest of the palette. */}
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-zinc-600">
+          <span
+            aria-hidden
+            className="inline-flex h-2.5 w-4 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
+          >
+            <span className="h-1/3 w-full bg-[#FF9933]" />
+            <span className="h-1/3 w-full bg-white" />
+            <span className="h-1/3 w-full bg-[#138808]" />
+          </span>
+          Made with <span className="text-rose-400">♥</span> in Bharat
         </p>
       </footer>
     </main>
