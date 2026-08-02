@@ -17,6 +17,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
+import { PairMobileSection } from "@/components/PairMobileSection";
 import { api } from "@/lib/api";
 import { istParts } from "@/lib/engine/config";
 import type { ExecutionMode, LedgerSnapshot, UserProfile } from "@/lib/types";
@@ -533,6 +534,15 @@ export function UserPill({
               label="Logins recorded"
               value={profile?.logins ? String(profile.logins) : "—"}
             />
+          </Section>
+
+          {/*
+            Read-only phone companion — mints the moment the dropdown opens,
+            same as funds above. Angel One's own sign-in never renders on the
+            phone; this QR is the one thing it needs from here.
+          */}
+          <Section title="Pair Mobile">
+            <PairMobileSection />
           </Section>
 
           <div className="flex items-center gap-1.5 border-t border-zinc-800/80 p-2">

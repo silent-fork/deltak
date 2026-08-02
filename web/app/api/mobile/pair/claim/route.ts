@@ -18,7 +18,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const token = new URL(request.url).searchParams.get("token") ?? "";
-  const sessionId = token ? await completeMobilePairing(token) : null;
+  // A phone that scanned a real QR must never see a raw crash — a claim
+  // that fails for any reason (an unapplied migration as much as an
+  // expired token) reads the same as "this QR isn't good", not an error.
+  const sessionId = token ? await completeMobilePairing(token).catch(() => null) : null;
 
   const target = new URL(sessionId ? "/terminal" : "/terminal?mobile=expired", request.url);
   const res = NextResponse.redirect(target, { status: 302 });

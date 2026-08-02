@@ -287,8 +287,10 @@ companion; a desktop UA gets today's terminal, unchanged.
 Pairing is a QR the phone's own camera app scans directly — there is no
 in-app scanner and no camera permission this app ever asks for:
 
-1. An already-signed-in desktop taps **Pair Mobile** in the header, which
-   `POST`s `/api/mobile/pair`. That mints a random, two-minute claim ticket in
+1. An already-signed-in desktop opens the user pill dropdown (top right),
+   where a **Pair Mobile** section mints a QR the moment the dropdown opens —
+   small by default, tap to expand within the dropdown itself, no separate
+   modal. `POST /api/mobile/pair` mints a random, two-minute claim ticket in
    `mobile_pairings` and renders it server-side as an SVG QR (via `qrcode`,
    used only inside this one Node route handler — nothing about QR
    generation ships to the browser bundle) encoding

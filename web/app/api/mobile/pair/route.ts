@@ -42,14 +42,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const { claimUrl, expiresAt, qrSvg } = await startMobilePairing(
-    session.clientCode,
-    new URL(request.url).origin,
-  );
-
-  return NextResponse.json({
-    claim_url: claimUrl,
-    expires_at: expiresAt,
-    qr_svg: qrSvg,
-  });
+  try {
+    const { claimUrl, expiresAt, qrSvg } = await startMobilePairing(
+      session.clientCode,
+      new URL(request.url).origin,
+    );
+    return NextResponse.json({
+      claim_url: claimUrl,
+      expires_at: expiresAt,
+      qr_svg: qrSvg,
+    });
+  } catch (err) {
+    // Almost always migration 0011 not yet applied to this Supabase project —
+    // `mobile_pairings` doesn't exist yet, so the write PostgREST issues 404s.
+    // Surfacing that as JSON is what turns a bare 500 into an actionable
+    // message instead of the generic "Request failed (500)".
+    return NextResponse.json(
+      {
+        detail:
+          err instanceof Error
+            ? `Pairing failed: ${err.message}`
+            : "Pairing failed. Has migration 0011_mobile_companion.sql been applied?",
+      },
+      { status: 502 },
+    );
+  }
 }

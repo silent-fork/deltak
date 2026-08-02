@@ -6,7 +6,6 @@ import {
   FlaskConical,
   Hand,
   Plug,
-  QrCode,
   Radar,
   Radio,
   Sunrise,
@@ -16,7 +15,6 @@ import { useEffect, useState } from "react";
 
 import { EventLogMenu } from "@/components/EventLogMenu";
 import { LoginModal } from "@/components/LoginModal";
-import { PairMobileModal } from "@/components/PairMobileModal";
 import { UserPill } from "@/components/UserPill";
 import { Wordmark } from "@/components/Wordmark";
 import { Badge } from "@/components/ui/badge";
@@ -135,7 +133,6 @@ export function Header({
   onRefreshStatus: () => void;
 }) {
   const [loginOpen, setLoginOpen] = useState(false);
-  const [pairOpen, setPairOpen] = useState(false);
 
   const engine = useEngineContext();
   const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
@@ -319,23 +316,6 @@ export function Header({
           </button>
 
           {/*
-            Read-only phone companion — only meaningful once a trading
-            session actually exists to mirror. Angel One's own sign-in never
-            renders on the phone; this is the one thing a phone needs from
-            the desktop to see anything at all.
-          */}
-          {authed ? (
-            <button
-              onClick={() => setPairOpen(true)}
-              title="Pair a phone to watch signals and trades, read-only — no Angel One sign-in on the phone."
-              className="flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:border-quantum/50 hover:text-quantum"
-            >
-              <QrCode className="h-3 w-3" />
-              Pair Mobile
-            </button>
-          ) : null}
-
-          {/*
             The account, not just the connection. "Connected" proved a session
             existed and said nothing about whose — with a client code, a name
             and the day's book behind it, this answers both.
@@ -368,7 +348,6 @@ export function Header({
         onClose={() => setLoginOpen(false)}
         onSuccess={onRefreshStatus}
       />
-      <PairMobileModal open={pairOpen} onClose={() => setPairOpen(false)} />
     </header>
   );
 }
