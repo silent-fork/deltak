@@ -13,8 +13,12 @@ const mmss = (seconds: number) => {
 
 /**
  * The QR itself, small — QR generation is a well-tested contrast/module
- * problem, not something to shrink and hope still scans, so it renders at
- * its native aspect inside a fixed white square regardless of size.
+ * problem, not something to shrink and hope still scans, so the light/dark
+ * modules stay near-white/near-black (set server-side in
+ * `lib/server/mobile.ts`, tinted just enough to read as "this app's cyan"
+ * rather than stark white) and reliability never trades against theming.
+ * The quantum ring around the tile is what actually ties it to the rest of
+ * the HUD — same accent every other live/active element here uses.
  */
 function QrThumb({
   qrSvg,
@@ -30,16 +34,16 @@ function QrThumb({
   return (
     <div
       style={{ height: size, width: size }}
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-1.5"
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#eef9fa] p-1.5 ring-1 ring-quantum/40 ring-offset-1 ring-offset-zinc-900"
     >
       {qrSvg && !expired ? (
         <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
       ) : busy ? (
-        <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+        <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
       ) : expired ? (
-        <ShieldAlert className="h-4 w-4 text-zinc-400" />
+        <ShieldAlert className="h-4 w-4 text-zinc-500" />
       ) : (
-        <Smartphone className="h-4 w-4 text-zinc-400" />
+        <Smartphone className="h-4 w-4 text-zinc-500" />
       )}
     </div>
   );
@@ -108,8 +112,8 @@ export function PairMobileSection() {
         ) : null}
 
         <p className="max-w-[15rem] text-center text-[10px] leading-relaxed text-zinc-500">
-          Scan with your phone&apos;s own camera app — opens straight into the read-only
-          companion, no sign-in screen involved.
+          Scan with your phone&apos;s own camera app — opens straight into the companion,
+          no sign-in screen involved.
         </p>
 
         {claimUrl && !expired ? (
@@ -153,7 +157,7 @@ export function PairMobileSection() {
           {error ? "Pairing failed" : expired ? "QR expired" : "Scan to pair a phone"}
         </span>
         <span className="block text-[9.5px] text-zinc-600">
-          {error ? "Tap to retry" : expired ? "Tap for a new one" : "Read-only · tap to enlarge"}
+          {error ? "Tap to retry" : expired ? "Tap for a new one" : "Live from desktop · tap to enlarge"}
         </span>
       </span>
       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-600 group-hover:text-zinc-300" />

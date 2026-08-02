@@ -413,50 +413,51 @@ export function UserPill({
           role="menu"
           className="dk-scroll absolute right-0 top-full z-50 mt-1 max-h-[75vh] w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60"
         >
-          {/* Identity */}
-          <div className="flex items-center gap-2.5 px-3 py-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-quantum/30 to-quantum/5 font-mono text-[13px] font-bold text-quantum ring-1 ring-quantum/40">
-              {initials(profile, clientCode)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-[12px] font-semibold text-zinc-100">
-                  {name}
-                </span>
-                <BadgeCheck className="h-3 w-3 shrink-0 text-emerald-400" />
-              </div>
-              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-                <span className="text-emerald-400/90">{clientCode}</span>
-                {profile?.broker ? (
-                  <>
-                    <span className="text-zinc-700">·</span>
-                    <span className="truncate">{profile.broker}</span>
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <span
-              className={cn(
-                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
-                mode === "live"
-                  ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
-                  : "border-zinc-700 bg-zinc-900 text-zinc-400",
-              )}
-            >
-              {mode}
-            </span>
-          </div>
-
           {/*
-            Read-only phone companion — mints the moment the dropdown opens,
-            same as funds below. Angel One's own sign-in never renders on the
-            phone; this QR is the one thing it needs from here. Placed right
-            under identity, not buried below funds/book — pairing a phone is
-            as much "who's signed in" as the account details are.
+            Identity and Pair Mobile share one block, not two stacked
+            Sections — pairing a phone is as much "who's signed in here" as
+            the name and client code above it, so there's no divider or
+            second all-caps label between them, just this row's own
+            padding and a hairline rule.
           */}
-          <Section title="Pair Mobile">
-            <PairMobileSection />
-          </Section>
+          <div className="px-3 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-quantum/30 to-quantum/5 font-mono text-[13px] font-bold text-quantum ring-1 ring-quantum/40">
+                {initials(profile, clientCode)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[12px] font-semibold text-zinc-100">
+                    {name}
+                  </span>
+                  <BadgeCheck className="h-3 w-3 shrink-0 text-emerald-400" />
+                </div>
+                <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                  <span className="text-emerald-400/90">{clientCode}</span>
+                  {profile?.broker ? (
+                    <>
+                      <span className="text-zinc-700">·</span>
+                      <span className="truncate">{profile.broker}</span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
+                  mode === "live"
+                    ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                )}
+              >
+                {mode}
+              </span>
+            </div>
+
+            <div className="mt-2.5 border-t border-zinc-800/60 pt-2.5">
+              <PairMobileSection />
+            </div>
+          </div>
 
           <Section title="Contact">
             <EditableRow

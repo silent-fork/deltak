@@ -45,9 +45,11 @@ const PAIRING_TTL_MS = 2 * 60_000;
  * string so nothing about QR generation ships to the browser bundle; the
  * client only ever injects markup it never had to compute.
  *
- * White-on-black, not the app's usual cyan-on-zinc: a camera decoding a QR
- * needs the highest contrast it can get, and that trumps matching the theme
- * for a code this small.
+ * Near-white on near-black, not the app's usual cyan-on-zinc: a camera
+ * decoding a QR needs the highest contrast it can get, and that trumps
+ * matching the theme outright. The two colors are tinted just enough toward
+ * the quantum palette to read as "this app's QR" rather than a stock one,
+ * without giving up the contrast ratio a camera needs.
  */
 export async function startMobilePairing(
   clientCode: string,
@@ -61,7 +63,10 @@ export async function startMobilePairing(
   const qrSvg = await QRCode.toString(claimUrl, {
     type: "svg",
     margin: 1,
-    color: { dark: "#09090b", light: "#ffffff" },
+    // #0b1013 / #eef9fa — near-black/near-white with a whisper of the
+    // quantum cyan (#00f0ff), ~18:1 contrast, comfortably above what a
+    // camera needs to decode reliably.
+    color: { dark: "#0b1013", light: "#eef9fa" },
   });
 
   return { claimUrl, expiresAt, qrSvg };

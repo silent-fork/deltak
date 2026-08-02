@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Radar, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
+import { LogOut, Radar, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { QuadrantPill } from "@/components/QuadrantPill";
@@ -11,7 +11,7 @@ import { api, type MobileStateResponse } from "@/lib/api";
 import type { Position } from "@/lib/types";
 import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney } from "@/lib/utils";
 
-/** How often the phone re-polls its own read-only state. */
+/** How often the phone re-polls its state. */
 const POLL_MS = 5_000;
 
 function timeAgo(iso: string | null): string {
@@ -82,6 +82,11 @@ function PositionRow({ position }: { position: Position }) {
   );
 }
 
+/**
+ * What a paired phone sees at `/terminal` — same ambient glow, grid and
+ * panel language as the homepage and the desktop HUD, so this doesn't read
+ * as a stripped-down afterthought next to either.
+ */
 export function MobileCompanion({ clientCode }: { clientCode: string }) {
   const [data, setData] = useState<MobileStateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -120,28 +125,39 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
   const open = data?.positions.filter((p) => p.status === "OPEN") ?? [];
   const closed = data?.positions.filter((p) => p.status === "CLOSED").slice(0, 20) ?? [];
   const ledger = data?.signal?.ledger;
+  const mode = data?.signal?.mode ?? "paper";
 
   return (
-    <main className="dk-grid-bg min-h-dvh bg-zinc-950 pb-10">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
-        <div>
-          <Wordmark className="text-[14px] tracking-[0.16em]" />
-          <p className="mt-0.5 flex items-center gap-1 text-[9.5px] uppercase tracking-wider text-zinc-600">
-            <ShieldCheck className="h-2.5 w-2.5" />
-            {clientCode} · read-only
-          </p>
+    <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950 pb-10">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum/[0.08] blur-[110px]"
+      />
+
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-3.5 py-2.5 backdrop-blur">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-quantum/30 to-quantum/5 font-mono text-[11px] font-bold text-quantum ring-1 ring-quantum/40">
+            {clientCode.slice(0, 2).toUpperCase()}
+            <span className="absolute -bottom-px -right-px h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-zinc-950 animate-pulse-ring" />
+          </span>
+          <div className="leading-none">
+            <Wordmark className="text-[13px] tracking-[0.16em]" />
+            <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-400/80">
+              {clientCode}
+            </p>
+          </div>
         </div>
         <button
           onClick={() => void unpair()}
           disabled={signingOut}
-          className="flex h-7 items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400 transition-colors hover:border-rose-500/50 hover:text-rose-300"
+          className="flex h-7 items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2 text-[10px] font-semibold uppercase tracking-wider text-rose-300 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
         >
           <LogOut className="h-3 w-3" />
           Unpair
         </button>
       </header>
 
-      <div className="mx-auto max-w-md space-y-3 px-3 pt-3">
+      <div className="relative mx-auto max-w-md space-y-3 px-3 pt-3">
         {error ? (
           <div className="rounded border border-rose-500/40 bg-rose-500/10 p-2.5 text-[11px] text-rose-300">
             {error}
@@ -164,6 +180,19 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
 
         {ledger ? (
           <Card>
+            <CardHeader>
+              <CardTitle>Ledger</CardTitle>
+              <span
+                className={cn(
+                  "rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
+                  mode === "live"
+                    ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-400",
+                )}
+              >
+                {mode}
+              </span>
+            </CardHeader>
             <CardContent className="grid grid-cols-3 gap-2 p-3 text-center">
               <div>
                 <p className="dk-label">Open</p>
@@ -214,6 +243,10 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
             )}
           </CardContent>
         </Card>
+
+        <p className="pt-1 text-center font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-700">
+          DeltaK · DKMS
+        </p>
       </div>
     </main>
   );
