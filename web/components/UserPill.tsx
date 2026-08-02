@@ -447,6 +447,17 @@ export function UserPill({
             </span>
           </div>
 
+          {/*
+            Read-only phone companion — mints the moment the dropdown opens,
+            same as funds below. Angel One's own sign-in never renders on the
+            phone; this QR is the one thing it needs from here. Placed right
+            under identity, not buried below funds/book — pairing a phone is
+            as much "who's signed in" as the account details are.
+          */}
+          <Section title="Pair Mobile">
+            <PairMobileSection />
+          </Section>
+
           <Section title="Contact">
             <EditableRow
               icon={Mail}
@@ -534,15 +545,6 @@ export function UserPill({
               label="Logins recorded"
               value={profile?.logins ? String(profile.logins) : "—"}
             />
-          </Section>
-
-          {/*
-            Read-only phone companion — mints the moment the dropdown opens,
-            same as funds above. Angel One's own sign-in never renders on the
-            phone; this QR is the one thing it needs from here.
-          */}
-          <Section title="Pair Mobile">
-            <PairMobileSection />
           </Section>
 
           <div className="flex items-center gap-1.5 border-t border-zinc-800/80 p-2">
