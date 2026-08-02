@@ -28,17 +28,26 @@ export default function Icon() {
             width: 26,
             height: 26,
             borderRadius: 7,
-            // A solid dark tile, not the translucent cyan wash the same mark
-            // uses inside the app — there it always sits on the terminal's
-            // own dark background; a favicon has to hold its own against a
-            // light tab bar or bookmarks bar, so the square carries its
-            // background with it rather than depending on the page's.
-            border: "1.5px solid #00f0ff",
-            background: "#09090b",
+            border: "1.5px solid rgba(0,240,255,0.6)",
+            background: "rgba(0,240,255,0.14)",
           }}
         >
+          {/*
+            A solid dark fill made the whole tile too heavy — the pop against
+            a light background doesn't need to come from the square's own
+            background at all. A thin dark stroke on the bolt's own outline
+            does the same job in miniature: the cyan fill stays legible on
+            light or dark, and the stroke is what keeps its edges crisp
+            rather than blurring into a bright background.
+          */}
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
+            <path
+              d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"
+              fill="#00f0ff"
+              stroke="#09090b"
+              strokeWidth="1"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       </div>
