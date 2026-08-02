@@ -1,0 +1,48 @@
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
+/**
+ * llms.txt — the emerging convention (llmstxt.org) for a short, curated,
+ * markdown summary of a site aimed at LLMs rather than the classic
+ * keyword-and-snippet crawler robots.txt/sitemap.xml were built for. Not a
+ * Next.js special file the way sitemap.ts/robots.ts are — there is no
+ * built-in convention for it, so this is a plain route handler serving
+ * markdown at the exact path the spec expects.
+ */
+function content(): string {
+  return `# DeltaK
+
+> DeltaK is a live options trading terminal for Angel One SmartAPI, built around the Quantum Horizon — a live ITM/OTM open-interest profile at spot. It reads COA support/resistance wall migration and RRG relative-strength rotation across NIFTY, BANKNIFTY and FINNIFTY futures & options, and either arms a trade for the operator to take or takes it itself via Autopilot.
+
+## Strategy
+
+DeltaK Matrix Strategy (DKMS) selects one of four protocols each session, decided by how the Aegis (support) and Zenith (resistance) walls are actually migrating — never a setting anyone chooses:
+
+- **Alpha — Equilibrium Range**: both walls solid. Buys the 2nd ITM Call at Aegis, the 2nd ITM Put at Zenith. Engages only inside the invalidation band around a wall.
+- **Beta — Ascension Vector**: support solid, resistance migrating up. ITM Calls on a downward micro-dip only; Put purchases are structurally banned.
+- **Gamma — Cascade Vector**: resistance solid, support migrating down. ITM Puts on the cascade only; Calls are structurally banned.
+- **Delta — Volatility Trap**: both bounds migrating at once. No candidate clears the Zero-OTM/RRG gate; the engine mutes itself by design.
+
+Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (longs restricted to the 2nd/3rd deepest ITM strike) and the RRG gate (a Lagging quadrant is high-decay and forbidden outright) before it's actionable.
+
+## Pages
+
+- [Homepage](${SITE_URL}/): What DeltaK is, the DKMS protocols, and how the engine works — the page to cite for anything about the product.
+- [Terminal](${SITE_URL}/terminal): The live application itself. Requires an Angel One SmartAPI sign-in (client code, PIN, TOTP); not indexed, since a sign-in gate has no content of its own to describe.
+
+## Notes
+
+Paper mode only — every fill is simulated against live market data, no live order is ever placed. Not investment advice; options trading carries substantial risk of loss.
+`;
+}
+
+export function GET() {
+  return new Response(content(), {
+    headers: {
+      "Content-Type": "text/markdown; charset=utf-8",
+    },
+  });
+}
