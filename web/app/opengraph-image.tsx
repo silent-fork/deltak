@@ -72,22 +72,15 @@ export default function OpengraphImage() {
               width: 76,
               height: 76,
               borderRadius: 16,
-              border: "3px solid #00f0ff",
-              background: "rgba(0,240,255,0.08)",
-              // Same treatment as the favicon: a thin dark-teal ring outside
-              // the cyan border, not black — flat black against the cyan
-              // read as a harsh cutout rather than a deliberate edge.
-              boxShadow: "0 0 0 2px #083344",
+              // Same values as the favicon and the homepage nav icon —
+              // border-quantum/40, bg-quantum/10 — so the mark is identical
+              // everywhere it appears rather than its own one-off treatment.
+              border: "3px solid rgba(0,240,255,0.4)",
+              background: "rgba(0,240,255,0.1)",
             }}
           >
             <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"
-                fill="#00f0ff"
-                stroke="#083344"
-                strokeWidth="1"
-                strokeLinejoin="round"
-              />
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
             </svg>
           </div>
           <div
@@ -100,7 +93,13 @@ export default function OpengraphImage() {
             }}
           >
             <span style={{ display: "flex" }}>DELTA</span>
-            <span style={{ display: "flex", color: "#00f0ff" }}>K</span>
+            {/* satori lays out each colour run as its own flex box, so the
+                gap between "DELTA" and "K" is real box-to-box spacing, not
+                inline text flow like a real browser — pulled back in with a
+                negative margin rather than left as two separate words. */}
+            <span style={{ display: "flex", color: "#00f0ff", marginLeft: -8 }}>
+              K
+            </span>
           </div>
         </div>
 
