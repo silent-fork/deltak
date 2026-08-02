@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
@@ -176,7 +176,14 @@ const HEAD_TITLE: Record<string, string> = {
   LTP: "Last traded premium and its change on the day.",
 };
 
-export function OptionChainMatrix({
+/**
+ * Memoized: this renders a ~25-strike × 2-leg table (six cells a leg) and
+ * re-mapping it is real work. `chain` is a fresh object only when the engine
+ * actually rebuilt it — the 1 Hz loop skips both the rebuild and the
+ * snapshot paint on a tick that changed nothing — so a shallow-equal `chain`
+ * (and `signalToken`) reliably means there is nothing new to draw.
+ */
+export const OptionChainMatrix = memo(function OptionChainMatrix({
   chain,
   signalToken,
 }: {
@@ -350,4 +357,4 @@ export function OptionChainMatrix({
       </div>
     </Card>
   );
-}
+});

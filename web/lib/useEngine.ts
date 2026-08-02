@@ -59,6 +59,13 @@ import { api } from "@/lib/api";
 const TICK_INTERVAL_MS = 1000;
 const RESYNC_EVERY_TICKS = 30;
 /**
+ * Force a repaint at least this often, even if the dirty-check below found
+ * nothing worth painting for. A safety net against staleness in whatever it
+ * doesn't explicitly track (e.g. the tracked-token count after a resync) —
+ * not the thing doing the actual work of keeping the board current.
+ */
+const HEARTBEAT_MS = 5_000;
+/**
  * How often open positions are checkpointed to Supabase.
  *
  * Entries and exits write immediately; this is what keeps the marks on a
@@ -177,6 +184,29 @@ export function useEngine(simulate: boolean) {
   const modeRef = useRef<ExecutionMode>("paper");
   const sessionRef = useRef<EngineSession>(NO_SESSION);
   const busyRef = useRef(false);
+
+  /**
+   * `buildSnapshot`'s RRG-node cache, per underlying: the chain each
+   * underlying's node list was last computed from, and that list itself. A
+   * `chainsRef.current[u]` that is still the same object the cache was built
+   * from means nothing that feeds the RRG changed, so the old array is handed
+   * back rather than re-walked.
+   */
+  const lastRrgChainRef = useRef<Record<string, OptionChain | undefined>>({});
+  const lastRrgNodesRef = useRef<Record<string, RrgNode[]>>({});
+
+  /**
+   * What `setSnapshot` was last called with, so the 1 Hz loop can tell a tick
+   * that changed nothing from one that did — see the dirty-check in `tick`.
+   */
+  const lastRevisionRef = useRef(-1);
+  const lastEventsCountRef = useRef(-1);
+  const lastMarketOpenRef = useRef<boolean | null>(null);
+  const lastFeedLiveRef = useRef<boolean | null>(null);
+  const lastSettledRef = useRef<boolean | null>(null);
+  const lastRenderAtRef = useRef(0);
+  /** Skip repainting a tab nobody is looking at; the engine keeps running. */
+  const hiddenRef = useRef(false);
 
   const streamRef = useRef<SmartStreamClient | null>(null);
   const simRef = useRef<SimulatedFeed | null>(null);
@@ -416,9 +446,22 @@ export function useEngine(simulate: boolean) {
       };
     }
 
+    /**
+     * The RRG node list only depends on the chain it was built from — never
+     * on the calendar — so a `buildSnapshot` call that fires because the
+     * ledger or the event log changed (not because any chain rebuilt) can
+     * hand back the exact array it handed back last time. That is what lets
+     * `RrgScatter` (a Recharts SVG plot) bail out of re-rendering on a
+     * snapshot that has nothing new for it.
+     */
     const rrgNodes: Record<string, RrgNode[]> = {};
     for (const u of UNDERLYINGS) {
       const chain = chainsRef.current[u];
+      if (chain && lastRrgChainRef.current[u] === chain) {
+        rrgNodes[u] = lastRrgNodesRef.current[u] ?? [];
+        continue;
+      }
+
       const engine = rrgRef.current[u];
       const nodes: RrgNode[] = [];
       if (chain && engine) {
@@ -446,6 +489,8 @@ export function useEngine(simulate: boolean) {
         }
       }
       rrgNodes[u] = nodes;
+      lastRrgChainRef.current[u] = chain;
+      lastRrgNodesRef.current[u] = nodes;
     }
 
     return {
@@ -561,11 +606,64 @@ export function useEngine(simulate: boolean) {
         }
       }
 
-      setSnapshot(buildSnapshot());
+      /*
+       * Paint only when something in the snapshot could actually be
+       * different. `plan.rebuild` covers new prints and freshly replayed
+       * history; the ledger's own revision counter covers a fill, an exit or
+       * a mark that moved a P&L (guards run on every trading tick whether or
+       * not they act, so they are not by themselves a reason to paint); the
+       * event count covers a log line with nothing else attached to it; and
+       * the market-open/feed/settled flags cover the clock crossing a
+       * session boundary on its own, with no print to carry the news. The
+       * heartbeat is the backstop for anything this list missed.
+       */
+      const marketOpenNow = isMarketOpen();
+      const feedLiveNow = feedLive();
+      const eventsCount = eventsRef.current.length;
+      const ledgerRevision = ledger.revision;
+      const now = Date.now();
+      const dirty =
+        plan.rebuild ||
+        ledgerRevision !== lastRevisionRef.current ||
+        eventsCount !== lastEventsCountRef.current ||
+        marketOpenNow !== lastMarketOpenRef.current ||
+        feedLiveNow !== lastFeedLiveRef.current ||
+        plan.settled !== lastSettledRef.current ||
+        now - lastRenderAtRef.current >= HEARTBEAT_MS;
+
+      if (dirty) {
+        lastRevisionRef.current = ledgerRevision;
+        lastEventsCountRef.current = eventsCount;
+        lastMarketOpenRef.current = marketOpenNow;
+        lastFeedLiveRef.current = feedLiveNow;
+        lastSettledRef.current = plan.settled;
+        lastRenderAtRef.current = now;
+        // The engine (guards, mark-to-market, checkpointing) has already run
+        // above regardless; a hidden tab only skips the paint, never the work
+        // that keeps circuit breakers and the ledger honest.
+        if (!hiddenRef.current) setSnapshot(buildSnapshot());
+      }
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, buildSnapshot, log, spotMap]);
+  }, [bookExit, bookScaleOut, buildSnapshot, feedLive, log, spotMap]);
+
+  /**
+   * Repaint the instant the tab comes back into view, rather than leaving it
+   * on whatever was on screen when it was hidden until the next dirty tick.
+   */
+  useEffect(() => {
+    const onVisibility = () => {
+      const hidden = document.visibilityState === "hidden";
+      hiddenRef.current = hidden;
+      if (!hidden) {
+        lastRenderAtRef.current = Date.now();
+        setSnapshot(buildSnapshot());
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [buildSnapshot]);
 
   /* --------------------------------------------------------- lifecycle */
 

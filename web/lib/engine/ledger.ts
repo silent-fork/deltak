@@ -34,6 +34,13 @@ export class Ledger {
   startingCapital: number;
   realised = 0;
   charges = 0;
+  /**
+   * Bumped on every state change that would alter what `snapshot()` returns —
+   * open/close/reduce/reset always, `markToMarket` only when a mark actually
+   * moved. The 1 Hz loop reads this to decide whether the board has anything
+   * new to paint, so it must never be bumped for a no-op pass.
+   */
+  revision = 0;
 
   constructor(
     capital: number,
@@ -115,6 +122,7 @@ export class Ledger {
     const cost = this.legCharges(pos.side, pos.avg_price, pos.quantity);
     this.charges = r2(this.charges + cost);
     this.capital = r2(this.capital - cost);
+    this.revision += 1;
     return pos;
   }
 
@@ -145,6 +153,7 @@ export class Ledger {
     this.charges = r2(this.charges + cost);
     this.capital = r2(this.capital + pnl - cost);
     this.closed.push(pos);
+    this.revision += 1;
     return pos;
   }
 
@@ -166,19 +175,26 @@ export class Ledger {
     const cost = this.legCharges(pos.side === "BUY" ? "SELL" : "BUY", r2(price), qty);
     this.charges = r2(this.charges + cost);
     this.capital = r2(this.capital + pnl - cost);
+    this.revision += 1;
     return pos;
+  }
+
+  /** True if marking `pos` to `ltp` would leave it exactly as it is. */
+  private static markIsNoop(pos: Position, ltp: number): boolean {
+    return pos.ltp === r2(ltp);
   }
 
   markToMarket(ticks: TickStore): void {
     for (const pos of this.positions.values()) {
       const ltp = ticks.ltp(pos.token, pos.ltp);
-      if (ltp <= 0) continue;
+      if (ltp <= 0 || Ledger.markIsNoop(pos, ltp)) continue;
       const direction = pos.side === "BUY" ? 1 : -1;
       pos.ltp = r2(ltp);
       pos.unrealised_pnl = r2((ltp - pos.avg_price) * pos.quantity * direction);
       pos.pnl_pct = pos.avg_price
         ? r2(((ltp - pos.avg_price) / pos.avg_price) * 100 * direction)
         : 0;
+      this.revision += 1;
     }
   }
 
@@ -232,5 +248,6 @@ export class Ledger {
     this.charges = 0;
     this.positions.clear();
     this.closed = [];
+    this.revision += 1;
   }
 }

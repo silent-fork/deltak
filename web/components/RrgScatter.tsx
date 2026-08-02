@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
   ReferenceArea,
@@ -72,7 +72,14 @@ function NodeDot(props: {
   );
 }
 
-export function RrgScatter({
+/**
+ * Memoized: this is a Recharts `ScatterChart` (a full SVG layout pass), and
+ * `nodes` only gets a new array when the engine's RRG cache actually
+ * recomputed it — see the per-underlying cache in `useEngine`'s
+ * `buildSnapshot`. A shallow-equal `nodes` means the plot has nothing new to
+ * lay out.
+ */
+export const RrgScatter = memo(function RrgScatter({
   nodes,
   highlightToken,
   signal,
@@ -363,4 +370,4 @@ export function RrgScatter({
       </CardContent>
     </Card>
   );
-}
+});

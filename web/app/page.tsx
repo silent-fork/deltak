@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
 import { EngineProvider } from "@/components/EngineProvider";
@@ -26,6 +26,13 @@ export default function TerminalPage() {
   const selected = engine.focus;
   const setSelected = engine.setFocus;
   const [, forceRefresh] = useState(0);
+  /**
+   * One stable identity for "something outside the engine loop happened, redraw."
+   * Handed to the memoized panels below as-is — a fresh arrow function on every
+   * render would defeat their `React.memo` the moment any of them took it as a
+   * prop, since a new function is never `===` the last one.
+   */
+  const bumpRefresh = useCallback(() => forceRefresh((n) => n + 1), []);
 
   const { snapshot, streamStatus, simulated, demo, error, market } = engine;
 
@@ -134,7 +141,7 @@ export default function TerminalPage() {
           selected={selected}
           events={snapshot?.events ?? []}
           onSelect={(u) => setSelected(u as Underlying)}
-          onRefreshStatus={() => forceRefresh((n) => n + 1)}
+          onRefreshStatus={bumpRefresh}
         />
 
         {degraded ? (
@@ -196,9 +203,9 @@ export default function TerminalPage() {
                 signal={signal}
                 mode={snapshot?.mode ?? "paper"}
                 chain={chain}
-                onExecuted={() => forceRefresh((n) => n + 1)}
+                onExecuted={bumpRefresh}
                 ledger={snapshot?.ledger}
-                onLedgerChanged={() => forceRefresh((n) => n + 1)}
+                onLedgerChanged={bumpRefresh}
               />
             </aside>
           </section>

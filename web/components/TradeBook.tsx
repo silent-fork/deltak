@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -213,7 +213,13 @@ function PositionCard({
   );
 }
 
-export function TradeBook({
+/**
+ * Memoized: `ledger` is a fresh object only when the ledger's own revision
+ * actually moved (a fill, an exit, a mark that changed), and `onChanged` /
+ * `onRefreshArchive` are stabilized at their call sites — see `SignalDeck`
+ * and `TerminalPage`. A shallow-equal prop set means an identical book.
+ */
+export const TradeBook = memo(function TradeBook({
   ledger,
   onChanged,
   archive,
@@ -447,4 +453,4 @@ export function TradeBook({
       </div>
     </>
   );
-}
+});

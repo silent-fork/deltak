@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { SignalPanel } from "@/components/SignalPanel";
 import { TradeBook } from "@/components/TradeBook";
@@ -28,7 +28,14 @@ import { PROTOCOL_META, cn, pnlTone, signedMoney } from "@/lib/utils";
 
 type Deck = "signal" | "book";
 
-export function SignalDeck({
+/**
+ * Memoized: `TradeBook` and `SignalPanel` underneath are each their own real
+ * chunk of work, and this only needs to redraw when its own inputs — not
+ * some unrelated part of the snapshot — actually changed. `onExecuted` and
+ * `onLedgerChanged` must stay referentially stable at the call site for that
+ * to mean anything.
+ */
+export const SignalDeck = memo(function SignalDeck({
   signal,
   mode,
   chain,
@@ -54,6 +61,12 @@ export function SignalDeck({
    */
   const { archive, loading: archiveLoading, error: archiveError, reload: reloadArchive } =
     useTradeArchive();
+  // `TradeBook` is memoized too; wrapping `reloadArchive` here rather than
+  // inline in its JSX prop keeps that identity stable across renders that
+  // don't touch the archive, instead of a fresh closure defeating the memo.
+  const handleRefreshArchive = useCallback(() => {
+    void reloadArchive();
+  }, [reloadArchive]);
 
   // The badge and the header total read the same merged book the trade tab
   // itself renders — live ledger plus whatever Supabase still holds from a
@@ -135,9 +148,9 @@ export function SignalDeck({
           archive={archive}
           archiveLoading={archiveLoading}
           archiveError={archiveError}
-          onRefreshArchive={() => void reloadArchive()}
+          onRefreshArchive={handleRefreshArchive}
         />
       )}
     </Card>
   );
-}
+});

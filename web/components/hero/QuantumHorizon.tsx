@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
@@ -54,7 +54,13 @@ const TH = 100;
  * price has to travel to reach either bound.
  */
 
-export function QuantumHorizon({
+/**
+ * Memoized: this drives its own live-tick spot trace (`useSpotTrace`), so the
+ * only reason it needs to redraw from the outside is a genuinely new `chain`,
+ * `quote`, `candles`, or `stats` — all of which already only change identity
+ * when the engine or the market-data poll actually produced something new.
+ */
+export const QuantumHorizon = memo(function QuantumHorizon({
   chain,
   quote,
   candles = [],
@@ -688,4 +694,4 @@ export function QuantumHorizon({
       </CardContent>
     </Card>
   );
-}
+});

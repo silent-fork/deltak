@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { memo } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -346,7 +347,9 @@ function Wall({
   );
 }
 
-export function CoaMatrixPanel({
+/** Memoized: identical props (the common case on a tick that changed nothing
+ * upstream) means an identical wall read-out — skip the re-render. */
+export const CoaMatrixPanel = memo(function CoaMatrixPanel({
   chain,
   aegisOi = [],
   zenithOi = [],
@@ -649,4 +652,4 @@ export function CoaMatrixPanel({
       </CardContent>
     </Card>
   );
-}
+});
