@@ -30,9 +30,10 @@ const SITE_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
-const TITLE = "DeltaK Terminal — Angel One Options Trading HUD";
+const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal for Angel One";
 const DESCRIPTION =
-  "DeltaK Matrix Strategy (DKMS): a live options trading terminal for Angel One SmartAPI. " +
+  "DeltaK Matrix Strategy (DKMS): a live options trading terminal for Angel One SmartAPI, " +
+  "built around the Quantum Horizon — a live ITM/OTM open-interest profile at spot. " +
   "COA support/resistance wall tracking, RRG relative-strength rotation and signal-driven " +
   "Autopilot execution across NIFTY, BANKNIFTY and FINNIFTY futures & options.";
 
@@ -58,6 +59,7 @@ export const metadata: Metadata = {
     "intraday options strategy",
     "relative strength rotation",
     "RRG",
+    "Quantum Horizon",
     "DeltaK",
     "DKMS",
     "paper trading",
