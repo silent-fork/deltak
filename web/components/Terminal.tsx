@@ -70,16 +70,49 @@ export function Terminal() {
    * always settle (each catches its own errors), but live chain data never
    * comes with that guarantee — a dead feed or a market that never opens
    * today would otherwise leave the boot screen spinning forever. Once the
-   * session check has settled, real data gets a few seconds to show up before
-   * this falls through to the dashboard's own per-panel skeletons regardless.
+   * session check has settled, real data gets a stretch of time to show up
+   * before this falls through to the dashboard's own per-panel skeletons
+   * regardless. Wide enough to cover the WS feed actually ticking most of a
+   * fresh chain's strikes, which is the slow part of the boot, not a guess at
+   * "a few seconds."
    */
   const [dataTimedOut, setDataTimedOut] = useState(false);
   useEffect(() => {
     if (!engine.sessionChecked || dataTimedOut) return;
-    const id = setTimeout(() => setDataTimedOut(true), 4000);
+    const id = setTimeout(() => setDataTimedOut(true), 8000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.sessionChecked]);
+
+  /**
+   * `chain.rows` exists the instant the scrip master builds the strike ladder
+   * — every row's `oi`/`volume`/`ltp` only ever come from a live WS tick, and
+   * start at zero, so a row count alone says nothing about whether the feed
+   * has actually quoted anything yet. This is the same fraction RRG and
+   * Quantum Horizon each compute internally to decide when their own
+   * "maturing" overlays can drop; the boot screen needs the same bar so it
+   * doesn't hand off to the board before those overlays already would.
+   */
+  const LEG_READY_FRACTION = 0.9;
+  const legMaturity = useMemo(() => {
+    if (!chain?.rows.length) return { matured: 0, expected: 0 };
+    let matured = 0;
+    let expected = 0;
+    for (const row of chain.rows) {
+      if (row.call) {
+        expected += 1;
+        if (row.call.oi > 0) matured += 1;
+      }
+      if (row.put) {
+        expected += 1;
+        if (row.put.oi > 0) matured += 1;
+      }
+    }
+    return { matured, expected };
+  }, [chain]);
+  const legsReady =
+    legMaturity.expected > 0 &&
+    legMaturity.matured >= Math.ceil(legMaturity.expected * LEG_READY_FRACTION);
 
   /**
    * Every panel but RRG gates its own paint on this same tick's data, just on
@@ -87,16 +120,18 @@ export function Terminal() {
    * strike row, Quantum Horizon's profile needs two (a single strike can't
    * plot a spread), and the signal deck needs a signal — which only exists
    * once the engine has evaluated *a* chain for this underlying, so it never
-   * lags `chain` by more than the same tick. Combining them is what makes one
-   * boot screen stand in for all four instead of each painting on its own
-   * schedule a second or two apart.
+   * lags `chain` by more than the same tick. `legsReady` on top of all that
+   * is what actually keeps the boot screen up until the numbers in those
+   * panels are real, not just a ladder of strikes with every cell reading
+   * zero. Combining them is what makes one boot screen stand in for all four
+   * instead of each painting on its own schedule a second or two apart.
    *
    * RRG is deliberately left out: it has its own translucent "maturing"
    * overlay for the long tail of nodes that seed in over several ticks, and
    * gating the whole board on that would hold the boot screen up long after
    * everything else is real.
    */
-  const dataReady = !!chain && chain.rows.length >= 2 && !!signal;
+  const dataReady = !!chain && chain.rows.length >= 2 && !!signal && legsReady;
   const bootStages = [
     { done: engine.sessionChecked },
     { done: engine.masterReady },
