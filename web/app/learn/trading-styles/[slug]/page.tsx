@@ -43,29 +43,29 @@ export default async function TradingStylePage({ params }: { params: Promise<{ s
         { label: style.name },
       ]}
     >
-      <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
+      <section className="relative mx-auto max-w-4xl px-5 pb-6 pt-4">
         <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
           <Clock3 className="h-3 w-3 shrink-0" />
           {style.durationLabel}
         </span>
         <h1 className="mt-4 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">{style.name}</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
+        <p className="mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
           {style.summary}
         </p>
-        <div className="mx-auto mt-5 max-w-sm">
+        <div className="mt-5 max-w-sm">
           <TimeHorizonBar activeSlug={style.slug} />
         </div>
-        <p className="mx-auto mt-2 max-w-2xl text-balance text-[11.5px] leading-relaxed text-zinc-600">
+        <p className="mt-2 max-w-2xl text-balance text-[11.5px] leading-relaxed text-zinc-600">
           {style.horizon}
         </p>
         {style.slug === "options-buying-vs-selling" && (
-          <div className="mx-auto mt-6 max-w-md">
+          <div className="mt-6 max-w-md">
             <BuySellBalance />
           </div>
         )}
       </section>
 
-      <section className="relative mx-auto max-w-3xl px-5 pb-8">
+      <section className="relative mx-auto max-w-4xl px-5 pb-8">
         <div className="dk-panel space-y-3 rounded-lg p-5">
           <h2 className="text-[13px] font-semibold text-zinc-100">How it works</h2>
           {style.howItWorks.map((p, i) => (
@@ -76,14 +76,25 @@ export default async function TradingStylePage({ params }: { params: Promise<{ s
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-3xl px-5 pb-8">
+      <section className="relative mx-auto max-w-4xl px-5 pb-8">
+        <div className="dk-panel space-y-3 rounded-lg p-5">
+          <h2 className="text-[13px] font-semibold text-zinc-100">Worked example</h2>
+          {style.exampleTrade.map((p, i) => (
+            <p key={i} className="text-[12.5px] leading-relaxed text-zinc-400">
+              {p}
+            </p>
+          ))}
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-4xl px-5 pb-8">
         <div className="dk-panel rounded-lg p-5">
           <h2 className="text-[13px] font-semibold text-zinc-100">Who it suits</h2>
           <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-400">{style.suitedFor}</p>
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-3xl px-5 pb-10">
+      <section className="relative mx-auto max-w-4xl px-5 pb-10">
         <div className="dk-panel rounded-lg p-5">
           <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-zinc-100">
             <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
@@ -99,7 +110,7 @@ export default async function TradingStylePage({ params }: { params: Promise<{ s
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-3xl px-5 pb-10">
+      <section className="relative mx-auto max-w-4xl px-5 pb-10">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Other trading styles</h2>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           {others.map((o) => (

@@ -32,8 +32,11 @@ export function TimeHorizonBar({ activeSlug }: { activeSlug: string }) {
         })}
       </div>
       <div className="mt-1 flex text-[8px] uppercase tracking-wider text-zinc-600">
-        {ZONES.map((z) => (
-          <span key={z.slug} style={{ width: `${z.width}%` }} className="truncate">
+        {ZONES.map((z, i) => (
+          <span
+            key={z.slug}
+            className={`flex-1 whitespace-nowrap ${i === 0 ? "text-left" : i === ZONES.length - 1 ? "text-right" : "text-center"}`}
+          >
             {z.label}
           </span>
         ))}

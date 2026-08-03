@@ -61,8 +61,8 @@ export default function LearnHubPage() {
         </p>
       </section>
 
-      <section className="relative mx-auto max-w-4xl px-5 pb-14">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section className="relative mx-auto max-w-6xl px-5 pb-14">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {SECTIONS.map((s) => (
             <Link
               key={s.href}
@@ -83,7 +83,7 @@ export default function LearnHubPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-4xl px-5 pb-4">
+      <section className="relative mx-auto max-w-6xl px-5 pb-4">
         <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
           DeltaK&apos;s own terminology
         </h2>

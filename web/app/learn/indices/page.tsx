@@ -31,12 +31,12 @@ export default function IndicesHubPage() {
         </p>
       </section>
 
-      <section className="relative mx-auto max-w-4xl px-5 pb-8">
+      <section className="relative mx-auto max-w-6xl px-5 pb-8">
         <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Lot size by index</h2>
         <LotSizeBars indices={INDICES} />
       </section>
 
-      <section className="relative mx-auto max-w-4xl px-5 pb-8">
+      <section className="relative mx-auto max-w-6xl px-5 pb-8">
         <div className="dk-panel overflow-x-auto rounded-lg">
           <table className="w-full min-w-[560px] text-left text-[12.5px]">
             <thead>

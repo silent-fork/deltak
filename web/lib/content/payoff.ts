@@ -152,3 +152,48 @@ export function computePayoff(legs: Leg[], example: PayoffExample): PayoffSummar
     netCreditPerShare,
   };
 }
+
+const inr = (n: number) => `₹${Math.round(Math.abs(n)).toLocaleString("en-IN")}`;
+
+/**
+ * A worked "say you did this" walkthrough, built entirely from the same
+ * leg definitions and `computePayoff` output the chart and stats panel
+ * already render — so the strikes, premiums and P&L in the prose can never
+ * drift out of sync with the numbers printed next to it.
+ */
+export function tradeIdeaNarrative(legs: Leg[], example: PayoffExample): string[] {
+  const summary = computePayoff(legs, example);
+  const legPhrases = legs.map((leg) => {
+    const strike = strikeFor(example, leg.offset);
+    const premium = premiumFor(leg.type, leg.offset);
+    const qty = leg.qty ?? 1;
+    const label = leg.type === "call" ? "call" : "put";
+    return `${leg.action} the ${qty > 1 ? `${qty}x ` : ""}${strike} ${label} for ${inr(premium)}`;
+  });
+  const joined =
+    legPhrases.length === 1
+      ? legPhrases[0]
+      : legPhrases.length === 2
+        ? legPhrases.join(", and you ")
+        : `${legPhrases.slice(0, -1).join(", ")}, and ${legPhrases[legPhrases.length - 1]}`;
+
+  const netPerLot = summary.netCreditPerShare * example.lotSize;
+  const setup =
+    `Say ${example.underlying} is trading around ${example.spot.toLocaleString("en-IN")} with a few sessions left ` +
+    `before expiry. You ${joined} — a net ${netPerLot >= 0 ? "credit" : "debit"} of ${inr(netPerLot)} for one lot of ${example.lotSize}.`;
+
+  const profitClause = summary.unlimitedProfit
+    ? "an amount that keeps growing the further it runs, with no cap"
+    : `${inr(summary.maxProfit)} per lot`;
+  const lossClause = summary.unlimitedLoss
+    ? "an open-ended loss that grows the further it moves against you"
+    : `${inr(summary.maxLoss)} per lot`;
+
+  const outcome = summary.breakevens.length
+    ? `At expiry, the position is worth the most once ${example.underlying} is on the right side of ${
+        summary.breakevens.length === 1 ? summary.breakevens[0] : `${summary.breakevens[0]} or ${summary.breakevens[summary.breakevens.length - 1]}`
+      } — up to ${profitClause}. Move against that line instead and the worst case is capped at ${lossClause}, not open-ended.`
+    : `At expiry the position's value is capped at ${profitClause} on the upside and ${lossClause} on the downside, regardless of where ${example.underlying} finishes.`;
+
+  return [setup, outcome];
+}

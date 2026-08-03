@@ -24,7 +24,7 @@ const CATEGORIES: StrategyCategory[] = ["Bullish", "Bearish", "Volatility", "Neu
 export default function StrategiesHubPage() {
   return (
     <LearnChrome ctaLocation="learn-strategies-hub" crumbs={[{ label: "Learn", href: "/learn" }, { label: "Strategies" }]}>
-      <section className="relative mx-auto max-w-5xl px-5 pb-8 pt-4 text-center">
+      <section className="relative mx-auto max-w-4xl px-5 pb-8 pt-4 text-center">
         <h1 className="text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
           Options trading strategies, from a single leg to defined-risk advanced structures
         </h1>
@@ -38,7 +38,7 @@ export default function StrategiesHubPage() {
       {CATEGORIES.map((category) => {
         const items = STRATEGIES.filter((s) => s.category === category);
         return (
-          <section key={category} className="relative mx-auto max-w-5xl px-5 pb-10">
+          <section key={category} className="relative mx-auto max-w-6xl px-5 pb-10">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{category}</h2>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((s) => (

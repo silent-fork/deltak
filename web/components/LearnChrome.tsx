@@ -26,7 +26,7 @@ export function LearnChrome({
         className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.07] blur-[140px]"
       />
 
-      <header className="relative mx-auto flex max-w-4xl items-center justify-between px-5 py-5">
+      <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <Link href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
             <Zap className="h-4 w-4 text-quantum" />
@@ -45,7 +45,7 @@ export function LearnChrome({
 
       <nav
         aria-label="Breadcrumb"
-        className="relative mx-auto flex max-w-4xl flex-wrap items-center gap-1.5 px-5 pb-2 font-mono text-[10.5px] uppercase tracking-wider text-zinc-600"
+        className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-5 pb-2 font-mono text-[10.5px] uppercase tracking-wider text-zinc-600"
       >
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
@@ -82,7 +82,7 @@ export function LearnChrome({
         </div>
       </section>
 
-      <footer className="relative mx-auto max-w-4xl px-5 pb-8 text-center text-[10px] leading-relaxed text-zinc-600">
+      <footer className="relative mx-auto max-w-6xl px-5 pb-8 text-center text-[10px] leading-relaxed text-zinc-600">
         <p>
           Educational content only, not investment advice. Options trading carries substantial risk
           of loss — examples on this page use illustrative figures, not live market quotes.

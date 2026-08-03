@@ -34,9 +34,9 @@ export default function GlossaryHubPage() {
       {GLOSSARY_CATEGORIES.map((category) => {
         const items = GLOSSARY.filter((g) => g.category === category);
         return (
-          <section key={category} className="relative mx-auto max-w-4xl px-5 pb-10">
+          <section key={category} className="relative mx-auto max-w-6xl px-5 pb-10">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{category}</h2>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((g) => (
                 <Link
                   key={g.slug}

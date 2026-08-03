@@ -31,8 +31,8 @@ export default function TradingStylesHubPage() {
         </p>
       </section>
 
-      <section className="relative mx-auto max-w-4xl px-5 pb-12">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section className="relative mx-auto max-w-6xl px-5 pb-12">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {TRADING_STYLES.map((s) => (
             <Link
               key={s.slug}

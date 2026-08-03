@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 
 import { ComplexityBadge, LearnChrome } from "@/components/LearnChrome";
 import { legStrikeLabel, PayoffChart } from "@/components/PayoffChart";
-import { computePayoff } from "@/lib/content/payoff";
+import { computePayoff, tradeIdeaNarrative } from "@/lib/content/payoff";
 import { getStrategy, STRATEGIES, STRATEGY_EXAMPLE } from "@/lib/content/strategies";
 
 export const dynamic = "error";
@@ -37,6 +37,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
   if (!strategy) notFound();
 
   const summary = computePayoff(strategy.legs, STRATEGY_EXAMPLE);
+  const tradeIdea = tradeIdeaNarrative(strategy.legs, STRATEGY_EXAMPLE);
   const others = STRATEGIES.filter((s) => s.slug !== strategy.slug && s.category === strategy.category).slice(0, 3);
 
   const jsonLd = {
@@ -73,7 +74,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
             {strategy.name}
           </h1>
           <p className="mt-1 text-[13px] font-semibold uppercase tracking-wide text-quantum">{strategy.outlook}</p>
-          <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
+          <p className="mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
             {strategy.summary}
           </p>
         </section>
@@ -136,6 +137,19 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
             <div className="dk-panel rounded-lg p-4">
               <h2 className="text-[13px] font-semibold text-zinc-100">When to deploy it</h2>
               <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-400">{strategy.idealScenario}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative mx-auto max-w-4xl px-5 pb-8">
+          <div className="dk-panel rounded-lg p-4">
+            <h2 className="text-[13px] font-semibold text-zinc-100">Worked example</h2>
+            <div className="mt-2 space-y-2.5">
+              {tradeIdea.map((para, i) => (
+                <p key={i} className="text-[12.5px] leading-relaxed text-zinc-400">
+                  {para}
+                </p>
+              ))}
             </div>
           </div>
         </section>

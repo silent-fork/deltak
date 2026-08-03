@@ -9,6 +9,12 @@ import { OiBuildupMatrix } from "@/components/OiBuildupMatrix";
 import { ThetaCurve } from "@/components/ThetaCurve";
 import { getGlossaryTerm, GLOSSARY } from "@/lib/content/glossary";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 const MONEYNESS_TERMS: Record<string, "itm" | "atm" | "otm" | "moneyness"> = {
   "at-the-money-atm": "atm",
   "in-the-money-itm": "itm",
@@ -48,7 +54,7 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
     "@type": "DefinedTerm",
     name: entry.term,
     description: entry.shortDef,
-    inDefinedTermSet: "https://deltak-terminal.vercel.app/learn/glossary",
+    inDefinedTermSet: `${SITE_URL}/learn/glossary`,
   };
 
   return (
@@ -62,19 +68,19 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
           { label: entry.term },
         ]}
       >
-        <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
+        <section className="relative mx-auto max-w-4xl px-5 pb-6 pt-4">
           <span className="inline-block shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             {entry.category}
           </span>
           <h1 className="mt-3 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
             {entry.term}
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-balance text-[14px] leading-relaxed text-zinc-300">
+          <p className="mt-3 max-w-2xl text-balance text-[14px] leading-relaxed text-zinc-300">
             {entry.shortDef}
           </p>
         </section>
 
-        <section className="relative mx-auto max-w-3xl px-5 pb-8">
+        <section className="relative mx-auto max-w-4xl px-5 pb-8">
           <div className="dk-panel space-y-3 rounded-lg p-5">
             {entry.body.map((para, i) => (
               <p key={i} className="text-[13px] leading-relaxed text-zinc-400">
@@ -100,7 +106,7 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
         </section>
 
         {related.length > 0 && (
-          <section className="relative mx-auto max-w-3xl px-5 pb-10">
+          <section className="relative mx-auto max-w-4xl px-5 pb-10">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Related terms</h2>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {related.map((r) => (
