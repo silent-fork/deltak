@@ -589,18 +589,36 @@ export function useEngine(simulate: boolean) {
       if (plan.rebuild) {
         for (const u of UNDERLYINGS) {
           const builder = buildersRef.current[u];
-          const engine = signalEnginesRef.current[u];
-          if (!builder || !engine) continue;
+          if (!builder) continue;
           const spot = ticksRef.current.ltp(master.spotToken(u));
           // Rotation advances on real prints in a live session, and on nothing
           // else — a replayed session must survive the loop that follows it.
-          const chain = builder.build(master, ticksRef.current, spot, plan.advance);
-          chainsRef.current[u] = chain;
-          signalsRef.current[u] = engine.evaluate(chain, master, cap, free, {
-            marketPcr: marketRef.current?.pcr[u] ?? null,
-            buildupClass: marketRef.current?.buildup[u] ?? null,
-          });
+          chainsRef.current[u] = builder.build(master, ticksRef.current, spot, plan.advance);
         }
+      }
+
+      /**
+       * Signals are re-evaluated every tick, not gated on `plan.rebuild` like
+       * the chain above: `trading` has to take effect the instant the market
+       * closes, and the tick right after the bell is exactly one where
+       * nothing else changed enough to trigger a rebuild — a signal gated on
+       * `rebuild` would keep showing whatever was actionable one second
+       * before close until the next replay/seed happened to land. Cheap: it
+       * rides on whatever chain already exists, real or carried over.
+       */
+      for (const u of UNDERLYINGS) {
+        const engine = signalEnginesRef.current[u];
+        const chain = chainsRef.current[u];
+        if (!engine || !chain) continue;
+        signalsRef.current[u] = engine.evaluate(chain, master, cap, free, {
+          marketPcr: marketRef.current?.pcr[u] ?? null,
+          buildupClass: marketRef.current?.buildup[u] ?? null,
+          // `plan.guards` is exactly `planTick`'s own `marketOpen || simulated`
+          // (see loop.ts) — reused here rather than recomputed, so there is
+          // one source of truth for "is there a real market right now" and
+          // the signal engine never proposes a trade off replayed history.
+          trading: plan.guards,
+        });
       }
 
       if (plan.guards) {

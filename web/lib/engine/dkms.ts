@@ -69,6 +69,15 @@ export interface EvaluateContext {
   marketPcr?: number | null;
   /** This underlying's near-expiry futures OIBuildup class, if fetched. */
   buildupClass?: OiBuildupType | null;
+  /**
+   * Whether there is a real (or simulated) market to trade in right now —
+   * `useEngine`'s own `trading = marketOpen || simulated`, the same flag
+   * `planTick` gates the risk guards on. Defaults to `true` so every existing
+   * caller (chiefly the test suite, which has no notion of wall-clock time)
+   * keeps evaluating as it always did; the engine's tick loop is the one
+   * real caller that ever passes `false`.
+   */
+  trading?: boolean;
 }
 
 const emptyLevels = (): CoaLevels => ({
@@ -133,7 +142,7 @@ export class SignalEngine {
     maxDeployable?: number,
     context: EvaluateContext = {},
   ): Signal {
-    const { marketPcr = null, buildupClass = null } = context;
+    const { marketPcr = null, buildupClass = null, trading = true } = context;
     const levels = chain.levels;
     const spot = chain.spot;
     const prevSpot = this.lastSpot;
@@ -148,6 +157,21 @@ export class SignalEngine {
         `Zenith-1 ${fmt(levels.zenith_1)} (shift ${levels.zenith_shift >= 0 ? "+" : ""}${levels.zenith_shift})`,
       `PCR ${chain.pcr.toFixed(2)} · spot ${spot.toLocaleString("en-IN")} · ATM ${fmt(chain.atm_strike)}`,
     ];
+
+    // A closed exchange has no fill for an entry to reach, and a chain built
+    // from replayed history is Friday's prices, not a live read — neither is
+    // a market this engine should be proposing a trade against. Checked
+    // ahead of every other gate below: a stale-data or a regime read is not
+    // the reason there's no signal right now, the closed market is.
+    if (!trading) {
+      return this.blocked(
+        protocol,
+        levels ?? emptyLevels(),
+        "MARKET_CLOSED",
+        "Market closed — signal suppressed",
+        [...rationale, "No live market to enter against; DKMS does not propose trades off replayed history."],
+      );
+    }
 
     if (spot <= 0 || !chain.rows.length) {
       return this.blocked(protocol, levels ?? emptyLevels(), "NO_DATA", "Awaiting live feed", rationale);

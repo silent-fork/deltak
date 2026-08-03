@@ -466,6 +466,25 @@ test("Alpha at support buys an ITM call under the Zero-OTM rule", () => {
   assert.ok(sig.sizing!.lots >= 1);
 });
 
+test("a closed market blocks the signal even when the setup otherwise qualifies", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  // Same chain that produces an actionable Alpha buy above — only `trading`
+  // differs, and that alone must suppress it.
+  const sig = engine.evaluate(chain, master, 1_000_000, undefined, { trading: false });
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.blocked_reason, "MARKET_CLOSED");
+  assert.equal(sig.token, null);
+  assert.equal(sig.entry_price, null);
+});
+
+test("trading defaults to true when the caller omits it", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.notEqual(sig.blocked_reason, "MARKET_CLOSED");
+});
+
 test("Alpha mid-range is blocked", () => {
   const { master, ticks, builder, engine } = warmEngine(24_550, WALLS);
   const chain = builder.build(master, ticks, 24_550);
