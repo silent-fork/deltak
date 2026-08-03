@@ -17,7 +17,15 @@ import { parseExpiry, type Instrument, type MasterPayload } from "@/lib/engine/s
  */
 
 export const runtime = "nodejs";
-export const revalidate = 3600;
+/**
+ * Never prerendered: a `revalidate` export with no `dynamic` here used to let
+ * `next build` treat this as a static route and execute it at build time —
+ * downloading the 40 MB scrip master just to hit Next's Data Cache's 2 MB
+ * response-size ceiling and log a "can not be cached" warning for a body
+ * that was never going to be reused build-to-build anyway. The real hour-long
+ * cache is the response's own `Cache-Control` below, served at the edge.
+ */
+export const dynamic = "force-dynamic";
 /** The 40 MB parse needs headroom beyond the default function timeout. */
 export const maxDuration = 60;
 
@@ -43,7 +51,7 @@ for (const [underlying, spec] of Object.entries(INDEX_UNIVERSE)) {
 export async function GET() {
   let rows: RawRow[];
   try {
-    const res = await fetch(SCRIP_MASTER_URL, { next: { revalidate: 3600 } });
+    const res = await fetch(SCRIP_MASTER_URL, { cache: "no-store" });
     if (!res.ok) {
       return NextResponse.json(
         { detail: `Scrip master download failed (HTTP ${res.status}).` },
