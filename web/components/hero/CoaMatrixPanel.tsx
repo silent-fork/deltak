@@ -404,6 +404,12 @@ function EngageCorridor({
   // the spot marker itself glows with, rather than an unrelated warning
   // colour — and each cap's own pulse stands down for the width of it.
   const overlapping = !!(aegisBand?.armed && zenithBand?.armed && aegisCapEnd > zenithCapStart);
+  // Spot's own marker turns amber the instant it is standing inside the
+  // ambiguous zone itself, not just whenever the zone exists — the cyan
+  // border already says "this stretch is overlap"; this says "and that is
+  // exactly where spot is right now."
+  const spotInOverlap =
+    overlapping && spotPct !== null && spotPct >= zenithCapStart && spotPct <= aegisCapEnd;
 
   return (
     <div className="mt-1.5">
@@ -440,16 +446,31 @@ function EngageCorridor({
           <div
             title="Overlap — spot sits inside both engage zones at once; Alpha reads this as ambiguous, not double-armed."
             className="absolute inset-y-0 overflow-hidden"
-            style={{ left: `${zenithCapStart}%`, right: `${100 - aegisCapEnd}%` }}
+            style={{
+              left: `${zenithCapStart}%`,
+              right: `${100 - aegisCapEnd}%`,
+              maskImage: "linear-gradient(to right, transparent, black 14%, black 86%, transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent, black 14%, black 86%, transparent)",
+            }}
           >
             <div
               className="absolute inset-0 animate-hazard-scroll"
               style={{
                 backgroundImage:
-                  "repeating-linear-gradient(45deg, rgba(16,185,129,0.55) 0 6px, rgba(244,63,94,0.55) 6px 12px)",
-                backgroundSize: "24px 24px",
+                  "repeating-linear-gradient(45deg, rgba(16,185,129,0.5) 0 7px, rgba(244,63,94,0.5) 7px 14px)",
+                backgroundSize: "28px 28px",
               }}
             />
+            {spotInOverlap && spotPct !== null ? (
+              <div
+                className="absolute inset-y-0 w-12 -translate-x-1/2"
+                style={{
+                  left: `${((spotPct - zenithCapStart) / (aegisCapEnd - zenithCapStart)) * 100}%`,
+                  background: "radial-gradient(circle, rgba(252,211,77,0.6) 0%, transparent 72%)",
+                }}
+              />
+            ) : null}
             <div
               className="absolute inset-0 animate-pulse-ring"
               style={{ boxShadow: "inset 0 0 8px rgba(0,240,255,0.7)" }}
@@ -458,9 +479,17 @@ function EngageCorridor({
         ) : null}
         {spotPct !== null ? (
           <span
-            title={`Spot ${fmt(spot, 0)}`}
-            className="absolute top-1/2 h-3 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum"
-            style={{ left: `${spotPct}%`, boxShadow: "0 0 6px rgba(0,240,255,0.8)" }}
+            title={`Spot ${fmt(spot, 0)}${spotInOverlap ? " — inside the overlap zone" : ""}`}
+            className={cn(
+              "absolute top-1/2 h-3 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full",
+              spotInOverlap ? "bg-amber-300" : "bg-quantum",
+            )}
+            style={{
+              left: `${spotPct}%`,
+              boxShadow: spotInOverlap
+                ? "0 0 8px rgba(252,211,77,0.9)"
+                : "0 0 6px rgba(0,240,255,0.8)",
+            }}
           />
         ) : null}
       </div>
