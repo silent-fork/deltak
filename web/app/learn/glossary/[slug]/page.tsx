@@ -3,9 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BreakevenLine } from "@/components/BreakevenLine";
+import { GreekGauge } from "@/components/GreekGauge";
 import { LearnChrome } from "@/components/LearnChrome";
+import { MarginStack } from "@/components/MarginStack";
+import { MaxPainCurve } from "@/components/MaxPainCurve";
 import { MoneynessStrip } from "@/components/MoneynessStrip";
 import { OiBuildupMatrix } from "@/components/OiBuildupMatrix";
+import { PcrGauge } from "@/components/PcrGauge";
 import { ThetaCurve } from "@/components/ThetaCurve";
 import { getGlossaryTerm, GLOSSARY } from "@/lib/content/glossary";
 
@@ -101,6 +106,41 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
           {entry.slug === "theta" && (
             <div className="dk-panel mt-4 rounded-lg p-4">
               <ThetaCurve />
+            </div>
+          )}
+          {(entry.slug === "delta-greek" || entry.slug === "gamma-greek" || entry.slug === "vega" || entry.slug === "implied-volatility-iv") && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <GreekGauge
+                kind={
+                  entry.slug === "delta-greek"
+                    ? "delta"
+                    : entry.slug === "gamma-greek"
+                      ? "gamma"
+                      : entry.slug === "vega"
+                        ? "vega"
+                        : "iv"
+                }
+              />
+            </div>
+          )}
+          {(entry.slug === "span-margin" || entry.slug === "exposure-margin") && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <MarginStack />
+            </div>
+          )}
+          {entry.slug === "max-pain" && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <MaxPainCurve />
+            </div>
+          )}
+          {entry.slug === "put-call-ratio-pcr" && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <PcrGauge />
+            </div>
+          )}
+          {entry.slug === "breakeven-point" && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <BreakevenLine />
             </div>
           )}
         </section>
