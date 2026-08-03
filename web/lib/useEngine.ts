@@ -33,7 +33,7 @@ import {
 } from "@/lib/engine/config";
 import { ChainBuilder } from "@/lib/engine/coa";
 import { SignalEngine } from "@/lib/engine/dkms";
-import { applyNseSnapshot } from "@/lib/engine/nseSnapshot";
+import { applyNseSnapshot, buildMarketSnapshotPayload } from "@/lib/engine/nseSnapshot";
 import { RrgEngine } from "@/lib/engine/rrg";
 import { Ledger, applySlippage } from "@/lib/engine/ledger";
 import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
@@ -46,6 +46,7 @@ import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
 import { SimulatedFeed } from "@/lib/stream/simFeed";
 import { useMarketData, type MarketData } from "@/lib/useMarketData";
 import { clearMarketCache } from "@/lib/market/client";
+import { istDate } from "@/lib/market/clock";
 import { api } from "@/lib/api";
 import { setAnalyticsContext, track } from "@/lib/analytics";
 
@@ -968,6 +969,51 @@ export function useEngine(simulate: boolean) {
     onNseOptionChain,
   });
   marketRef.current = market;
+
+  /**
+   * Save whatever the focused underlying currently has available — the
+   * counterpart to the DB-hydration read in `useMarketData.ts`. Fires on
+   * exactly two events: the market closing while a session is open (data
+   * from the live session that just ended is already settled, so this
+   * saves immediately), and switching focus to a different underlying
+   * while it's already closed (given a few seconds first, so this captures
+   * that underlying's own hydrated-or-fetched data rather than the empty
+   * chain it starts from the instant focus changes).
+   *
+   * `snapshot?.market_open` — not a bare `isMarketOpen()` call — is what
+   * makes "just closed" detectable at all: it is the one place in this hook
+   * that already updates the moment the exchange clock crosses the bell
+   * (see the `dirty` check in `tick`, below), so the previous value survives
+   * across renders instead of being re-derived fresh (and thus indistinguishable
+   * from "always closed") every time.
+   */
+  const prevMarketOpenRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const nowOpen = snapshot?.market_open ?? null;
+    if (nowOpen === null) return;
+    const justClosed = prevMarketOpenRef.current === true && !nowOpen;
+    prevMarketOpenRef.current = nowOpen;
+    if (nowOpen) return;
+
+    const id = setTimeout(
+      () => {
+        const chain = chainsRef.current[focus];
+        if (!chain) return;
+        const payload = buildMarketSnapshotPayload(chain, {
+          candles: marketRef.current?.candles ?? [],
+          stats: marketRef.current?.stats ?? null,
+          pcr: marketRef.current?.pcr[focus] ?? null,
+          buildup: marketRef.current?.buildup[focus] ?? null,
+        });
+        // Nothing worth persisting yet — do not overwrite a genuinely
+        // populated row with an empty one.
+        if (!payload.legs.length && !payload.candles.length) return;
+        void api.market.snapshotWrite(focus, istDate(), payload).catch(() => undefined);
+      },
+      justClosed ? 0 : 4_000,
+    );
+    return () => clearTimeout(id);
+  }, [snapshot?.market_open, focus]);
 
   /**
    * The index itself, out of hours.

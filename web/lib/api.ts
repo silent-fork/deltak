@@ -5,6 +5,8 @@ import type {
   ExecutionMode,
   HolidayResponse,
   MarginResponse,
+  MarketSnapshotPayload,
+  MarketSnapshotReadResponse,
   NseOptionChainResponse,
   OiResponse,
   PcrResponse,
@@ -204,6 +206,16 @@ export const api = {
       request<NseOptionChainResponse>(
         `/api/market/nse-option-chain?underlying=${encodeURIComponent(underlying)}`,
       ),
+    /** The closed-market board-hydration store — global, not per account. */
+    snapshotRead: (underlying: string) =>
+      request<MarketSnapshotReadResponse>(
+        `/api/market/snapshot?underlying=${encodeURIComponent(underlying)}`,
+      ),
+    snapshotWrite: (underlying: string, sessionDate: string, payload: MarketSnapshotPayload) =>
+      request<{ ok: true }>("/api/market/snapshot", {
+        method: "POST",
+        body: JSON.stringify({ underlying, sessionDate, payload }),
+      }),
   },
 
   history: (resource: string, params: Record<string, string> = {}) =>

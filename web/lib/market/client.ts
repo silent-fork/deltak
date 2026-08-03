@@ -6,6 +6,7 @@ import type {
   HolidayResponse,
   MarginPosition,
   MarginResponse,
+  MarketSnapshotReadResponse,
   NseOptionChainResponse,
   OiResponse,
   PcrResponse,
@@ -213,5 +214,18 @@ export function fetchHolidays(ttlMs = 15 * 60_000) {
 export function fetchNseOptionChain(underlying: string, ttlMs = 20 * 60_000) {
   return cached<NseOptionChainResponse>(`nse-oc:${underlying}`, ttlMs, () =>
     api.market.nseOptionChain(underlying),
+  );
+}
+
+/**
+ * The closed-market board-hydration read — cached briefly so switching
+ * focus back and forth doesn't re-read the same row. Writes
+ * (`api.market.snapshotWrite`) are rare, one-shot, and called directly from
+ * `useEngine.ts` rather than through this queue, the same way position and
+ * order persistence already bypasses it.
+ */
+export function fetchMarketSnapshot(underlying: string, ttlMs = 5 * 60_000) {
+  return cached<MarketSnapshotReadResponse>(`snapshot:${underlying}`, ttlMs, () =>
+    api.market.snapshotRead(underlying),
   );
 }

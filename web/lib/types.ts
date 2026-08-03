@@ -4,6 +4,7 @@
  */
 
 import type { INDEX_UNIVERSE } from "./engine/config";
+import type { OiBuildupType } from "./market/constants";
 
 export type ExecutionMode = "paper" | "live";
 /**
@@ -435,3 +436,32 @@ export interface NseOptionChainResponse {
   timestamp: string;
   legs: NseOptionLeg[];
 }
+
+/**
+ * Whatever the board had available for one underlying, captured while the
+ * market was closed — reuses `NseOptionLeg`'s shape for `legs` since the
+ * fold-into-the-tick-store logic (`applyNseSnapshot`) is source-agnostic:
+ * a leg here can equally have come from Angel One's own closed-market
+ * replay or from the NSE supplement, whichever the tab actually had at
+ * save time.
+ */
+export interface MarketSnapshotPayload {
+  spot: number;
+  stats: SessionStats | null;
+  candles: Candle[];
+  legs: NseOptionLeg[];
+  pcr: number | null;
+  buildup: OiBuildupType | null;
+}
+
+export interface MarketSnapshotRecord {
+  underlying: string;
+  /** ISO, `YYYY-MM-DD` — the trading session this snapshot describes. */
+  sessionDate: string;
+  updatedAt: string;
+  payload: MarketSnapshotPayload;
+}
+
+export type MarketSnapshotReadResponse =
+  | ({ found: true } & MarketSnapshotRecord)
+  | { found: false };
