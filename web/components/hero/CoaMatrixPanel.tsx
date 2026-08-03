@@ -395,6 +395,14 @@ function EngageCorridor({
   const zenithCapStart = zenithBand
     ? Math.min(100 - MIN_CAP_PCT, pct(zenithBand.lo) ?? 100)
     : 100;
+  // A narrow enough corridor lets both caps reach past each other — spot can
+  // then sit inside both trigger zones at once, which Protocol Alpha reads as
+  // ambiguous (see the "overlap" state above), not double-armed. Two markers
+  // independently pulsing their own colour on top of each other just reads as
+  // noise here, so the shared zone gets its own single, distinct treatment —
+  // a moving hazard stripe, not a blink — and each cap's own pulse stands
+  // down for the width of it.
+  const overlapping = !!(aegisBand?.armed && zenithBand?.armed && aegisCapEnd > zenithCapStart);
 
   return (
     <div className="mt-1.5">
@@ -405,7 +413,9 @@ function EngageCorridor({
             className={cn(
               "absolute inset-y-0 left-0 rounded-l-full transition-[width,background-color] duration-500",
               aegisBand.armed
-                ? "bg-emerald-500/70 animate-pulse-ring"
+                ? overlapping
+                  ? "bg-emerald-500/70"
+                  : "bg-emerald-500/70 animate-pulse-ring"
                 : "bg-emerald-500/15",
             )}
             style={{ width: `${aegisCapEnd}%` }}
@@ -416,9 +426,26 @@ function EngageCorridor({
             title={`Zenith engage zone ${fmt(zenithBand.lo, 0)}–${fmt(zenithBand.hi, 0)}${zenithBand.armed ? " — armed" : ""}`}
             className={cn(
               "absolute inset-y-0 right-0 rounded-r-full transition-[width,background-color] duration-500",
-              zenithBand.armed ? "bg-rose-500/70 animate-pulse-ring" : "bg-rose-500/15",
+              zenithBand.armed
+                ? overlapping
+                  ? "bg-rose-500/70"
+                  : "bg-rose-500/70 animate-pulse-ring"
+                : "bg-rose-500/15",
             )}
             style={{ width: `${100 - zenithCapStart}%` }}
+          />
+        ) : null}
+        {overlapping ? (
+          <div
+            title="Overlap — spot sits inside both engage zones at once; Alpha reads this as ambiguous, not double-armed."
+            className="absolute inset-y-0 animate-hazard-scroll"
+            style={{
+              left: `${zenithCapStart}%`,
+              right: `${100 - aegisCapEnd}%`,
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgba(245,158,11,0.85) 0 4px, rgba(9,9,11,0.85) 4px 8px)",
+              backgroundSize: "16px 16px",
+            }}
           />
         ) : null}
         {spotPct !== null ? (
