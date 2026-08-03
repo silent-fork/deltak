@@ -121,8 +121,6 @@ const saveOrder = (row: OrderRow) => {
   void api.persist("orders", [row]).catch(() => undefined);
 };
 
-export type StreamState = StreamStatus;
-
 export function useEngine(simulate: boolean) {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
   const [session, setSession] = useState<EngineSession>(NO_SESSION);

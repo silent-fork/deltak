@@ -261,7 +261,6 @@ export function Terminal() {
       <div className="dk-grid-bg flex h-dvh flex-col overflow-hidden">
         <Header
           snapshot={snapshot}
-          streamState={streamStatus}
           simulated={simulated}
           selected={selected}
           events={snapshot?.events ?? []}

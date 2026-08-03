@@ -2,13 +2,10 @@
 
 import {
   Activity,
-  AlarmClock,
   FlaskConical,
   Hand,
   Plug,
   Radar,
-  Radio,
-  Sunrise,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -28,9 +25,8 @@ import type {
   RiskEvent,
   SpotQuote,
 } from "@/lib/types";
-import type { StreamState } from "@/lib/useEngine";
-import { useCountdown, useTickFlash } from "@/lib/useEngine";
-import { cn, countdown, fmt, signed } from "@/lib/utils";
+import { useTickFlash } from "@/lib/useEngine";
+import { cn, fmt, signed } from "@/lib/utils";
 
 /** Sensex ahead of Bankex in the header rail — the more heavily-traded of BSE's two. */
 const BSE_TICKER_ORDER: Record<string, number> = { SENSEX: 0, BANKEX: 1 };
@@ -126,7 +122,6 @@ function SpotTicker({
 
 export function Header({
   snapshot,
-  streamState,
   simulated,
   selected,
   events,
@@ -134,7 +129,6 @@ export function Header({
   onRefreshStatus,
 }: {
   snapshot: EngineSnapshot | null;
-  streamState: StreamState;
   simulated: boolean;
   selected: string;
   events: RiskEvent[];
@@ -160,33 +154,11 @@ export function Header({
   }, [snapshot?.spots]);
 
   const engine = useEngineContext();
-  const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
-  const toOpen = useCountdown(snapshot?.seconds_to_open);
   const clock = useIstClock();
   const marketOpen = snapshot?.market_open ?? false;
   const mode: ExecutionMode = snapshot?.mode ?? "paper";
   const authed = snapshot?.authenticated ?? false;
   const automation = engine.automation;
-
-  /*
-   * "Closed" and "Live" side by side was a contradiction the operator had to
-   * resolve themselves. SmartStream accepts a subscription at any hour and then
-   * sends nothing, so a connected socket says only that the wire is up — while
-   * the exchange is shut it reads as Linked, and the board it feeds is settled
-   * on the last session rather than running.
-   */
-  const trading = marketOpen || simulated;
-  const linked = streamState === "live" && !trading;
-  const streamLabel =
-    streamState === "live" ? (trading ? "Live" : "Linked") : streamState;
-  const streamTone =
-    streamState === "error"
-      ? "text-rose-400"
-      : streamState === "live"
-        ? trading
-          ? "text-emerald-400"
-          : "text-zinc-500"
-        : "text-amber-400";
 
   return (
     // `backdrop-blur` gives the header its own stacking context, which later
@@ -262,23 +234,6 @@ export function Header({
 
           <HolidayMenu />
 
-          <Badge
-            title={
-              linked
-                ? "Socket connected, exchange closed — no prints are arriving. The board is settled on the last session."
-                : "Market-data socket status."
-            }
-            className={cn("h-7 border-zinc-800", streamTone)}
-          >
-            <Radio
-              className={cn(
-                "h-3 w-3",
-                streamState === "live" && trading && "animate-pulse-ring",
-              )}
-            />
-            {streamLabel}
-          </Badge>
-
           {/* Exchange wall clock */}
           <span
             title="Exchange wall clock — Asia/Kolkata"
@@ -289,41 +244,6 @@ export function Header({
               IST
             </span>
           </span>
-
-          {/*
-            One slot, two clocks. In session it counts down to the 3:15 PM
-            flatten; out of hours that number means nothing — a Saturday
-            afternoon has no Daylight Rest — so it counts to the next bell
-            instead. Exchange holidays are not known to the terminal, so the
-            open it names is the next weekday's, holiday or not.
-          */}
-          {marketOpen ? (
-            <Badge
-              title="Time to the 3:15 PM IST Daylight Rest Protocol — all positions flatten automatically."
-              className={cn(
-                "h-7 border-zinc-800 font-semibold",
-                seconds === 0
-                  ? "text-zinc-500"
-                  : seconds < 600
-                    ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
-                    : "text-quantum",
-              )}
-            >
-              <AlarmClock className="h-3 w-3" />
-              {seconds === 0 ? "Rest" : countdown(seconds)}
-            </Badge>
-          ) : (
-            <Badge
-              title="Time to the next 9:15 AM IST open, skipping the weekend. Exchange holidays are not accounted for."
-              className="h-7 border-zinc-800 font-semibold text-zinc-400"
-            >
-              <Sunrise className="h-3 w-3" />
-              <span className="text-[9px] font-normal uppercase tracking-wider text-zinc-600">
-                Opens
-              </span>
-              {toOpen > 0 ? countdown(toOpen) : "—"}
-            </Badge>
-          )}
 
           {/*
             Paper vs Live used to live here; Live has no server-side home yet
