@@ -1,6 +1,6 @@
 "use client";
 
-import { Radar, TrendingDown, TrendingUp, Zap } from "lucide-react";
+import { Activity, Radar, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
@@ -12,23 +12,13 @@ import { Wordmark } from "@/components/Wordmark";
 import { setAnalyticsContext, track } from "@/lib/analytics";
 import { api, type MobileStateResponse } from "@/lib/api";
 import type { Position } from "@/lib/types";
-import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney } from "@/lib/utils";
+import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney, timeAgo } from "@/lib/utils";
 
 /** How often the phone re-polls its state. */
 const POLL_MS = 5_000;
 
 /** Same visual boot sequence as the desktop terminal, different narration — nothing here authenticates against Angel One. */
 const BOOT_LINES = [["Reading the paired desktop…", "Syncing the live signal…", "Loading the trade book…"]];
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return "never";
-  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.round(minutes / 60)}h ago`;
-}
 
 function SignalRow({ underlying, signal }: { underlying: string; signal: MobileStateResponse["signal"] }) {
   const s = signal?.signals[underlying];
@@ -172,13 +162,27 @@ export function MobileCompanion({
             </div>
             <Wordmark className="text-[13px] tracking-[0.16em]" />
           </div>
-          <MobileUserMenu
-            clientCode={clientCode}
-            mode={mode}
-            wallet={ledger ?? null}
-            onUnpair={() => void unpair()}
-            unpairBusy={signingOut}
-          />
+          <div className="flex items-center gap-1.5">
+            {/* Same word and icon the desktop header's own market-status badge
+                uses (see Header.tsx) — one vocabulary for "is the exchange
+                open" everywhere this HUD shows it. */}
+            <Badge
+              className={cn(
+                "h-6 border-zinc-800",
+                data?.signal?.market_open ? "text-emerald-300" : "text-zinc-500",
+              )}
+            >
+              <Activity className="h-3 w-3" />
+              {data?.signal?.market_open ? "Open" : "Closed"}
+            </Badge>
+            <MobileUserMenu
+              clientCode={clientCode}
+              mode={mode}
+              wallet={ledger ?? null}
+              onUnpair={() => void unpair()}
+              unpairBusy={signingOut}
+            />
+          </div>
         </header>
 
         <div className="dk-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">

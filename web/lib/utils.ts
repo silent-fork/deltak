@@ -58,6 +58,17 @@ export const countdown = (seconds: number) => {
 export const pnlTone = (n: number) =>
   n > 0 ? "text-emerald-400" : n < 0 ? "text-rose-400" : "text-zinc-400";
 
+/** A stored ISO timestamp as "just now" / "5m ago" / "3h ago", relative to now. */
+export function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
+}
+
 /* ------------------------------------------------------------------ strategy */
 
 export const QUADRANT_META: Record<
