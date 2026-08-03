@@ -42,11 +42,11 @@ const config: Config = {
       },
       keyframes: {
         "tick-up": {
-          "0%": { backgroundColor: "rgba(16,185,129,0.28)" },
+          "0%": { backgroundColor: "rgba(16,185,129,0.22)" },
           "100%": { backgroundColor: "transparent" },
         },
         "tick-down": {
-          "0%": { backgroundColor: "rgba(244,63,94,0.28)" },
+          "0%": { backgroundColor: "rgba(244,63,94,0.22)" },
           "100%": { backgroundColor: "transparent" },
         },
         "pulse-ring": {
@@ -67,8 +67,8 @@ const config: Config = {
         },
       },
       animation: {
-        "tick-up": "tick-up 620ms ease-out",
-        "tick-down": "tick-down 620ms ease-out",
+        "tick-up": "tick-up 900ms ease-out",
+        "tick-down": "tick-down 900ms ease-out",
         "pulse-ring": "pulse-ring 2s ease-in-out infinite",
         scan: "scan 5s linear infinite",
         drift: "drift 6s ease-in-out infinite",

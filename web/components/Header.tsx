@@ -89,7 +89,12 @@ function SpotTicker({
         </span>
         <span
           className={cn(
-            "mt-1 block rounded font-mono text-[13px] font-semibold leading-none",
+            // The flash used to be a letter-tight rectangle with a 4px
+            // radius, reading as a hard highlighter block rather than a
+            // tick. Negative margins give the fill room to breathe past the
+            // glyphs without shifting the ticker's own layout, and a wider
+            // radius keeps it soft at this size.
+            "-mx-1 -my-0.5 mt-0.5 block rounded-md px-1 py-0.5 font-mono text-[13px] font-semibold leading-none",
             quoted ? "text-zinc-100" : "text-zinc-600",
             flash === "up" && "animate-tick-up",
             flash === "down" && "animate-tick-down",
