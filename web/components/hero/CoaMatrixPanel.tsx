@@ -598,16 +598,20 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
             <span
               className={cn(
                 "font-mono text-[9px] font-semibold uppercase tracking-wider",
-                bands.aegis?.armed || bands.zenith?.armed
-                  ? "text-quantum"
-                  : "text-zinc-600",
+                bands.aegis?.armed && bands.zenith?.armed
+                  ? "text-amber-400"
+                  : bands.aegis?.armed || bands.zenith?.armed
+                    ? "text-quantum"
+                    : "text-zinc-600",
               )}
             >
-              {bands.aegis?.armed
-                ? "at aegis"
-                : bands.zenith?.armed
-                  ? "at zenith"
-                  : "mid-range"}
+              {bands.aegis?.armed && bands.zenith?.armed
+                ? "overlap"
+                : bands.aegis?.armed
+                  ? "at aegis"
+                  : bands.zenith?.armed
+                    ? "at zenith"
+                    : "mid-range"}
             </span>
           }
         >
