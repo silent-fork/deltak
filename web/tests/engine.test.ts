@@ -43,6 +43,7 @@ import {
   secondsToNextOpen,
 } from "../lib/engine/config";
 import type { CoaLevels, OptionChain } from "../lib/types";
+import { withRetry } from "../lib/retry";
 
 /* ------------------------------------------------------------------ sizing */
 
@@ -915,4 +916,40 @@ test("a nearly worthless contract still pays the broker's minimum", () => {
     mode: "paper",
   });
   assert.equal(ledger.snapshot("paper").charges, 25);
+});
+
+/* ------------------------------------------------------------------ retry */
+
+test("withRetry returns on the first success without waiting", async () => {
+  let calls = 0;
+  const result = await withRetry(async () => {
+    calls += 1;
+    return "ok";
+  }, 3, 5);
+  assert.equal(result, "ok");
+  assert.equal(calls, 1);
+});
+
+test("withRetry retries a failing call up to the attempt limit, then throws", async () => {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      withRetry(async () => {
+        calls += 1;
+        throw new Error(`fail ${calls}`);
+      }, 3, 1),
+    /fail 3/,
+  );
+  assert.equal(calls, 3);
+});
+
+test("withRetry recovers once a later attempt succeeds", async () => {
+  let calls = 0;
+  const result = await withRetry(async () => {
+    calls += 1;
+    if (calls < 2) throw new Error("transient");
+    return "recovered";
+  }, 3, 1);
+  assert.equal(result, "recovered");
+  assert.equal(calls, 2);
 });

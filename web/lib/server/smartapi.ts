@@ -1,5 +1,7 @@
 import "server-only";
 
+import { withRetry } from "@/lib/retry";
+
 /**
  * Angel One SmartAPI v2.0 client for route handlers.
  *
@@ -79,12 +81,22 @@ export async function smartApiCall<T = Record<string, unknown>>(
 
   let res: Response;
   try {
-    res = await fetch(url, {
-      method: init.method,
-      headers: smartApiHeaders(init.jwt),
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      cache: "no-store",
-    });
+    // One retry, short gap: a bare `fetch()` failure here is Vercel's own
+    // network to Angel One hiccupping, not a rate limit or a rejection (both
+    // are classified from a real response below and never reach this catch)
+    // — most of these clear in under a second and never need to surface as
+    // the 502 the browser console otherwise shows for every one of them.
+    res = await withRetry(
+      () =>
+        fetch(url, {
+          method: init.method,
+          headers: smartApiHeaders(init.jwt),
+          body: init.body === undefined ? undefined : JSON.stringify(init.body),
+          cache: "no-store",
+        }),
+      2,
+      300,
+    );
   } catch (err) {
     throw new SmartApiError(
       `SmartAPI transport error: ${err instanceof Error ? err.message : "unreachable"}`,

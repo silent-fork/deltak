@@ -16,6 +16,7 @@ import type {
   UserProfile,
 } from "@/lib/types";
 import { archiveRowToPosition, type ArchiveRow } from "@/lib/engine/book";
+import { withRetry } from "@/lib/retry";
 import {
   DEFAULT_CONFIG,
   EXCHANGE_NSE_CM,
@@ -710,7 +711,7 @@ export function useEngine(simulate: boolean) {
 
   const loadMaster = useCallback(async () => {
     try {
-      const payload = (await api.master()) as MasterPayload;
+      const payload = await withRetry(() => api.master() as Promise<MasterPayload>);
       masterRef.current = new ScripMaster(payload);
       setMasterReady(masterRef.current.ready);
       setError(null);
@@ -721,7 +722,7 @@ export function useEngine(simulate: boolean) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Scrip master fetch failed";
       setError(message);
-      log("INFO", `Scrip master unavailable: ${message}`);
+      log("INFO", `Scrip master unavailable after 3 attempts: ${message} — retrying in the background.`);
     }
     return masterRef.current;
   }, [log]);
@@ -729,13 +730,30 @@ export function useEngine(simulate: boolean) {
   /** Every OPEN position Supabase still has on file for this account. */
   const loadOpenPositions = useCallback(async (): Promise<Position[]> => {
     try {
-      const rows = await api.history("positions", { limit: "100" });
+      const rows = await withRetry(() => api.history("positions", { limit: "100" }));
       const list = Array.isArray(rows) ? (rows as ArchiveRow[]) : [];
       return list.map(archiveRowToPosition).filter((p) => p.status === "OPEN");
     } catch {
       return [];
     }
   }, []);
+
+  /**
+   * The master is not optional — nothing renders without it, and unlike the
+   * historical-data polls in `useMarketData` it has no loop of its own to
+   * fall back on if the three quick retries inside `loadMaster` still come
+   * up empty (a real outage, not a blip). This covers that case without
+   * asking the operator to reload the tab themselves, backing off to a slow,
+   * patient cadence instead of hammering a downed endpoint — and stops the
+   * moment a load actually lands.
+   */
+  useEffect(() => {
+    if (!sessionChecked || masterReady) return;
+    const id = setInterval(() => {
+      if (!masterRef.current.ready) void loadMaster();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [sessionChecked, masterReady, loadMaster]);
 
   useEffect(() => {
     const cfg = cfgRef.current;
