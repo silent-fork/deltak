@@ -168,7 +168,7 @@ export function MobileCompanion({
                 open" everywhere this HUD shows it. */}
             <Badge
               className={cn(
-                "h-6 border-zinc-800",
+                "h-8 border-zinc-800",
                 data?.signal?.market_open ? "text-emerald-300" : "text-zinc-500",
               )}
             >
@@ -186,7 +186,7 @@ export function MobileCompanion({
         </header>
 
         <div className="dk-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto flex min-h-full max-w-md flex-col space-y-2.5 px-2.5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2.5">
+          <div className="mx-auto flex min-h-full max-w-md flex-col space-y-2.5 px-2.5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
             {error ? (
               <div className="shrink-0 rounded border border-rose-500/40 bg-rose-500/10 p-2.5 text-[11px] text-rose-300">
                 {error}
