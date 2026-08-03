@@ -44,14 +44,20 @@ export function initials(profile: UserProfile | null, clientCode: string): strin
   return (clientCode || "DK").slice(0, 2).toUpperCase();
 }
 
-/** A stored UTC stamp as IST wall time — the only clock this terminal keeps. */
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** A stored UTC stamp as IST wall time — "03 Aug 2026 · 14:32 IST", the only clock this terminal keeps. */
 function ist(value: string | null | undefined): string {
   if (!value) return "—";
   const at = new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(value) ? value : `${value}Z`);
   if (Number.isNaN(at.getTime())) return value;
   const p = istParts(at);
+  const [year, month, day] = p.date.split("-").map(Number);
   const hhmm = [p.hour, p.minute].map((v) => String(v).padStart(2, "0")).join(":");
-  return `${p.date} ${hhmm}`;
+  return `${String(day).padStart(2, "0")} ${MONTHS[month - 1]} ${year} · ${hhmm} IST`;
 }
 
 function Row({
@@ -277,12 +283,6 @@ function Chips({ values, empty }: { values: string[]; empty: string }) {
   );
 }
 
-interface Funds {
-  net: number;
-  available_cash: number;
-  utilised_debits: number;
-}
-
 export function UserPill({
   profile,
   clientCode,
@@ -300,9 +300,8 @@ export function UserPill({
 }) {
   const engine = useEngineContext();
   const [open, setOpen] = useState(false);
-  const [funds, setFunds] = useState<Funds | null>(null);
-  const [fundsError, setFundsError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pairExpanded, setPairExpanded] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Same contract as the log menu: click-away closes, Escape closes.
@@ -322,49 +321,19 @@ export function UserPill({
     };
   }, [open]);
 
-  /*
-   * Margin is read once as soon as the account is known, not on a timer and
-   * not gated behind the dropdown opening. It is a metered broker call, so
-   * "once" still holds — the difference is that "once" now means the moment
-   * the operator is signed in, so the panel has real numbers already sitting
-   * there the first time it's opened, rather than a "Reading margin…" beat
-   * every single time. The explicit Refresh button below is what re-reads it
-   * after that.
-   */
-  useEffect(() => {
-    if (!clientCode) return;
-    let cancelled = false;
-    api
-      .rms()
-      .then((f) => {
-        if (!cancelled) {
-          setFunds(f);
-          setFundsError(null);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setFundsError(err instanceof Error ? err.message : "Margin read failed");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [clientCode]);
-
   const name = profile?.name ?? clientCode ?? "Operator";
   const closed = ledger?.closed_positions.length ?? 0;
   const openCount = ledger?.open_positions.length ?? 0;
+  const free = ledger ? Math.max(0, ledger.capital - ledger.deployed_margin) : 0;
+  const deployedPct =
+    ledger && ledger.capital > 0
+      ? Math.min(100, Math.max(0, (ledger.deployed_margin / ledger.capital) * 100))
+      : 0;
 
   async function refresh() {
     setBusy(true);
     try {
       await engine.refreshProfile();
-      const f = await api.rms().catch(() => null);
-      if (f) {
-        setFunds(f);
-        setFundsError(null);
-      }
     } finally {
       setBusy(false);
     }
@@ -376,7 +345,7 @@ export function UserPill({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title={`Signed in as ${name} (${clientCode}) — profile, funds and today's book`}
+        title={`Signed in as ${name} (${clientCode}) — profile, paper wallet and today's book`}
         className={cn(
           "flex h-7 max-w-[190px] items-center gap-1.5 rounded-md border pl-1 pr-1.5 transition-colors",
           open
@@ -411,7 +380,15 @@ export function UserPill({
       {open ? (
         <div
           role="menu"
-          className="dk-scroll absolute right-0 top-full z-50 mt-1 max-h-[75vh] w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60"
+          className={cn(
+            "dk-scroll absolute right-0 top-full z-50 mt-1 w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60",
+            // The parent shell clips anything past the viewport edge
+            // (overflow-hidden), so this can't go fully unbounded — but the
+            // QR/device list wants room to grow rather than scroll inside an
+            // already-short window, so it gets almost the full viewport
+            // instead of the collapsed state's tighter cap.
+            pairExpanded ? "max-h-[calc(100dvh-5rem)]" : "max-h-[75vh]",
+          )}
         >
           {/*
             Identity and Pair Mobile share one block, not two stacked
@@ -455,7 +432,7 @@ export function UserPill({
             </div>
 
             <div className="mt-2.5 border-t border-zinc-800/60 pt-2.5">
-              <PairMobileSection />
+              <PairMobileSection onExpandedChange={setPairExpanded} />
             </div>
           </div>
 
@@ -494,57 +471,73 @@ export function UserPill({
           </Section>
 
           {/*
-            Funds, straight from the broker's RMS. This is what the account can
-            actually deploy, which is not the paper ledger's capital — the two
-            are shown apart for exactly that reason.
+            The paper ledger, not the broker's RMS — there's no live mode in
+            play here, so this is the one balance that actually moves when a
+            trade opens or closes, for either device to show.
           */}
-          <Section title="Funds · broker">
-            {fundsError ? (
-              <div className="text-[10px] text-amber-400/90">{fundsError}</div>
-            ) : funds ? (
-              <>
-                <Row
-                  icon={Wallet}
-                  label="Available cash"
-                  value={money(funds.available_cash, 0)}
-                />
-                <Row label="Net" value={money(funds.net, 0)} />
-                <Row label="Utilised" value={money(funds.utilised_debits, 0)} />
-              </>
-            ) : (
-              <div className="text-[10px] text-zinc-600">Reading margin…</div>
-            )}
-          </Section>
-
-          {/* Today's book — the same numbers the trade book shows, summarised. */}
-          <Section title={`Book · ${mode}`}>
-            <Row label="Open positions" value={String(openCount)} />
-            <Row label="Closed today" value={String(closed)} />
-            <div className="flex items-baseline justify-between gap-3 py-[3px]">
-              <span className="dk-label text-[9px]">Booked P&amp;L</span>
-              <span
-                className={cn(
-                  "font-mono text-[11px] font-semibold",
-                  pnlTone(ledger?.realised_pnl ?? 0),
-                )}
-              >
-                {signedMoney(ledger?.realised_pnl ?? 0, 0)}
-              </span>
+          <Section title={`Paper Wallet · ${mode}`}>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/70">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-quantum/50 to-quantum transition-[width] duration-500"
+                style={{ width: `${deployedPct}%` }}
+              />
             </div>
-            <Row label="Equity" value={money(ledger?.equity ?? 0, 0)} />
+            <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-zinc-600">
+              <span>{deployedPct.toFixed(0)}% deployed</span>
+              <span>{money(free, 0)} free</span>
+            </div>
+
+            <div className="mt-2.5">
+              <Row icon={Wallet} label="Capital" value={money(ledger?.capital ?? 0, 0)} />
+              <Row label="Equity" value={money(ledger?.equity ?? 0, 0)} />
+              <Row label="Deployed" value={money(ledger?.deployed_margin ?? 0, 0)} />
+              <Row label="Charges" value={money(ledger?.charges ?? 0, 0)} />
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-zinc-800/60 pt-2 text-center">
+              <div>
+                <p className="dk-label text-[8px]">Open</p>
+                <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.open_pnl ?? 0))}>
+                  {signedMoney(ledger?.open_pnl ?? 0, 0)}
+                </p>
+              </div>
+              <div>
+                <p className="dk-label text-[8px]">Booked</p>
+                <p
+                  className={cn(
+                    "mt-0.5 font-mono text-[11px] font-semibold",
+                    pnlTone(ledger?.realised_pnl ?? 0),
+                  )}
+                >
+                  {signedMoney(ledger?.realised_pnl ?? 0, 0)}
+                </p>
+              </div>
+              <div>
+                <p className="dk-label text-[8px]">Total</p>
+                <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.total_pnl ?? 0))}>
+                  {signedMoney(ledger?.total_pnl ?? 0, 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-zinc-800/60 pt-2 text-center">
+              <div>
+                <p className="dk-label text-[8px]">Open positions</p>
+                <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{openCount}</p>
+              </div>
+              <div>
+                <p className="dk-label text-[8px]">Closed today</p>
+                <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{closed}</p>
+              </div>
+            </div>
           </Section>
 
           <Section title="Session">
             <Row icon={Clock3} label="Signed in" value={ist(loginTime)} />
-            <Row label="Broker last login" value={profile?.broker_last_login ?? "—"} />
             <Row
               icon={Building2}
               label="Known since"
               value={profile?.first_seen_at ? ist(profile.first_seen_at) : "—"}
-            />
-            <Row
-              label="Logins recorded"
-              value={profile?.logins ? String(profile.logins) : "—"}
             />
           </Section>
 

@@ -92,12 +92,28 @@ function QrThumb({
  * sitting there the first time the section is seen, the same "no dead click"
  * choice the funds panel above it makes.
  */
-export function PairMobileSection() {
+export function PairMobileSection({
+  onExpandedChange,
+}: {
+  /** Lets `UserPill` drop its own dropdown's height cap while the QR/device list is showing, rather than nesting a second scrollbar inside it. */
+  onExpandedChange?: (expanded: boolean) => void;
+}) {
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpandedState] = useState(false);
+  const setExpanded = useCallback(
+    (next: boolean) => {
+      setExpandedState(next);
+      onExpandedChange?.(next);
+    },
+    [onExpandedChange],
+  );
+
+  // The dropdown's own cap should relax the instant this unmounts (dropdown
+  // closed) too, not just when collapsed while still open.
+  useEffect(() => () => onExpandedChange?.(false), [onExpandedChange]);
   const expiresAtRef = useRef(0);
 
   const [devices, setDevices] = useState<PairedDevice[]>([]);
