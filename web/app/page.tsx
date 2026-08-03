@@ -9,6 +9,7 @@ import {
   Layers,
   LineChart,
   LockKeyhole,
+  Orbit,
   Radar,
   Repeat2,
   Rocket,
@@ -219,21 +220,23 @@ export default function HomePage() {
         <div className="mt-8 flex flex-col items-center justify-center gap-3">
           {/* Capped, not full-bleed: on mobile this wrapper is the shared width
               for the two buttons, so the CTA row reads as one deliberate size
-              rather than content-hugging pills. Reverts to each button's own
-              natural width side-by-side once there's room, at `sm`. */}
-          <div className="flex w-full max-w-[18rem] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
+              rather than content-hugging pills. Side-by-side at every width —
+              `flex-1` on each button splits the capped wrapper evenly on a
+              phone; past `sm` the wrapper itself stops capping and each
+              button reverts to its own natural (unequal) width. */}
+          <div className="flex w-full max-w-[19rem] flex-row items-stretch gap-2 sm:w-auto sm:max-w-none sm:items-center sm:gap-3">
             <CtaLink
               href="/terminal"
               location="hero"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-7 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-3 text-[12px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:h-11 sm:flex-none sm:px-7 sm:text-[13px]"
             >
               Terminal
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </CtaLink>
             <CtaLink
               href="/learn"
               location="hero-learn"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-7 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/60 px-3 text-[12px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:h-11 sm:flex-none sm:px-7 sm:text-[13px]"
             >
               Learn
             </CtaLink>
@@ -242,6 +245,41 @@ export default function HomePage() {
             <LockKeyhole className="h-3 w-3" />
             Free — sign in with your own Angel One account
           </span>
+
+          {/*
+            Not a third button in the Terminal/Learn pair — that would imply
+            it's a third way into the same gated app, when it's the one
+            surface on this whole site nobody has to sign in for at all. A
+            standalone banner earns that distinction: the live-pulse dot
+            reads as "this is a running dashboard, not a page," and the
+            orbiting-dot mark previews the RRG scatter itself rather than
+            just naming it.
+          */}
+          <CtaLink
+            href="/fno-sector-rotation"
+            location="hero-fno"
+            className="group mt-2 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10"
+          >
+            <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+              <span className="absolute h-6 w-6 animate-ping rounded-full bg-emerald-400/20" />
+              <Orbit className="relative h-4 w-4 text-emerald-400" />
+            </span>
+            {/*
+              Two copy lengths, not one wrapped one — a phone-width pill
+              wrapping this onto two lines broke the pill shape (confirmed
+              at 390px). `whitespace-nowrap` plus a shorter mobile string
+              keeps it one line everywhere instead.
+            */}
+            <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
+              <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
+              — F&amp;O Sector Rotation, live RRG
+            </span>
+            <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
+              <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
+              — NSE F&amp;O Sector Rotation dashboard, live RRG
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-400 transition-transform group-hover:translate-x-0.5" />
+          </CtaLink>
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
@@ -422,11 +460,11 @@ export default function HomePage() {
             guards — against simulated fills, no live order ever placed,
             for as long as you want to watch it work.
           </p>
-          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-row items-stretch justify-center gap-3">
             <CtaLink
               href="/terminal"
               location="closing"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:flex-none sm:px-6"
             >
               Terminal
               <ArrowRight className="h-4 w-4" />
@@ -434,7 +472,7 @@ export default function HomePage() {
             <CtaLink
               href="/learn"
               location="closing-learn"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-6 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-4 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:flex-none sm:px-6"
             >
               Learn
             </CtaLink>

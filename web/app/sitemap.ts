@@ -12,13 +12,13 @@ const SITE_URL =
     : "http://localhost:3000");
 
 /**
- * "/" and everything under "/learn" are what's meant to rank — real,
- * server-rendered, static content with no user input or live data source.
- * "/terminal" is the app itself, marked `noindex` on its own page (see
- * app/terminal/page.tsx): Google's own guidance is to leave noindex pages
- * out of the sitemap rather than submit a URL you're simultaneously telling
- * it not to index. Everything else is an API route or the OAuth callback,
- * neither of which is content.
+ * "/", everything under "/learn", and "/fno-sector-rotation" are what's
+ * meant to rank — real content with no login gate. "/terminal" is the app
+ * itself, marked `noindex` on its own page (see app/terminal/page.tsx):
+ * Google's own guidance is to leave noindex pages out of the sitemap rather
+ * than submit a URL you're simultaneously telling it not to index.
+ * Everything else is an API route or the OAuth callback, neither of which
+ * is content.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticEntries: MetadataRoute.Sitemap = [
@@ -29,6 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    { url: `${SITE_URL}/fno-sector-rotation`, changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE_URL}/learn`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/learn/strategies`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/glossary`, changeFrequency: "monthly", priority: 0.7 },
