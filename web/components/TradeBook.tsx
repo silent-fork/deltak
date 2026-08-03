@@ -375,12 +375,10 @@ export const TradeBook = memo(function TradeBook({
           ))}
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-[9px] text-zinc-600">
-            {archiveError
-              ? archiveError
-              : "Synced with Supabase — survives a reload, spans every session."}
-          </span>
+        <div className="flex items-center justify-end gap-2">
+          {archiveError ? (
+            <span className="text-[9px] text-zinc-600">{archiveError}</span>
+          ) : null}
           <button
             onClick={onRefreshArchive}
             disabled={archiveLoading}
