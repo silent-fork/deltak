@@ -182,6 +182,21 @@ export class Ledger {
     return pos;
   }
 
+  /**
+   * Re-admit a position a previous session left open — same map a freshly
+   * opened position lives in, so `markToMarket` and every `runGuards` check
+   * (stop, target, invalidation, Weakening scale-out) treat it identically to
+   * one opened this session, instead of the frozen, read-only snapshot a
+   * reload otherwise leaves behind. No capital or charge is touched here:
+   * both were already applied against whatever session actually opened it,
+   * and this session's ledger has no record of that to subtract a second time.
+   */
+  restore(position: Position): void {
+    if (this.positions.has(position.id)) return;
+    this.positions.set(position.id, { ...position });
+    this.revision += 1;
+  }
+
   /** True if marking `pos` to `ltp` would leave it exactly as it is. */
   private static markIsNoop(pos: Position, ltp: number): boolean {
     return pos.ltp === r2(ltp);

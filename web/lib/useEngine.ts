@@ -15,6 +15,7 @@ import type {
   Underlying,
   UserProfile,
 } from "@/lib/types";
+import { archiveRowToPosition, type ArchiveRow } from "@/lib/engine/book";
 import {
   DEFAULT_CONFIG,
   EXCHANGE_NSE_CM,
@@ -725,6 +726,17 @@ export function useEngine(simulate: boolean) {
     return masterRef.current;
   }, [log]);
 
+  /** Every OPEN position Supabase still has on file for this account. */
+  const loadOpenPositions = useCallback(async (): Promise<Position[]> => {
+    try {
+      const rows = await api.history("positions", { limit: "100" });
+      const list = Array.isArray(rows) ? (rows as ArchiveRow[]) : [];
+      return list.map(archiveRowToPosition).filter((p) => p.status === "OPEN");
+    } catch {
+      return [];
+    }
+  }, []);
+
   useEffect(() => {
     const cfg = cfgRef.current;
     for (const u of UNDERLYINGS) {
@@ -742,11 +754,46 @@ export function useEngine(simulate: boolean) {
 
     let cancelled = false;
     void (async () => {
-      // Both before the feed: the master supplies the tokens to subscribe to,
-      // and the session supplies the credentials to subscribe with.
-      const [restored] = await Promise.all([restoreSession(), loadMaster()]);
+      // All three before the feed: the master supplies the tokens to
+      // subscribe to, the session supplies the credentials to subscribe
+      // with, and the open book supplies what to re-admit into it once it
+      // exists.
+      const [restored, , openFromDb] = await Promise.all([
+        restoreSession(),
+        loadMaster(),
+        loadOpenPositions(),
+      ]);
       if (cancelled) return;
       startFeed(restored.authenticated ? restored : sessionRef.current);
+
+      /**
+       * Re-admit whatever this account still had open at last checkpoint —
+       * mode always starts back at "paper" on a fresh load (see `switchMode`),
+       * so a stored live position has no local counterpart to reconcile
+       * against yet and is left for the broker's own book, not silently
+       * adopted here. Each restored position also needs its own option token
+       * force-subscribed: the band-based subscription in `startFeed` only
+       * covers strikes near today's ATM, and a position opened a session ago
+       * may since have drifted outside it.
+       */
+      const toRestore = openFromDb.filter((p) => p.mode === modeRef.current);
+      if (toRestore.length) {
+        for (const pos of toRestore) {
+          ledgerRef.current.restore(pos);
+          // A nonzero realised P&L on a still-open position only ever comes
+          // from a prior scale-out (see `Ledger.reduce`) — the one signal a
+          // restored position carries for "already scaled once", since the
+          // in-memory `scaled` set itself does not survive a reload.
+          if (pos.realised_pnl !== 0) scaledRef.current.add(pos.id);
+          streamRef.current?.subscribeNew(EXCHANGE_NSE_FO, [pos.token]);
+        }
+        log(
+          "INFO",
+          `Restored ${toRestore.length} open position(s) from a previous session — live monitoring resumed.`,
+        );
+        track("positions_restored", { count: toRestore.length });
+      }
+
       // Both calls catch their own errors internally, so this always settles —
       // "checked" is never stuck behind a network failure the way a gate on
       // `masterReady` alone would be.

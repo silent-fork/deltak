@@ -26,6 +26,7 @@ import {
 } from "../lib/engine/charges";
 import {
   breach,
+  checkStops,
   checkWeakeningRotation,
   decideExit,
   weakeningCorroborated,
@@ -510,6 +511,59 @@ test("scale-out keeps the residual, full scale-out closes", () => {
   assert.equal(l.realised, 20 * 150);
   l.reduce(pos.id, 2, 120);
   assert.equal(l.get(pos.id), undefined);
+});
+
+test("restore re-admits a position into live monitoring — mark-to-market and the stop-loss watchdog both reach it", async () => {
+  // Session 1 opens the position, then the tab closes — nothing here
+  // survives except what a DB checkpoint would have captured.
+  const session1 = new Ledger(500_000, 0, 25);
+  const opened = openPos(session1, 100, 2); // stop 75, target 150
+
+  // Session 2 starts fresh and knows nothing until it is restored.
+  const session2 = new Ledger(500_000, 0, 25);
+  assert.equal(session2.openPositions.length, 0);
+  session2.restore(opened);
+  assert.equal(session2.openPositions.length, 1);
+  assert.equal(session2.capital, 500_000); // restoring touches no capital or charges
+  assert.equal(session2.charges, 0);
+
+  const ticks = new TickStore();
+  const up = emptyTick("1001"); up.ltp = 120; ticks.apply(up);
+  session2.markToMarket(ticks);
+  assert.equal(session2.get(opened.id)!.unrealised_pnl, 20 * 150);
+
+  let exitedId: string | null = null;
+  const stopTick = emptyTick("1001"); stopTick.ltp = 70; ticks.apply(stopTick);
+  await checkStops({
+    ledger: session2,
+    chains: {},
+    rrg: {},
+    cfg: DEFAULT_CONFIG,
+    ltp: (token) => ticks.ltp(token),
+    exit: async (pos) => { exitedId = pos.id; },
+    scaleOut: async () => {},
+    log: () => {},
+    scaled: new Set<string>(),
+    daylightRestDone: true,
+    onDaylightRestDone: () => {},
+  });
+  assert.equal(exitedId, opened.id);
+});
+
+test("restore is idempotent — an id already held stays the live copy, not the restore attempt", () => {
+  const l = new Ledger(500_000, 0, 25);
+  const pos = openPos(l);
+  const before = l.openPositions.length;
+  l.restore({ ...pos, ltp: 999 });
+  assert.equal(l.openPositions.length, before);
+  assert.equal(l.get(pos.id)!.ltp, pos.ltp);
+});
+
+test("a scaled-out position carries nonzero realised P&L while still open — the signal restore uses to know it was already scaled once", () => {
+  const l = new Ledger(500_000, 0, 25);
+  const pos = openPos(l, 100, 4);
+  l.reduce(pos.id, 2, 120);
+  assert.notEqual(l.get(pos.id)!.realised_pnl, 0);
 });
 
 /* --------------------------------------------------------- circuit breakers */
