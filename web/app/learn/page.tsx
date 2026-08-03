@@ -49,7 +49,7 @@ export default function LearnHubPage() {
     <LearnChrome ctaLocation="learn-hub" viewEvent="learn_hub_view" crumbs={[{ label: "Learn" }]}>
       <section className="relative mx-auto max-w-4xl px-5 pb-10 pt-4 text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
-          Free · No login · Static reference
+          Free · No login · Reference
         </span>
         <h1 className="mt-4 text-balance text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl">
           The DeltaK options trading wiki

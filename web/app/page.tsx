@@ -354,7 +354,7 @@ export default function HomePage() {
           <div className="relative text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
               <BookOpen className="h-3 w-3" />
-              Free · No login · Static reference
+              Free · No login · Reference
             </span>
             <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
               The DeltaK options trading wiki
@@ -385,17 +385,6 @@ export default function HomePage() {
                 </span>
               </Link>
             ))}
-          </div>
-
-          <div className="relative mt-8 text-center">
-            <CtaLink
-              href="/learn"
-              location="learn-teaser"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-6 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
-            >
-              Browse the wiki
-              <ArrowRight className="h-4 w-4" />
-            </CtaLink>
           </div>
         </div>
       </section>
