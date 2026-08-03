@@ -165,7 +165,7 @@ export function MobileCompanion({
       />
 
       <div className="relative flex h-dvh flex-col">
-        <header className="z-10 flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-3 py-2 backdrop-blur">
+        <header className="z-10 flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
               <Zap className="h-3.5 w-3.5 text-quantum" />
