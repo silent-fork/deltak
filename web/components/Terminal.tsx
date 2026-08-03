@@ -45,6 +45,16 @@ export function Terminal() {
   const quote = snapshot?.spots[selected];
 
   /**
+   * Whether RRG should say "market closed" — the exchange's own clock, not
+   * `engine.settled`. `settled` means "nothing changed this exact tick",
+   * which stays false for as long as session-seeding or closed-market replay
+   * is still trickling data in after the bell, so using it here left the RRG
+   * panel sitting on its "still maturing" state for a stretch after close
+   * instead of admitting immediately that there is no rotation to show.
+   */
+  const marketClosedForRotation = !simulated && !(snapshot?.market_open ?? false);
+
+  /**
    * COA Matrix and Quantum Horizon both draw part of their picture from the
    * historical enrichment `useMarketData` keeps only for the focused
    * underlying — switching drops its candles and OI series the instant the
@@ -303,7 +313,7 @@ export function Terminal() {
               nodes={nodes}
               highlightToken={signal?.token}
               signal={signal}
-              settled={engine.settled}
+              settled={marketClosedForRotation}
               asOf={market.stats?.date ?? null}
               chain={chain}
             />
