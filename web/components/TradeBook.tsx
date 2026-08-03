@@ -3,9 +3,9 @@
 import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
 import { memo, useState } from "react";
 
+import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
-import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { useEngineContext } from "@/components/EngineProvider";
 import { mergeBook } from "@/lib/engine/book";
 import { istParts } from "@/lib/engine/config";
@@ -265,17 +265,8 @@ export const TradeBook = memo(function TradeBook({
 
   if (!ledger) {
     return (
-      <CardContent className="min-h-0 p-2">
-        <SkeletonPanel label="Loading the ledger">
-          <div className="grid shrink-0 grid-cols-4 gap-1">
-            {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-[30px]" />
-            ))}
-          </div>
-          <Skeleton className="h-[26px] shrink-0" />
-          <Skeleton className="h-[64px] shrink-0" />
-          <Skeleton className="h-[64px] shrink-0" />
-        </SkeletonPanel>
+      <CardContent className="relative min-h-[200px] p-2">
+        <PanelBootOverlay label="the ledger" />
       </CardContent>
     );
   }

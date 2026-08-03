@@ -12,7 +12,6 @@ import {
   wallDepth,
   wallMerged,
 } from "@/lib/coaView";
-import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { DEFAULT_CONFIG } from "@/lib/engine/config";
 import type { OiPoint, OptionChain } from "@/lib/types";
 import { cn, compact, fmt, signed } from "@/lib/utils";
@@ -531,24 +530,11 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
   // Levels derived from an empty ladder are not levels, they are placeholders.
   if (!chain?.rows.length) {
     return (
-      <Card className="min-h-0">
+      <Card className="relative min-h-[280px]">
         <CardHeader className="shrink-0">
           <CardTitle className="truncate">COA Matrix</CardTitle>
-          <Skeleton className="h-2 w-20" />
         </CardHeader>
-        <CardContent className="min-h-0 p-1.5">
-          <SkeletonPanel label="Loading COA levels">
-            <div className="grid shrink-0 grid-cols-2 gap-1.5">
-              <Skeleton className="h-[52px]" />
-              <Skeleton className="h-[52px]" />
-            </div>
-            <Skeleton className="h-[46px] shrink-0" />
-            <Skeleton className="h-[40px] shrink-0" />
-            <Skeleton className="h-[36px] shrink-0" />
-            <Skeleton className="min-h-[28px] flex-1" />
-            <Skeleton className="h-[30px] shrink-0" />
-          </SkeletonPanel>
-        </CardContent>
+        <PanelBootOverlay label="COA levels" />
       </Card>
     );
   }

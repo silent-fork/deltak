@@ -2,10 +2,10 @@
 
 import { memo, useMemo } from "react";
 
+import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { wallTags, type WallTag } from "@/lib/coaView";
 import type { OptionChain, OptionLeg } from "@/lib/types";
 import { cn, compact, fmt } from "@/lib/utils";
@@ -196,30 +196,11 @@ export const OptionChainMatrix = memo(function OptionChainMatrix({
   // An empty ladder is still loading: the master or the feed has not landed.
   if (!chain?.rows.length) {
     return (
-      <Card className="h-full min-h-0">
+      <Card className="relative h-full min-h-0">
         <CardHeader className="shrink-0">
           <CardTitle className="truncate">4-Quadrant Option Chain</CardTitle>
-          <Skeleton className="h-2 w-28" />
         </CardHeader>
-        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
-          <SkeletonPanel label="Loading the option chain">
-            <Skeleton className="h-[19px] shrink-0" />
-            {/* A ladder of strikes, each with a wider strike column in the
-                middle — the shape the rows will actually take. */}
-            {Array.from({ length: 14 }, (_, i) => (
-              <div key={i} className="flex shrink-0 items-center gap-1">
-                <Skeleton className="h-3 flex-1" />
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-3 flex-1" />
-              </div>
-            ))}
-            {/* The fixed row count above only ever fills a fixed height — on
-                anything taller than a short window it left the bottom of the
-                card as bare background instead of "still loading". This
-                takes whatever is left. */}
-            <Skeleton className="min-h-[19px] flex-1 rounded-md" />
-          </SkeletonPanel>
-        </CardContent>
+        <PanelBootOverlay label="the option chain" />
       </Card>
     );
   }

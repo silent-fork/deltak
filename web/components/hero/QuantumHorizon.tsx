@@ -1,11 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { coaMetrics } from "@/lib/coaView";
 import { DEFAULT_CONFIG, INDEX_UNIVERSE } from "@/lib/engine/config";
 import type { Candle, OptionChain, SessionStats, SpotQuote } from "@/lib/types";
@@ -313,21 +311,9 @@ export const QuantumHorizon = memo(function QuantumHorizon({
         </div>
 
         {!view ? (
-          <SkeletonPanel
-            label="Loading the open-interest profile"
-            className="h-[108px] shrink-0 justify-end rounded-md border border-zinc-800/70 bg-zinc-950/40 p-2"
-          >
-            {/* Bars either side of a centre line — the profile's own shape. */}
-            <div className="flex h-full items-center gap-[3px]">
-              {Array.from({ length: 22 }, (_, i) => (
-                <Skeleton
-                  key={i}
-                  className="flex-1"
-                  style={{ height: `${28 + ((i * 37) % 55)}%` }}
-                />
-              ))}
-            </div>
-          </SkeletonPanel>
+          <div className="relative h-[108px] shrink-0 rounded-md border border-zinc-800/70 bg-zinc-950/40">
+            <PanelBootOverlay label="the open-interest profile" />
+          </div>
         ) : (
           <>
             <div className="relative rounded-md border border-zinc-800/70 bg-zinc-950/50 px-1.5 pb-1 pt-2">
@@ -508,21 +494,7 @@ export const QuantumHorizon = memo(function QuantumHorizon({
                 </span>
               </div>
 
-              {/* Translucent, not opaque — the bars already up are real
-                  reads, not placeholders, so only the still-zero ones
-                  should read as "not here yet". */}
-              {maturing ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
-                >
-                  <Loader2 className="h-3 w-3 animate-spin text-quantum" />
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
-                    Quoting strikes · {view.matured}/{view.expected}
-                  </span>
-                </div>
-              ) : null}
+              {maturing ? <PanelBootOverlay label="strikes" /> : null}
             </div>
 
             {/* Corridor rail — Aegis, spot, Zenith at a glance */}
@@ -646,9 +618,7 @@ export const QuantumHorizon = memo(function QuantumHorizon({
 
           <div className="relative mt-1 min-h-0 flex-1">
             {!traceView ? (
-              <SkeletonPanel label="Loading the spot trace" className="h-full">
-                <Skeleton className="h-full min-h-0 w-full rounded" />
-              </SkeletonPanel>
+              <PanelBootOverlay label="the spot trace" />
             ) : (
               <svg
                 viewBox={`0 0 ${TW} ${TH}`}
@@ -764,18 +734,7 @@ export const QuantumHorizon = memo(function QuantumHorizon({
                 profile above is still filling in, so it carries the same
                 "not settled yet" scrim rather than looking finished while
                 the panel above it plainly isn't. */}
-            {traceView && maturing ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="absolute inset-0 flex items-center justify-center gap-1.5 rounded bg-zinc-950/55 backdrop-blur-[1px]"
-              >
-                <Loader2 className="h-3 w-3 animate-spin text-quantum" />
-                <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
-                  Quoting strikes · {view?.matured}/{view?.expected}
-                </span>
-              </div>
-            ) : null}
+            {traceView && maturing ? <PanelBootOverlay label="strikes" /> : null}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Loader2, Moon, TrendingDown, TrendingUp, Waves } from "lucide-react";
+import { ArrowLeftRight, Moon, TrendingDown, TrendingUp, Waves } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -14,9 +14,9 @@ import {
   ZAxis,
 } from "recharts";
 
+import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton, SkeletonPanel } from "@/components/ui/skeleton";
 import { DEFAULT_CONFIG, INDEX_UNIVERSE } from "@/lib/engine/config";
 import type { OptionChain, Protocol, RrgNode, Signal } from "@/lib/types";
 import { PROTOCOL_META, QUADRANT_META, cn, fmt } from "@/lib/utils";
@@ -256,48 +256,9 @@ export const RrgScatter = memo(function RrgScatter({
               </span>
             </div>
           ) : visible.length === 0 ? (
-            <SkeletonPanel
-              label={
-                expected > 0
-                  ? `0/${expected} nodes matured — waiting for a genuine price move`
-                  : "Loading rotation nodes"
-              }
-              className="h-full"
-            >
-              {/* The plot's own geometry — quadrants and a scatter of nodes —
-                  rather than a filled slab where the chart will be. */}
-              <div className="relative h-full min-h-0 w-full rounded-md border border-zinc-800/70">
-                <span className="absolute left-1/2 top-0 h-full w-px bg-zinc-800/60" />
-                <span className="absolute left-0 top-1/2 h-px w-full bg-zinc-800/60" />
-                {[
-                  ["28%", "34%"],
-                  ["62%", "22%"],
-                  ["44%", "58%"],
-                  ["71%", "66%"],
-                ].map(([left, top]) => (
-                  <Skeleton
-                    key={`${left}-${top}`}
-                    className="absolute h-2 w-2 rounded-full"
-                    style={{ left, top }}
-                  />
-                ))}
-                {/*
-                  A chain that has legs quoting but zero matured nodes is a
-                  different state from "the chain doesn't exist yet" — the
-                  bare geometric skeleton above says the latter; this says the
-                  pipeline is live and is specifically waiting on a real print,
-                  which on a thin instrument can be the actual bottleneck.
-                */}
-                {expected > 0 ? (
-                  <div className="absolute inset-0 flex items-center justify-center gap-1.5 px-2 text-center">
-                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-quantum" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-                      0/{expected} matured — awaiting a genuine price move
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </SkeletonPanel>
+            <div className="relative h-full min-h-0 w-full rounded-md border border-zinc-800/70">
+              <PanelBootOverlay label="rotation nodes" />
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 8, right: 14, bottom: 4, left: -14 }}>
@@ -350,21 +311,8 @@ export const RrgScatter = memo(function RrgScatter({
             </ResponsiveContainer>
           )}
 
-          {/* Translucent, not opaque — nodes are already real and placed
-              correctly, so blacking them out would be lying about how much
-              is actually known. This just says the picture isn't finished
-              yet. */}
           {visible.length > 0 && maturing ? (
-            <div
-              role="status"
-              aria-live="polite"
-              className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-md bg-zinc-950/55 backdrop-blur-[1px]"
-            >
-              <Loader2 className="h-3 w-3 animate-spin text-quantum" />
-              <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-400">
-                Maturing nodes · {nodes.length}/{expected}
-              </span>
-            </div>
+            <PanelBootOverlay label="rotation nodes" />
           ) : null}
         </div>
 
