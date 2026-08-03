@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronDown, Loader2, RefreshCw, Smartphone } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Smartphone, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics";
-import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { api, type PairedDevice } from "@/lib/api";
+import { cn, timeAgo } from "@/lib/utils";
 
 const mmss = (seconds: number) => {
   const s = Math.max(0, Math.round(seconds));
@@ -94,12 +94,16 @@ function QrThumb({
  */
 export function PairMobileSection() {
   const [qrSvg, setQrSvg] = useState<string | null>(null);
-  const [claimUrl, setClaimUrl] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const expiresAtRef = useRef(0);
+
+  const [devices, setDevices] = useState<PairedDevice[]>([]);
+  const [maxDevices, setMaxDevices] = useState(3);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   /**
    * `isRefresh` distinguishes the QR this section auto-mints the moment it
@@ -113,7 +117,6 @@ export function PairMobileSection() {
     try {
       const res = await api.mobile.pair();
       setQrSvg(res.qr_svg);
-      setClaimUrl(res.claim_url);
       expiresAtRef.current = new Date(res.expires_at).getTime();
       setSecondsLeft(Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000)));
       track(isRefresh ? "mobile_pair_qr_refreshed" : "mobile_pair_qr_minted");
@@ -140,44 +143,79 @@ export function PairMobileSection() {
     return () => clearInterval(id);
   }, [qrSvg]);
 
+  /** Best-effort — a failed read here still leaves QR minting fully usable. */
+  const loadDevices = useCallback(async () => {
+    try {
+      const res = await api.mobile.devices();
+      setDevices(res.devices);
+      setMaxDevices(res.max_devices);
+    } catch {
+      // Left as whatever was last known good.
+    } finally {
+      setDevicesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDevices();
+    // A phone paired from elsewhere while this dropdown sits open should
+    // still show up without the operator having to close and reopen it.
+    const id = setInterval(() => void loadDevices(), 8_000);
+    return () => clearInterval(id);
+  }, [loadDevices]);
+
+  const removeDevice = useCallback(
+    async (sessionId: string) => {
+      setRemovingId(sessionId);
+      try {
+        await api.mobile.removeDevice(sessionId);
+        track("mobile_device_removed");
+        await loadDevices();
+      } catch (err) {
+        track("mobile_device_remove_failed", {
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        setRemovingId(null);
+      }
+    },
+    [loadDevices],
+  );
+
   const expired = qrSvg !== null && secondsLeft <= 0;
+  const atDeviceCap = devicesLoaded && devices.length >= maxDevices;
 
   if (expanded) {
     return (
-      <div className="flex flex-col items-center gap-2 py-1">
+      <div className="flex flex-col items-center gap-1">
         <QrThumb
           qrSvg={qrSvg}
           expired={expired}
           busy={busy}
-          size={176}
+          size={128}
           onReload={expired || error ? () => void mint(true) : undefined}
         />
 
         {error ? (
-          <p className="text-center text-[10px] text-rose-300">{error}</p>
+          <p className="text-center text-[9.5px] text-rose-300">{error}</p>
         ) : qrSvg && !expired ? (
-          <p className="font-mono text-[10px] text-zinc-500">
+          <p className="font-mono text-[9.5px] text-zinc-500">
             Expires in <span className="text-zinc-300">{mmss(secondsLeft)}</span>
           </p>
         ) : null}
 
-        <p className="max-w-[15rem] text-center text-[10px] leading-relaxed text-zinc-500">
-          Scan with your phone&apos;s own camera app — opens straight into the companion,
-          no sign-in screen involved.
+        <p className="max-w-[15rem] text-center text-[9.5px] leading-snug text-zinc-500">
+          {atDeviceCap
+            ? `${maxDevices} of ${maxDevices} phones already paired — remove one below to free a slot.`
+            : "Scan with your phone's camera app — no sign-in screen involved."}
         </p>
 
-        {claimUrl && !expired ? (
-          <p className="max-w-full truncate text-[9px] text-zinc-700" title={claimUrl}>
-            {claimUrl}
-          </p>
-        ) : null}
-
-        <div className="flex items-center gap-1.5">
+        <div className="mt-0.5 flex items-center gap-1.5">
           {expired || error ? (
             <button
               onClick={() => void mint(true)}
               disabled={busy}
-              className="flex h-6 items-center gap-1 rounded border border-quantum/50 bg-quantum/10 px-2 text-[9.5px] font-semibold uppercase tracking-wider text-quantum hover:bg-quantum/20 disabled:opacity-50"
+              className="flex h-5.5 items-center gap-1 rounded border border-quantum/50 bg-quantum/10 px-2 text-[9px] font-semibold uppercase tracking-wider text-quantum hover:bg-quantum/20 disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               New QR
@@ -185,11 +223,52 @@ export function PairMobileSection() {
           ) : null}
           <button
             onClick={() => setExpanded(false)}
-            className="flex h-6 items-center gap-1 rounded border border-zinc-800 bg-zinc-900/60 px-2 text-[9.5px] font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
+            className="flex h-5.5 items-center gap-1 rounded border border-zinc-800 bg-zinc-900/60 px-2 text-[9px] font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
           >
             <ChevronDown className="h-3 w-3 rotate-180" />
             Collapse
           </button>
+        </div>
+
+        <div className="mt-0.5 w-full border-t border-zinc-800/70 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="dk-label text-[8px]">Paired devices</span>
+            {devicesLoaded ? (
+              <span className="font-mono text-[9px] text-zinc-600">
+                {devices.length}/{maxDevices}
+              </span>
+            ) : null}
+          </div>
+          {devicesLoaded && devices.length === 0 ? (
+            <p className="mt-1 text-[9.5px] text-zinc-600">No phones paired yet.</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {devices.map((d, i) => (
+                <li
+                  key={d.session_id}
+                  className="flex items-center justify-between gap-2 rounded border border-zinc-800 bg-zinc-900/50 px-2 py-1"
+                >
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <Smartphone className="h-3 w-3 shrink-0 text-zinc-500" />
+                    <span className="truncate text-[10px] text-zinc-300">Phone {i + 1}</span>
+                    <span className="shrink-0 text-[9px] text-zinc-600">· {timeAgo(d.paired_at)}</span>
+                  </div>
+                  <button
+                    onClick={() => void removeDevice(d.session_id)}
+                    disabled={removingId === d.session_id}
+                    title="Remove this device"
+                    className="shrink-0 rounded p-0.5 text-zinc-600 hover:bg-rose-500/10 hover:text-rose-300 disabled:opacity-50"
+                  >
+                    {removingId === d.session_id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <X className="h-3 w-3" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     );
@@ -212,8 +291,15 @@ export function PairMobileSection() {
         onReload={expired || error ? () => void mint(true) : undefined}
       />
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] text-zinc-300 group-hover:text-zinc-100">
-          {error ? "Pairing failed" : expired ? "QR expired" : "Scan to pair a phone"}
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-[11px] text-zinc-300 group-hover:text-zinc-100">
+            {error ? "Pairing failed" : expired ? "QR expired" : "Scan to pair a phone"}
+          </span>
+          {devicesLoaded && devices.length > 0 ? (
+            <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/80 px-1 py-0.5 font-mono text-[8.5px] text-zinc-500">
+              {devices.length}/{maxDevices} paired
+            </span>
+          ) : null}
         </span>
         <span className="block text-[9.5px] text-zinc-600">
           {error ? "Tap to retry" : expired ? "Tap for a new one" : "Live from desktop · tap to enlarge"}

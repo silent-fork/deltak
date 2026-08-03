@@ -218,8 +218,23 @@ export const api = {
     /** What the paired phone polls — never touches Angel One. */
     state: () => request<MobileStateResponse>("/api/mobile/state"),
     logout: () => request<{ paired: boolean }>("/api/mobile/logout", { method: "POST" }),
+    /** Desktop's own list of every phone currently paired to this account. */
+    devices: () =>
+      request<{ devices: PairedDevice[]; max_devices: number }>("/api/mobile/devices"),
+    /** Desktop unpairs one phone by session id, freeing a slot toward the cap. */
+    removeDevice: (sessionId: string) =>
+      request<{ removed: boolean }>(`/api/mobile/devices/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+      }),
   },
 };
+
+/** One row of `GET /api/mobile/devices`. */
+export interface PairedDevice {
+  session_id: string;
+  paired_at: string;
+  last_seen_at: string;
+}
 
 /** `GET /api/mobile/state` — the desktop's last pushed signal mirror, plus this account's positions. */
 export interface MobileStateResponse {

@@ -7,8 +7,10 @@ import {
   claimMobilePairing as claimPairingToken,
   createMobilePairing,
   createMobileSession,
+  listMobileSessions,
   readMobileSession,
   revokeMobileSession,
+  revokeMobileSessionForClient,
   writeLiveSignal,
 } from "@/lib/supabase";
 
@@ -38,6 +40,9 @@ export const MOBILE_SESSION_COOKIE_OPTIONS = {
 
 /** How long a QR stays scannable before the desktop has to show a fresh one. */
 const PAIRING_TTL_MS = 2 * 60_000;
+
+/** How many phones one account may keep paired at once. */
+export const MAX_PAIRED_DEVICES = 3;
 
 /**
  * Mint a QR the phone's own camera can scan directly — no in-app scanner, no
@@ -72,13 +77,47 @@ export async function startMobilePairing(
   return { claimUrl, expiresAt, qrSvg };
 }
 
-/** Burn the QR's token and open a new mobile session for whichever account minted it. */
-export async function completeMobilePairing(token: string): Promise<string | null> {
+export type PairingOutcome =
+  | { status: "paired"; sessionId: string }
+  | { status: "invalid" }
+  | { status: "limit" };
+
+/**
+ * Burn the QR's token and open a new mobile session for whichever account
+ * minted it — unless that account already has `MAX_PAIRED_DEVICES` phones
+ * live, in which case the token is still burned (it was single-use the
+ * moment it was scanned) but no session opens. The desktop's own device list
+ * is where a slot actually gets freed.
+ */
+export async function completeMobilePairing(token: string): Promise<PairingOutcome> {
   const clientCode = await claimPairingToken(token);
-  if (!clientCode) return null;
+  if (!clientCode) return { status: "invalid" };
+  const active = await listMobileSessions(clientCode);
+  if (active.length >= MAX_PAIRED_DEVICES) return { status: "limit" };
   const sessionId = randomUUID();
   await createMobileSession(clientCode, sessionId);
-  return sessionId;
+  return { status: "paired", sessionId };
+}
+
+export interface PairedDevice {
+  sessionId: string;
+  pairedAt: string;
+  lastSeenAt: string;
+}
+
+/** Every phone currently paired to this account, for the desktop's own device list. */
+export async function listPairedDevices(clientCode: string): Promise<PairedDevice[]> {
+  const rows = await listMobileSessions(clientCode);
+  return rows.map((r) => ({
+    sessionId: r.session_id,
+    pairedAt: r.created_at,
+    lastSeenAt: r.last_seen_at,
+  }));
+}
+
+/** "Remove this device" from the desktop's profile menu — frees a pairing slot. */
+export async function removePairedDevice(clientCode: string, sessionId: string): Promise<boolean> {
+  return revokeMobileSessionForClient(clientCode, sessionId);
 }
 
 /** The client code a paired phone's cookie is still good for, or null if it never was one. */

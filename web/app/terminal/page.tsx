@@ -52,5 +52,5 @@ export default async function TerminalRoute({
   const { mobile } = await searchParams;
   if (clientCode) return <MobileCompanion clientCode={clientCode} justPaired={mobile === "paired"} />;
 
-  return <MobilePairScreen expired={mobile === "expired"} />;
+  return <MobilePairScreen expired={mobile === "expired"} limitReached={mobile === "limit"} />;
 }

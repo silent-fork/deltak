@@ -1,7 +1,8 @@
-import { QrCode, ScanLine, ShieldCheck } from "lucide-react";
+import { QrCode, ScanLine, ShieldCheck, Smartphone } from "lucide-react";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { Wordmark } from "@/components/Wordmark";
+import { MAX_PAIRED_DEVICES } from "@/lib/server/mobile";
 
 /**
  * What a phone sees at `/terminal` before it's paired.
@@ -12,10 +13,32 @@ import { Wordmark } from "@/components/Wordmark";
  * that and waits. Angel One's client-code/PIN/TOTP form never renders on
  * mobile at all — this replaces it entirely on a mobile user agent.
  */
-export function MobilePairScreen({ expired }: { expired?: boolean }) {
+export function MobilePairScreen({
+  expired,
+  limitReached,
+}: {
+  expired?: boolean;
+  /** This account already has `MAX_PAIRED_DEVICES` phones paired — the QR was valid, but claiming it was refused. */
+  limitReached?: boolean;
+}) {
+  const steps = limitReached
+    ? [
+        "Open the DeltaK terminal on your desktop",
+        "Open the profile menu, top right",
+        "Remove a phone under Paired devices, then scan again",
+      ]
+    : [
+        "Sign in to the terminal on your desktop",
+        "Open the profile menu, top right",
+        "Scan the QR with your camera app",
+      ];
+
   return (
     <main className="dk-grid-bg relative h-dvh overflow-hidden bg-zinc-950">
-      <AnalyticsBeacon event="mobile_pair_screen_view" data={{ expired: Boolean(expired) }} />
+      <AnalyticsBeacon
+        event="mobile_pair_screen_view"
+        data={{ expired: Boolean(expired), limit_reached: Boolean(limitReached) }}
+      />
 
       <div
         aria-hidden
@@ -32,24 +55,30 @@ export function MobilePairScreen({ expired }: { expired?: boolean }) {
 
         <div className="dk-panel relative mt-8 w-full max-w-xs rounded-2xl p-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-quantum/40 bg-quantum/10">
-            <ScanLine className="h-6 w-6 text-quantum" />
+            {limitReached ? (
+              <Smartphone className="h-6 w-6 text-quantum" />
+            ) : (
+              <ScanLine className="h-6 w-6 text-quantum" />
+            )}
           </div>
 
           <h1 className="mt-4 text-[15px] font-semibold text-zinc-50">
-            {expired ? "That QR expired" : "Pair this phone"}
+            {limitReached
+              ? `${MAX_PAIRED_DEVICES} phones already paired`
+              : expired
+                ? "That QR expired"
+                : "Pair this phone"}
           </h1>
           <p className="mx-auto mt-2 max-w-[22rem] text-[12.5px] leading-relaxed text-zinc-400">
-            {expired
-              ? "QR codes stay valid for two minutes. Open DeltaK on your desktop and scan the fresh one."
-              : "Open the DeltaK terminal on your desktop, open the profile menu, and scan the QR with this phone's camera — not a QR reader inside this page."}
+            {limitReached
+              ? `This account already has ${MAX_PAIRED_DEVICES} phones paired — DeltaK's cap. Remove one from the desktop's profile menu, then scan again.`
+              : expired
+                ? "QR codes stay valid for two minutes. Open DeltaK on your desktop and scan the fresh one."
+                : "Open the DeltaK terminal on your desktop, open the profile menu, and scan the QR with this phone's camera — not a QR reader inside this page."}
           </p>
 
           <ol className="mt-5 space-y-2.5 text-left">
-            {[
-              "Sign in to the terminal on your desktop",
-              "Open the profile menu, top right",
-              "Scan the QR with your camera app",
-            ].map((step, i) => (
+            {steps.map((step, i) => (
               <li key={step} className="flex items-start gap-2.5">
                 <span className="mt-px flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-zinc-700 font-mono text-[10px] font-bold text-zinc-500">
                   {i + 1}

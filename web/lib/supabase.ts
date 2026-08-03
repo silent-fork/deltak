@@ -566,6 +566,58 @@ export async function revokeMobileSession(sessionId: string): Promise<void> {
   });
 }
 
+export interface MobileSessionRow {
+  session_id: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
+/** Every phone currently paired to this account, oldest first. */
+export async function listMobileSessions(clientCode: string): Promise<MobileSessionRow[]> {
+  if (!supabaseConfigured || !clientCode) return [];
+  const search = new URLSearchParams({
+    select: "session_id,created_at,last_seen_at",
+    client_code: `eq.${clientCode}`,
+    revoked_at: "is.null",
+    order: "created_at.asc",
+  });
+  const res = await fetch(`${base()}/${MOBILE_SESSIONS}?${search.toString()}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return Array.isArray(body) ? (body as MobileSessionRow[]) : [];
+}
+
+/**
+ * "Remove this device" from the desktop's side — scoped to `clientCode` so
+ * one account can never revoke a phone paired to another. Returns whether a
+ * row actually matched: the desktop's list can be a poll or two stale, and a
+ * phone that unpaired itself in the meantime should read as "already gone",
+ * not an error.
+ */
+export async function revokeMobileSessionForClient(
+  clientCode: string,
+  sessionId: string,
+): Promise<boolean> {
+  if (!supabaseConfigured || !clientCode || !sessionId) return false;
+  const search = new URLSearchParams({
+    client_code: `eq.${clientCode}`,
+    session_id: `eq.${sessionId}`,
+    revoked_at: "is.null",
+  });
+  const res = await fetch(`${base()}/${MOBILE_SESSIONS}?${search.toString()}`, {
+    method: "PATCH",
+    headers: headers("return=representation"),
+    body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+    cache: "no-store",
+  });
+  if (!res.ok) return false;
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 /** Overwritten on every throttled push from the desktop tab — a mirror, not a log. */
 export async function writeLiveSignal(clientCode: string, snapshot: unknown): Promise<void> {
   if (!supabaseConfigured || !clientCode) return;
