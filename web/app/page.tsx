@@ -4,11 +4,15 @@ import {
   Bot,
   BookOpen,
   Building2,
+  Crosshair,
+  KeyRound,
   Layers,
   LineChart,
   LockKeyhole,
   Radar,
   Repeat2,
+  Rocket,
+  ScanLine,
   ShieldAlert,
   Sigma,
   Table2,
@@ -107,21 +111,25 @@ const PROTOCOLS = [
 const STEPS = [
   {
     n: "01",
+    icon: KeyRound,
     title: "Sign in with SmartAPI",
     body: "Client code, PIN and a six-digit TOTP — the same loginByPassword flow you'd use on Angel One directly. Nothing is stored beyond the session.",
   },
   {
     n: "02",
+    icon: ScanLine,
     title: "The engine reads the tape",
     body: "COA wall migration, RRG rotation and OI buildup recompute every second the market's open, across NIFTY, BANKNIFTY and FINNIFTY.",
   },
   {
     n: "03",
+    icon: Crosshair,
     title: "A signal arms",
     body: "Protocol, the Zero-OTM strike rule and the RRG quadrant all have to agree before anything is actionable — one dissent and it stays on standby.",
   },
   {
     n: "04",
+    icon: Rocket,
     title: "Autopilot fires, or you do",
     body: "An armed signal executes itself in Autopilot, or waits for a manual click — same sizing and risk gates either way, against simulated fills in Paper mode.",
   },
@@ -329,24 +337,32 @@ export default function HomePage() {
       </section>
 
       {/* How it works */}
-      <section className="relative mx-auto max-w-4xl px-5 py-10">
+      <section className="relative mx-auto max-w-6xl px-5 py-10">
         <h2 className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
           How it works
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {STEPS.map((s) => (
-            <div key={s.n} className="flex gap-3 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-4">
-              <span className="shrink-0 font-mono text-xl font-bold text-quantum/40">
-                {s.n}
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-[13px] font-semibold text-zinc-100">
-                  {s.title}
-                </h3>
-                <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-500">
-                  {s.body}
-                </p>
+
+        <div className="relative mt-12 grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((s, i) => (
+            <div key={s.n} className="relative flex flex-col items-center text-center lg:items-start lg:text-left">
+              <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-quantum/40 bg-zinc-950">
+                <s.icon className="h-5 w-5 text-quantum" />
+                <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 font-mono text-[9px] font-bold text-zinc-500">
+                  {s.n}
+                </span>
               </div>
+              {i < STEPS.length - 1 ? (
+                <ArrowRight
+                  aria-hidden
+                  className="absolute -right-[1.35rem] top-6 hidden h-4 w-4 -translate-y-1/2 text-quantum/40 lg:block"
+                />
+              ) : null}
+              <h3 className="mt-4 text-[13.5px] font-semibold text-zinc-100">
+                {s.title}
+              </h3>
+              <p className="mt-1.5 max-w-[15rem] text-[12.5px] leading-relaxed text-zinc-500 lg:max-w-none">
+                {s.body}
+              </p>
             </div>
           ))}
         </div>
