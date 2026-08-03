@@ -4,6 +4,7 @@ import { AlertTriangle, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SectorRotationApiResponse } from "@/lib/sectors/types";
 
 import { MarketPulse } from "./MarketPulse";
@@ -67,9 +68,44 @@ export function SectorDashboard() {
   }, []);
 
   if (state.status === "loading") {
+    // The real layout, not a placeholder box: each card renders with its own
+    // title so the shape of the dashboard is visible immediately, and a
+    // `PanelBootOverlay` sits over each one individually — matching how
+    // every other panel in this app boots (see `RrgScatter.tsx`) — rather
+    // than one generic spinner standing in for the whole page.
     return (
-      <div className="relative min-h-[70vh] rounded-lg border border-zinc-800/70 bg-zinc-900/30">
-        <PanelBootOverlay label="sector rotation" />
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="relative h-[52px] shrink-0 overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-900/40 shadow-panel backdrop-blur-sm">
+          <PanelBootOverlay label="market pulse" />
+        </div>
+
+        <div className="grid min-h-0 grid-cols-1 gap-3 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <Card className="min-h-0 border-quantum/20">
+            <CardHeader>
+              <CardTitle className="text-quantum">Sector Rotation RRG</CardTitle>
+            </CardHeader>
+            <CardContent className="relative min-h-[280px] flex-1 lg:min-h-[160px]">
+              <PanelBootOverlay label="sector rotation" />
+            </CardContent>
+          </Card>
+          <Card className="min-h-0 max-h-[380px] lg:max-h-none">
+            <CardHeader>
+              <CardTitle>Sector Leaderboard</CardTitle>
+            </CardHeader>
+            <CardContent className="relative min-h-[200px] flex-1">
+              <PanelBootOverlay label="sector leaderboard" />
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="min-h-0 shrink-0">
+          <CardHeader>
+            <CardTitle>Top F&amp;O Picks · Leading Sectors</CardTitle>
+          </CardHeader>
+          <CardContent className="relative min-h-[140px]">
+            <PanelBootOverlay label="top picks" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -126,9 +162,23 @@ export function SectorDashboard() {
 
       <TopPicks entries={data.picks} />
 
-      <div className="flex shrink-0 items-center justify-center gap-1.5 py-2 font-mono text-[9px] uppercase tracking-wider text-zinc-700">
-        <Zap className="h-2.5 w-2.5" />
-        Sourced from NSE bhavcopy &amp; niftyindices.com — independent of Angel One
+      <div className="flex shrink-0 flex-col items-center justify-center gap-1.5 py-2">
+        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-700">
+          <Zap className="h-2.5 w-2.5" />
+          Sourced from NSE bhavcopy &amp; niftyindices.com
+        </span>
+        {/* Same tricolour-swatch treatment as the homepage footer. */}
+        <span className="flex items-center gap-1.5 text-[10px] text-zinc-600">
+          <span
+            aria-hidden
+            className="inline-flex h-2 w-3 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
+          >
+            <span className="h-1/3 w-full bg-[#FF9933]" />
+            <span className="h-1/3 w-full bg-white" />
+            <span className="h-1/3 w-full bg-[#138808]" />
+          </span>
+          Made with <span className="text-rose-400">♥</span> in Bharat
+        </span>
       </div>
     </div>
   );

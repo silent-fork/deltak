@@ -56,19 +56,16 @@ export default function FnoRotationPage() {
             </span>
           </div>
           {/*
-            Hidden below `sm` — on a phone the logo, badge and Terminal
-            button already fill the row on their own; the title just wraps
-            it onto a second line for no benefit when the page itself
-            already says what it is.
+            Hidden below `sm` — on a phone the logo and Terminal button
+            already fill the row on their own; the title just wraps it onto
+            a second line for no benefit when the page itself already says
+            what it is.
           */}
           <div className="hidden min-w-0 sm:block">
             <h1 className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-300 sm:text-xs">
               F&amp;O Sector Rotation
             </h1>
           </div>
-          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-300">
-            No login
-          </span>
           <CtaLink
             href="/terminal"
             location="fno-nav"
