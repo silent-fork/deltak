@@ -148,7 +148,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
   weakeningMinAdverseMovePct: 0.05,
-  maxPositionCapitalPct: 25,
+  maxPositionCapitalPct: 40,
   maxPortfolioRiskPct: 60,
   pcrDivergencePct: 40,
 
