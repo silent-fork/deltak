@@ -35,7 +35,7 @@ function LegCells({
   if (!leg) {
     return (
       <>
-        {Array.from({ length: 6 }, (_, i) => (
+        {Array.from({ length: 5 }, (_, i) => (
           <td key={i} className="px-1.5 py-1 text-zinc-700">
             —
           </td>
@@ -52,18 +52,6 @@ function LegCells({
   const cells = [
     <td key="rrg" className="px-1.5 py-1">
       <QuadrantPill quadrant={leg.quadrant} compact />
-    </td>,
-
-    <td
-      key="rs"
-      className="px-1.5 py-1 font-mono text-[9px] text-zinc-600"
-      title={
-        leg.rs_ratio !== null
-          ? `RS-Ratio ${fmt(leg.rs_ratio)} · RS-Momentum ${fmt(leg.rs_momentum)}`
-          : "RRG node not yet seeded"
-      }
-    >
-      {leg.rs_ratio !== null ? fmt(leg.rs_ratio, 1) : "—"}
     </td>,
 
     <td key="vol" className="px-1.5 py-1 font-mono text-[10px] text-zinc-500">
@@ -87,7 +75,10 @@ function LegCells({
 
     <td
       key="ba"
-      className="px-1.5 py-1 font-mono text-[9.5px] tabular-nums"
+      className={cn(
+        "px-1.5 py-1 font-mono text-[9.5px] tabular-nums",
+        side === "call" && "text-left",
+      )}
       title={
         spread !== null
           ? `Bid ${fmt(leg.best_bid)} / Ask ${fmt(leg.best_ask)} — spread ${fmt(spread)}`
@@ -111,13 +102,18 @@ function LegCells({
 
     <td
       key="ltp"
-      className="px-1.5 py-1"
+      className={cn("px-1.5 py-1", side === "call" && "text-left")}
       title={`${leg.trading_symbol} · ${leg.moneyness}${leg.itm_depth > 0 ? ` depth ${leg.itm_depth}` : ""}`}
     >
       {/* A contract that has not traded has no price. Quoting 0.00 for it
           reads as "worthless", which is a very different claim. */}
       {leg.ltp > 0 ? (
-        <span className="flex items-baseline justify-end gap-1 whitespace-nowrap">
+        <span
+          className={cn(
+            "flex items-baseline gap-1 whitespace-nowrap",
+            side === "call" ? "justify-start" : "justify-end",
+          )}
+        >
           <span
             className={cn(
               "font-mono text-[13px] font-bold tabular-nums",
@@ -165,11 +161,10 @@ const BAND_TH =
 const COL_TH =
   "sticky top-[19px] z-20 h-[19px] bg-zinc-900 px-1.5 py-0.5 font-medium shadow-[0_1px_0_rgb(39,39,42)]";
 
-const HEAD = ["RRG", "RS", "Vol", "OI", "Bid·Ask", "LTP"] as const;
+const HEAD = ["RRG", "Vol", "OI", "Bid·Ask", "LTP"] as const;
 
 const HEAD_TITLE: Record<string, string> = {
   RRG: "Relative-rotation quadrant for this contract.",
-  RS: "RS-Ratio — relative strength against the index.",
   Vol: "Session volume.",
   OI: "Cumulative open interest.",
   "Bid·Ask": "Best bid and ask.",
@@ -267,19 +262,23 @@ export const OptionChainMatrix = memo(function OptionChainMatrix({
           <thead>
             <tr className="text-[9px] uppercase tracking-wider text-zinc-500">
               <th
-                colSpan={6}
+                colSpan={5}
                 className={cn(BAND_TH, "text-center text-emerald-500/80")}
               >
                 Calls
               </th>
               <th className={cn(BAND_TH, "text-center text-quantum/80")}>Strike</th>
-              <th colSpan={6} className={cn(BAND_TH, "text-center text-rose-500/80")}>
+              <th colSpan={5} className={cn(BAND_TH, "text-center text-rose-500/80")}>
                 Puts
               </th>
             </tr>
             <tr className="text-[9px] uppercase tracking-wider text-zinc-600">
               {[...HEAD].reverse().map((h) => (
-                <th key={`c-${h}`} className={COL_TH} title={HEAD_TITLE[h]}>
+                <th
+                  key={`c-${h}`}
+                  className={cn(COL_TH, (h === "LTP" || h === "Bid·Ask") && "text-left")}
+                  title={HEAD_TITLE[h]}
+                >
                   {h}
                 </th>
               ))}
