@@ -193,8 +193,19 @@ export const OptionChainMatrix = memo(function OptionChainMatrix({
     );
   }, [chain]);
 
-  // An empty ladder is still loading: the master or the feed has not landed.
-  if (!chain?.rows.length) {
+  /**
+   * The strike ladder exists the instant the scrip master builds it — every
+   * cell still reads zero until the feed (or a closed-market replay) has
+   * actually quoted something. A ladder of dashes is not "loaded" just
+   * because the rows exist, so the boot overlay stays up until at least one
+   * leg has a real print, not merely until `chain.rows.length` is nonzero.
+   */
+  const hasLtp = useMemo(
+    () => !!chain?.rows.some((r) => (r.call?.ltp ?? 0) > 0 || (r.put?.ltp ?? 0) > 0),
+    [chain],
+  );
+
+  if (!chain?.rows.length || !hasLtp) {
     return (
       <Card className="relative h-full min-h-0">
         <CardHeader className="shrink-0">
