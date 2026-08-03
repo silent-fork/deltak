@@ -728,7 +728,12 @@ export function useEngine(simulate: boolean) {
   useEffect(() => {
     const cfg = cfgRef.current;
     for (const u of UNDERLYINGS) {
-      const rrg = new RrgEngine(cfg.rrgWindow, cfg.rrgMomentumLookback, cfg.rrgTailLength);
+      const rrg = new RrgEngine(
+        cfg.rrgWindow,
+        cfg.rrgMomentumLookback,
+        cfg.rrgTailLength,
+        INDEX_UNIVERSE[u].rrgMinSamples,
+      );
       const builder = new ChainBuilder(u, rrg, cfg);
       rrgRef.current[u] = rrg;
       buildersRef.current[u] = builder;

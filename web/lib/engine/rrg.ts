@@ -58,6 +58,8 @@ export class RrgEngine {
     private window = 40,
     private momentumLookback = 5,
     private tailLength = 12,
+    /** Genuine-price-change threshold before a node matures. Per-instance so a thinly-traded underlying can mature sooner than the shared default. */
+    private minSamples = MIN_SAMPLES,
   ) {}
 
   private state(token: string): NodeState {
@@ -107,8 +109,8 @@ export class RrgEngine {
 
     // Until we have a meaningful sample, pull the node toward the origin so the
     // HUD does not present noise as conviction.
-    if (s.samples < MIN_SAMPLES) {
-      const damp = s.samples / MIN_SAMPLES;
+    if (s.samples < this.minSamples) {
+      const damp = s.samples / this.minSamples;
       rsRatio = 100 + (rsRatio - 100) * damp;
       rsMomentum = 100 + (rsMomentum - 100) * damp;
     }
@@ -138,7 +140,7 @@ export class RrgEngine {
 
   matured(token: string): boolean {
     const s = this.nodes.get(token);
-    return !!s && s.samples >= MIN_SAMPLES;
+    return !!s && s.samples >= this.minSamples;
   }
 
   reset(token?: string): void {

@@ -181,6 +181,20 @@ test("a stale, repeated print does not advance maturity", () => {
   assert.ok(!e.matured("T1"));
 });
 
+test("a custom minSamples matures a thinly-traded node sooner", () => {
+  const e = new RrgEngine(10, 2, 5, 4);
+  let price = 100;
+  for (let i = 1; i < 4; i++) { price *= 1.05; e.update("T1", price, 20_000); assert.ok(!e.matured("T1")); }
+  e.update("T1", price * 1.05, 20_000);
+  assert.ok(e.matured("T1"));
+});
+
+test("FINNIFTY declares a lower RRG maturity threshold than NIFTY/BANKNIFTY", () => {
+  assert.ok((INDEX_UNIVERSE.FINNIFTY.rrgMinSamples ?? MIN_SAMPLES) < MIN_SAMPLES);
+  assert.equal(INDEX_UNIVERSE.NIFTY.rrgMinSamples, undefined);
+  assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgMinSamples, undefined);
+});
+
 /* --------------------------------------------------------------------- COA */
 
 test("itm depth and nearest strike", () => {

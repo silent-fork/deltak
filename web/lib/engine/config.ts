@@ -29,6 +29,16 @@ export interface IndexSpec {
   spotTokenFallback: string;
   strikeStep: number;
   lotSize: number;
+  /**
+   * Override for `RrgEngine`'s default genuine-price-change threshold
+   * (`MIN_SAMPLES` in `lib/engine/rrg.ts`). Omit to use that default.
+   * FINNIFTY's real intraday option liquidity is thin enough that a premium
+   * can go many ticks without a genuine change, so the default threshold
+   * rarely gets satisfied and the RRG chart sits empty all session even
+   * though nothing is actually broken — this lets a thinner instrument
+   * mature its nodes sooner without changing the bar for every underlying.
+   */
+  rrgMinSamples?: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
@@ -64,6 +74,10 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     spotTokenFallback: "99926037",
     strikeStep: 50,
     lotSize: 40,
+    // Roughly half the default 8 — thin enough real liquidity that waiting
+    // for 8 genuine ticks routinely never happens in a session, but 4 is
+    // still enough to damp out a couple of noisy opening prints.
+    rrgMinSamples: 4,
   },
 };
 
@@ -79,8 +93,9 @@ export interface EngineConfig {
   /** ITM depth allowed for long entries — the Zero-OTM rule. */
   minItmDepth: number;
   maxItmDepth: number;
-  /** Rolling window (ticks) for the RRG relative-strength mean. */
+  /** Rolling window (engine ticks) for the RRG relative-strength mean. */
   rrgWindow: number;
+  /** How many ticks back RS-Momentum compares against — larger reads slower and smoother. */
   rrgMomentumLookback: number;
   rrgTailLength: number;
   /** Strikes either side of ATM plotted as active RRG nodes. */
@@ -146,8 +161,13 @@ export const DEFAULT_CONFIG: EngineConfig = {
   chainDepth: 12,
   minItmDepth: 2,
   maxItmDepth: 3,
-  rrgWindow: 40,
-  rrgMomentumLookback: 5,
+  // Widened from 40/5 — at the old settings a single noisy tick could swing
+  // a node's RS-Ratio/RS-Momentum enough to visibly jump across quadrants
+  // inside a few seconds. A longer mean window and momentum lookback both
+  // read over more of the session, so nodes drift the way a rotation
+  // actually develops rather than jittering tick to tick.
+  rrgWindow: 90,
+  rrgMomentumLookback: 15,
   rrgTailLength: 12,
   rrgNodeSpan: 6,
   oiSeedSpan: 5,
