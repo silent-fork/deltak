@@ -17,7 +17,6 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
-import Link from "next/link";
 
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
@@ -209,12 +208,11 @@ export default function HomePage() {
           options — and either arms a trade for you to take, or takes it itself.
         </p>
 
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-col items-center justify-center gap-3">
           {/* Capped, not full-bleed: on mobile this wrapper is the shared width
-              for both the button and the fine print below it, so the CTA reads
-              as one deliberate size rather than a content-hugging pill next to
-              a much wider line of text. Reverts to each element's own natural
-              width side-by-side once there's room, at `sm`. */}
+              for the two buttons, so the CTA row reads as one deliberate size
+              rather than content-hugging pills. Reverts to each button's own
+              natural width side-by-side once there's room, at `sm`. */}
           <div className="flex w-full max-w-[18rem] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
             <CtaLink
               href="/terminal"
@@ -224,11 +222,18 @@ export default function HomePage() {
               Terminal
               <ArrowRight className="h-4 w-4" />
             </CtaLink>
-            <span className="flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
-              <LockKeyhole className="h-3 w-3" />
-              Free — sign in with your own Angel One account
-            </span>
+            <CtaLink
+              href="/learn"
+              location="hero-learn"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-7 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            >
+              Learn
+            </CtaLink>
           </div>
+          <span className="flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
+            <LockKeyhole className="h-3 w-3" />
+            Free — sign in with your own Angel One account
+          </span>
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
@@ -369,9 +374,10 @@ export default function HomePage() {
 
           <div className="relative mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {LEARN_SECTIONS.map((s) => (
-              <Link
+              <CtaLink
                 key={s.href}
                 href={s.href}
+                location={`learn-teaser-${s.href.split("/").pop()}`}
                 className="group flex flex-col rounded-lg border border-zinc-800/70 bg-zinc-950/50 p-4 transition-colors hover:border-zinc-700"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/30 bg-quantum/10">
@@ -383,7 +389,7 @@ export default function HomePage() {
                   Browse
                   <ArrowRight className="h-3 w-3" />
                 </span>
-              </Link>
+              </CtaLink>
             ))}
           </div>
         </div>
@@ -400,14 +406,23 @@ export default function HomePage() {
             guards — against simulated fills, no live order ever placed,
             for as long as you want to watch it work.
           </p>
-          <CtaLink
-            href="/terminal"
-            location="closing"
-            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
-          >
-            Terminal
-            <ArrowRight className="h-4 w-4" />
-          </CtaLink>
+          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
+            <CtaLink
+              href="/terminal"
+              location="closing"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+            >
+              Terminal
+              <ArrowRight className="h-4 w-4" />
+            </CtaLink>
+            <CtaLink
+              href="/learn"
+              location="closing-learn"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-6 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            >
+              Learn
+            </CtaLink>
+          </div>
         </div>
       </section>
 
