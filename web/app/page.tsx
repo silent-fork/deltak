@@ -3,12 +3,14 @@ import {
   ArrowRight,
   Bot,
   BookOpen,
-  CalendarDays,
+  Building2,
   Layers,
+  LineChart,
   LockKeyhole,
   Radar,
   Repeat2,
   ShieldAlert,
+  Sigma,
   Table2,
   TrendingDown,
   TrendingUp,
@@ -126,6 +128,33 @@ const STEPS = [
   },
 ] as const;
 
+const LEARN_SECTIONS = [
+  {
+    href: "/learn/strategies",
+    icon: Sigma,
+    title: "Strategies",
+    body: "Twelve setups from a plain long call through iron condors and the jade lizard, each with a payoff diagram.",
+  },
+  {
+    href: "/learn/glossary",
+    icon: BookOpen,
+    title: "Glossary",
+    body: "Strikes, the Greeks, margin and settlement rules — plus Aegis, Zenith, Quantum Horizon and DKMS, defined in full.",
+  },
+  {
+    href: "/learn/trading-styles",
+    icon: LineChart,
+    title: "Trading Styles",
+    body: "Intraday, swing and positional options trading compared, and the buying-vs-selling decision underneath all three.",
+  },
+  {
+    href: "/learn/indices",
+    icon: Building2,
+    title: "Indices",
+    body: "NIFTY, BANKNIFTY, FINNIFTY and every other major Indian index F&O contract — lot size, strike step, exchange.",
+  },
+] as const;
+
 export default function HomePage() {
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
@@ -142,14 +171,23 @@ export default function HomePage() {
           </div>
           <Wordmark className="text-[15px] tracking-[0.18em]" />
         </div>
-        <CtaLink
-          href="/terminal"
-          location="nav"
-          className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
-        >
-          Terminal
-          <ArrowRight className="h-3.5 w-3.5" />
-        </CtaLink>
+        <div className="flex items-center gap-4">
+          <CtaLink
+            href="/learn"
+            location="nav-learn"
+            className="hidden text-[11px] font-semibold uppercase tracking-wider text-zinc-400 transition-colors hover:text-zinc-100 sm:block"
+          >
+            Learn
+          </CtaLink>
+          <CtaLink
+            href="/terminal"
+            location="nav"
+            className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
+          >
+            Terminal
+            <ArrowRight className="h-3.5 w-3.5" />
+          </CtaLink>
+        </div>
       </header>
 
       {/* Hero */}
@@ -309,6 +347,59 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Learn — the free static wiki, a separate surface from the terminal
+          above: no login, no data input, nothing computed per-visitor. */}
+      <section className="relative mx-auto max-w-6xl px-5 py-10">
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
+          <div className="relative text-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
+              <BookOpen className="h-3 w-3" />
+              Free · No login · Static reference
+            </span>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
+              The DeltaK options trading wiki
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
+              Strategy payoff diagrams, an options and Indian F&amp;O glossary,
+              trading styles and index reference — the same Aegis, Zenith and
+              Quantum Horizon vocabulary the terminal itself trades on,
+              explained in full.
+            </p>
+          </div>
+
+          <div className="relative mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {LEARN_SECTIONS.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="group flex flex-col rounded-lg border border-zinc-800/70 bg-zinc-950/50 p-4 transition-colors hover:border-zinc-700"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/30 bg-quantum/10">
+                  <s.icon className="h-4 w-4 text-quantum" />
+                </div>
+                <h3 className="mt-3 text-[13px] font-semibold text-zinc-100">{s.title}</h3>
+                <p className="mt-1.5 flex-1 text-[12px] leading-relaxed text-zinc-500">{s.body}</p>
+                <span className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-zinc-500 transition-colors group-hover:text-quantum">
+                  Browse
+                  <ArrowRight className="h-3 w-3" />
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="relative mt-8 text-center">
+            <CtaLink
+              href="/learn"
+              location="learn-teaser"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-6 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            >
+              Browse the wiki
+              <ArrowRight className="h-4 w-4" />
+            </CtaLink>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="relative mx-auto max-w-3xl px-5 py-14 text-center">
         <div className="dk-panel rounded-xl px-6 py-10">
@@ -339,22 +430,6 @@ export default function HomePage() {
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
           loss. Paper mode only, for now — every fill here is simulated.
-        </p>
-        <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-          <Link
-            href="/learn"
-            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
-          >
-            <BookOpen className="h-3 w-3" />
-            Options strategies &amp; F&amp;O glossary
-          </Link>
-          <Link
-            href="/learn/indices"
-            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
-          >
-            <CalendarDays className="h-3 w-3" />
-            NIFTY / BANKNIFTY / FINNIFTY contract specs
-          </Link>
         </p>
         {/* A literal tricolour swatch rather than relying on an emoji flag
             rendering consistently across platforms — three real stripes,
