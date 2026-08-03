@@ -2,7 +2,6 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Bot,
-  CalendarDays,
   Layers,
   LockKeyhole,
   Radar,
@@ -14,7 +13,6 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
-import Link from "next/link";
 
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
@@ -171,18 +169,25 @@ export default function HomePage() {
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <CtaLink
-            href="/terminal"
-            location="hero"
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
-          >
-            Terminal
-            <ArrowRight className="h-4 w-4" />
-          </CtaLink>
-          <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
-            <LockKeyhole className="h-3 w-3" />
-            Free — sign in with your own Angel One account
-          </span>
+          {/* Capped, not full-bleed: on mobile this wrapper is the shared width
+              for both the button and the fine print below it, so the CTA reads
+              as one deliberate size rather than a content-hugging pill next to
+              a much wider line of text. Reverts to each element's own natural
+              width side-by-side once there's room, at `sm`. */}
+          <div className="flex w-full max-w-[18rem] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
+            <CtaLink
+              href="/terminal"
+              location="hero"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-7 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+            >
+              Terminal
+              <ArrowRight className="h-4 w-4" />
+            </CtaLink>
+            <span className="flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
+              <LockKeyhole className="h-3 w-3" />
+              Free — sign in with your own Angel One account
+            </span>
+          </div>
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
@@ -331,16 +336,6 @@ export default function HomePage() {
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
           loss. Paper mode only, for now — every fill here is simulated.
-        </p>
-        <p className="mt-3">
-          <Link
-            href="/tools/expiry-calendar"
-            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
-          >
-            <CalendarDays className="h-3 w-3" />
-            NIFTY / BANKNIFTY / FINNIFTY expiry calendar
-          </Link>{" "}
-          — straight from Angel One&apos;s scrip master
         </p>
         {/* A literal tricolour swatch rather than relying on an emoji flag
             rendering consistently across platforms — three real stripes,

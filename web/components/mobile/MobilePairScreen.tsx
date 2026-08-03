@@ -1,5 +1,6 @@
 import { QrCode, ScanLine, ShieldCheck } from "lucide-react";
 
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { Wordmark } from "@/components/Wordmark";
 
 /**
@@ -13,7 +14,9 @@ import { Wordmark } from "@/components/Wordmark";
  */
 export function MobilePairScreen({ expired }: { expired?: boolean }) {
   return (
-    <main className="dk-grid-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-zinc-950 px-6 py-10 text-center">
+    <main className="dk-scroll dk-grid-bg relative flex min-h-dvh flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-zinc-950 px-6 py-10 text-center">
+      <AnalyticsBeacon event="mobile_pair_screen_view" data={{ expired: Boolean(expired) }} />
+
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.08] blur-[110px]"
@@ -37,13 +40,13 @@ export function MobilePairScreen({ expired }: { expired?: boolean }) {
         <p className="mx-auto mt-2 max-w-[22rem] text-[12.5px] leading-relaxed text-zinc-400">
           {expired
             ? "QR codes stay valid for two minutes. Open DeltaK on your desktop and scan the fresh one."
-            : "Open the DeltaK terminal on your desktop, tap Pair Mobile in the header, and scan the QR with this phone's camera — not a QR reader inside this page."}
+            : "Open the DeltaK terminal on your desktop, open the profile menu, and scan the QR with this phone's camera — not a QR reader inside this page."}
         </p>
 
         <ol className="mt-5 space-y-2.5 text-left">
           {[
             "Sign in to the terminal on your desktop",
-            "Tap Pair Mobile in its header",
+            "Open the profile menu, top right",
             "Scan the QR with your camera app",
           ].map((step, i) => (
             <li key={step} className="flex items-start gap-2.5">
@@ -56,9 +59,23 @@ export function MobilePairScreen({ expired }: { expired?: boolean }) {
         </ol>
       </div>
 
-      <p className="relative mt-6 flex max-w-[16rem] items-center justify-center gap-1.5 text-center text-[10.5px] uppercase tracking-wider text-zinc-600">
-        <ShieldCheck className="h-3 w-3 shrink-0 text-zinc-600" />
+      <p className="relative mt-6 flex max-w-[16rem] items-start justify-center gap-1.5 text-center text-[10.5px] uppercase tracking-wider text-zinc-600">
+        <ShieldCheck className="mt-px h-3 w-3 shrink-0 text-zinc-600" />
         No Angel One sign-in ever happens on this device
+      </p>
+
+      <p className="relative mt-8 flex items-center justify-center gap-1.5 text-zinc-600">
+        <span
+          aria-hidden
+          className="inline-flex h-2.5 w-4 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
+        >
+          <span className="h-1/3 w-full bg-[#FF9933]" />
+          <span className="h-1/3 w-full bg-white" />
+          <span className="h-1/3 w-full bg-[#138808]" />
+        </span>
+        <span className="text-[10px]">
+          Made with <span className="text-rose-400">♥</span> in Bharat
+        </span>
       </p>
     </main>
   );

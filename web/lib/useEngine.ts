@@ -1100,6 +1100,10 @@ export function useEngine(simulate: boolean) {
         market_open: snapshot.market_open,
         signals: snapshot.signals,
         ledger: {
+          capital: snapshot.ledger.capital,
+          equity: snapshot.ledger.equity,
+          deployed_margin: snapshot.ledger.deployed_margin,
+          charges: snapshot.ledger.charges,
           open_pnl: snapshot.ledger.open_pnl,
           realised_pnl: snapshot.ledger.realised_pnl,
           total_pnl: snapshot.ledger.total_pnl,

@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Smartphone } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -19,29 +20,62 @@ const mmss = (seconds: number) => {
  * rather than stark white) and reliability never trades against theming.
  * The quantum ring around the tile is what actually ties it to the rest of
  * the HUD — same accent every other live/active element here uses.
+ *
+ * A dead QR is not shown as a QR: once it expires the light tile disappears
+ * entirely (there's no code left worth the contrast it costs) in favour of a
+ * dark, on-theme placeholder with its own reload control — the near-blank
+ * near-white square a bare status icon used to leave behind read as broken,
+ * not expired.
  */
 function QrThumb({
   qrSvg,
   expired,
   busy,
   size,
+  onReload,
 }: {
   qrSvg: string | null;
   expired: boolean;
   busy: boolean;
   size: number;
+  /** Present only once there's something to recover from (expired or errored). */
+  onReload?: () => void;
 }) {
+  const live = qrSvg && !expired;
   return (
     <div
       style={{ height: size, width: size }}
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#eef9fa] p-1.5 ring-1 ring-quantum/40 ring-offset-1 ring-offset-zinc-900"
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg p-1.5 ring-1 ring-offset-1 ring-offset-zinc-900",
+        live ? "bg-[#eef9fa] ring-quantum/40" : "bg-zinc-900 ring-zinc-700",
+      )}
     >
-      {qrSvg && !expired ? (
+      {live ? (
         <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
       ) : busy ? (
         <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-      ) : expired ? (
-        <ShieldAlert className="h-4 w-4 text-zinc-500" />
+      ) : onReload ? (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onReload();
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            e.stopPropagation();
+            onReload();
+          }}
+          title="Reload the QR"
+          className="group/reload absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-zinc-900/90 text-zinc-400 transition-colors hover:text-quantum"
+        >
+          <RefreshCw className="h-4 w-4 transition-transform group-hover/reload:rotate-180" />
+          {size >= 100 ? (
+            <span className="text-[8.5px] font-semibold uppercase tracking-wider">Reload</span>
+          ) : null}
+        </span>
       ) : (
         <Smartphone className="h-4 w-4 text-zinc-500" />
       )}
@@ -76,9 +110,12 @@ export function PairMobileSection() {
       setClaimUrl(res.claim_url);
       expiresAtRef.current = new Date(res.expires_at).getTime();
       setSecondsLeft(Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000)));
+      track("mobile_pair_qr_minted");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't start pairing.");
+      const detail = err instanceof Error ? err.message : "Couldn't start pairing.";
+      setError(detail);
       setQrSvg(null);
+      track("mobile_pair_qr_failed", { detail });
     } finally {
       setBusy(false);
     }
@@ -101,7 +138,13 @@ export function PairMobileSection() {
   if (expanded) {
     return (
       <div className="flex flex-col items-center gap-2 py-1">
-        <QrThumb qrSvg={qrSvg} expired={expired} busy={busy} size={176} />
+        <QrThumb
+          qrSvg={qrSvg}
+          expired={expired}
+          busy={busy}
+          size={176}
+          onReload={expired || error ? () => void mint() : undefined}
+        />
 
         {error ? (
           <p className="text-center text-[10px] text-rose-300">{error}</p>
@@ -147,11 +190,20 @@ export function PairMobileSection() {
 
   return (
     <button
-      onClick={() => setExpanded(true)}
+      onClick={() => {
+        setExpanded(true);
+        track("mobile_pair_qr_expanded");
+      }}
       className="group flex w-full items-center gap-2.5 text-left"
       title="Expand to scan"
     >
-      <QrThumb qrSvg={qrSvg} expired={expired} busy={busy} size={44} />
+      <QrThumb
+        qrSvg={qrSvg}
+        expired={expired}
+        busy={busy}
+        size={44}
+        onReload={expired || error ? () => void mint() : undefined}
+      />
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] text-zinc-300 group-hover:text-zinc-100">
           {error ? "Pairing failed" : expired ? "QR expired" : "Scan to pair a phone"}

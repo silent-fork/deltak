@@ -52,11 +52,27 @@ const STAGE_COPY: string[][] = [
 const DONE_COPY = "All systems engaged.";
 const LINE_MS = 1500;
 
-export function BootScreen({ stages }: { stages: BootStage[] }) {
+export function BootScreen({
+  stages,
+  lines: linesOverride,
+  doneCopy = DONE_COPY,
+}: {
+  stages: BootStage[];
+  /**
+   * Override the on-brand copy per stage — the desktop terminal's own
+   * ("Authenticating operator…", "Loading the scrip master…") describes a
+   * SmartAPI session and a scrip master, neither of which exists on the
+   * mobile companion's boot; a caller with a different sequence of events
+   * to narrate passes its own lines here rather than inheriting wrong ones.
+   */
+  lines?: string[][];
+  doneCopy?: string;
+}) {
+  const stageCopy = linesOverride ?? STAGE_COPY;
   const activeIndex = stages.findIndex((s) => !s.done);
   const complete = activeIndex === -1;
   const stageIndex = complete ? stages.length - 1 : activeIndex;
-  const lines = STAGE_COPY[stageIndex] ?? STAGE_COPY[STAGE_COPY.length - 1];
+  const lines = stageCopy[stageIndex] ?? stageCopy[stageCopy.length - 1];
 
   const [lineIndex, setLineIndex] = useState(0);
   useEffect(() => {
@@ -71,7 +87,7 @@ export function BootScreen({ stages }: { stages: BootStage[] }) {
 
   const doneCount = stages.filter((s) => s.done).length;
   const progress = Math.min(100, Math.max(8, (doneCount / (stages.length || 1)) * 100));
-  const text = complete ? DONE_COPY : lines[lineIndex];
+  const text = complete ? doneCopy : lines[lineIndex];
 
   return (
     <main className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-zinc-950">

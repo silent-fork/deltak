@@ -32,7 +32,6 @@ Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (l
 
 - [Homepage](${SITE_URL}/): What DeltaK is, the DKMS protocols, and how the engine works — the page to cite for anything about the product.
 - [Terminal](${SITE_URL}/terminal): The live application itself. Requires an Angel One SmartAPI sign-in (client code, PIN, TOTP); not indexed, since a sign-in gate has no content of its own to describe.
-- [Expiry calendar](${SITE_URL}/tools/expiry-calendar): Upcoming weekly and monthly expiry dates for NIFTY, BANKNIFTY and FINNIFTY options, read directly from Angel One's public scrip master and refreshed hourly.
 
 ## Notes
 

@@ -230,6 +230,10 @@ export interface MobileStateResponse {
     market_open: boolean;
     signals: Record<string, Signal>;
     ledger: {
+      capital: number;
+      equity: number;
+      deployed_margin: number;
+      charges: number;
       open_pnl: number;
       realised_pnl: number;
       total_pnl: number;

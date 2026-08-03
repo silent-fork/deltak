@@ -19,7 +19,7 @@ export function Wordmark({
   glow?: boolean;
 }) {
   return (
-    <span className={cn("font-bold text-zinc-100", className)}>
+    <span className={cn("font-mono font-bold text-zinc-100", className)}>
       {/*
         Not `cn()` here: `text-quantum` (colour) and `text-glow-quantum` (a
         text-shadow utility, not a colour at all) look like the same
