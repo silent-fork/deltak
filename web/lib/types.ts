@@ -265,8 +265,8 @@ export interface EngineStatus {
 
 // Sourced from INDEX_UNIVERSE (lib/engine/config.ts) rather than a second
 // hardcoded list — this file used to carry its own separate copy, which is
-// exactly the kind of drift that left FINNIFTY (and later BANKEX/SENSEX)
-// out of step across the codebase.
+// exactly the kind of drift that let FINNIFTY quietly fall out of step
+// across the codebase.
 export { UNDERLYINGS } from "./engine/config";
 export type Underlying = keyof typeof INDEX_UNIVERSE;
 

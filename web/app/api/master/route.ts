@@ -82,19 +82,15 @@ export async function GET() {
     const name = (row.name ?? "").trim();
     const symbol = (row.symbol ?? "").trim();
 
-    if (seg === "NSE" || seg === "BSE") {
+    if (seg === "NSE") {
       const key = SPOT_LOOKUP[normalizeSpotAlias(name)] ?? SPOT_LOOKUP[normalizeSpotAlias(symbol)];
-      // A row only counts for an underlying actually listed on this segment —
-      // BSE and NSE both carry plenty of unrelated index/equity spots that
-      // could otherwise collide on a loose name match.
-      if (key && INDEX_UNIVERSE[key].exchange !== seg) continue;
       // Index spots carry no expiry; the futures/options rows do.
       if (key && !spots[key] && !(row.expiry ?? "")) {
         spots[key] = {
           token: String(row.token),
           symbol: symbol || name,
           name: key,
-          exchSeg: seg,
+          exchSeg: "NSE",
           strike: 0,
           lotSize: 1,
           expiry: null,
@@ -104,16 +100,11 @@ export async function GET() {
       continue;
     }
 
-    if (seg !== "NFO" && seg !== "BFO") continue;
+    if (seg !== "NFO") continue;
     if ((row.instrumenttype ?? "").toUpperCase() !== "OPTIDX") continue;
 
     const underlying = name.toUpperCase();
-    const spec = INDEX_UNIVERSE[underlying];
-    if (!spec) continue;
-    // Same cross-segment guard as the spot branch above.
-    if ((seg === "NFO" && spec.exchange !== "NSE") || (seg === "BFO" && spec.exchange !== "BSE")) {
-      continue;
-    }
+    if (!(underlying in INDEX_UNIVERSE)) continue;
 
     const expiry = parseExpiry(row.expiry ?? "");
     if (!expiry) continue;
@@ -125,7 +116,7 @@ export async function GET() {
       token: String(row.token),
       symbol,
       name: underlying,
-      exchSeg: seg,
+      exchSeg: "NFO",
       // Scrip-master strikes are quoted in paise.
       strike: Number(row.strike ?? 0) / 100,
       lotSize: Math.trunc(Number(row.lotsize ?? 0)) || 0,
@@ -147,12 +138,6 @@ export async function GET() {
   // exactly the kind of thing a real naming-drift bug hides behind.
   for (const [underlying, spec] of Object.entries(INDEX_UNIVERSE)) {
     if (spots[underlying]) continue;
-    if (!spec.spotTokenFallback) {
-      console.warn(
-        `[api/master] ${underlying} spot not found in the live master (checked aliases: ${spec.spotAliases.join(", ")}) and has no fallback token configured — its chain will stay empty until the alias list is corrected.`,
-      );
-      continue;
-    }
     console.warn(
       `[api/master] ${underlying} spot not found in the live master (checked aliases: ${spec.spotAliases.join(", ")}) — falling back to the configured token ${spec.spotTokenFallback}.`,
     );
@@ -160,7 +145,7 @@ export async function GET() {
       token: spec.spotTokenFallback,
       symbol: spec.label,
       name: underlying,
-      exchSeg: spec.exchange === "BSE" ? "BSE" : "NSE",
+      exchSeg: "NSE",
       strike: 0,
       lotSize: 1,
       expiry: null,

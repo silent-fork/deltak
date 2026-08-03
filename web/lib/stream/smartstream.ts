@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  EXCHANGE_BSE_CM,
-  EXCHANGE_BSE_FO,
-  EXCHANGE_NSE_CM,
-  EXCHANGE_NSE_FO,
-  SMART_STREAM_URL,
-} from "@/lib/engine/config";
+import { EXCHANGE_NSE_CM, EXCHANGE_NSE_FO, SMART_STREAM_URL } from "@/lib/engine/config";
 import { type Tick, emptyTick } from "./ticks";
 
 /**
@@ -106,8 +100,6 @@ export class SmartStreamClient {
   private tracked: Record<number, Set<string>> = {
     [EXCHANGE_NSE_CM]: new Set(),
     [EXCHANGE_NSE_FO]: new Set(),
-    [EXCHANGE_BSE_CM]: new Set(),
-    [EXCHANGE_BSE_FO]: new Set(),
   };
 
   status: StreamStatus = "idle";
@@ -165,10 +157,11 @@ export class SmartStreamClient {
   /**
    * Subscribe a delta (or the whole tracked set) in Mode 3 snap quote.
    *
-   * The default source is *every* tracked exchange type, not just the two
-   * NSE ones — this fires on every reconnect (see `ws.onopen` below), and a
-   * hardcoded NSE-only default would silently drop BSE tokens (BANKEX,
-   * SENSEX) the instant the socket ever reconnected.
+   * The default source is *every* tracked exchange type, built generically
+   * from `this.tracked` rather than hardcoding the two NSE ones — this fires
+   * on every reconnect (see `ws.onopen` below), so a hardcoded default would
+   * silently drop any other exchange type's tokens the instant the socket
+   * ever reconnected.
    */
   subscribe(only?: Record<number, string[]>): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;

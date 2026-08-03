@@ -13,7 +13,7 @@ export interface Instrument {
   token: string;
   symbol: string;
   name: string;
-  exchSeg: "NFO" | "NSE" | "BSE" | "BFO";
+  exchSeg: "NFO" | "NSE";
   strike: number;
   lotSize: number;
   /** ISO date, or null for index spots. */
@@ -128,28 +128,23 @@ export class ScripMaster {
     );
   }
 
-  /**
-   * Every token the feed should subscribe to, split first by exchange
-   * (NSE vs BSE ride different SmartStream exchange-type codes and can't
-   * share a subscription message) and then by segment within it.
-   */
+  /** Every token the feed should subscribe to, split by exchange segment. */
   subscriptionTokens(spotByUnderlying: Record<string, number>, chainDepth: number) {
-    const nse = { spotTokens: [] as string[], optionTokens: [] as string[] };
-    const bse = { spotTokens: [] as string[], optionTokens: [] as string[] };
+    const spotTokens: string[] = [];
+    const optionTokens: string[] = [];
 
     for (const [underlying, cfg] of Object.entries(INDEX_UNIVERSE)) {
-      const bucket = cfg.exchange === "BSE" ? bse : nse;
       const token = this.spotToken(underlying);
-      if (token) bucket.spotTokens.push(token);
+      if (token) spotTokens.push(token);
 
       const spot = spotByUnderlying[underlying] ?? 0;
       const band = cfg.strikeStep * (chainDepth + 2);
       for (const inst of this.contracts(underlying)) {
         if (spot <= 0 || Math.abs(inst.strike - spot) <= band) {
-          bucket.optionTokens.push(inst.token);
+          optionTokens.push(inst.token);
         }
       }
     }
-    return { nse, bse };
+    return { spotTokens, optionTokens };
   }
 }
