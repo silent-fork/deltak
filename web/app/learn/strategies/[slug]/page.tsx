@@ -54,6 +54,8 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <LearnChrome
         ctaLocation={`learn-strategy-${strategy.slug}`}
+        viewEvent="learn_strategy_view"
+        viewData={{ slug: strategy.slug, category: strategy.category, complexity: strategy.complexity }}
         crumbs={[
           { label: "Learn", href: "/learn" },
           { label: "Strategies", href: "/learn/strategies" },

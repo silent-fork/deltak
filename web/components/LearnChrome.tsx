@@ -1,6 +1,7 @@
 import { ArrowRight, ChevronRight, Zap } from "lucide-react";
 import Link from "next/link";
 
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -9,18 +10,28 @@ import { Wordmark } from "@/components/Wordmark";
  * rail and closing CTA/disclaimer, so the dozens of dynamic strategy,
  * glossary, trading-style and index pages don't each re-implement the same
  * chrome around their content.
+ *
+ * Also the one place that fires each page's view event — every /learn leaf
+ * is a Server Component, so without this nothing would ever tell Zaraz a
+ * human actually read the page rather than just clicked a CTA on it.
  */
 export function LearnChrome({
   crumbs,
   children,
   ctaLocation,
+  viewEvent,
+  viewData,
 }: {
   crumbs: { label: string; href?: string }[];
   children: React.ReactNode;
   ctaLocation: string;
+  /** Snake_case Zaraz event fired once on mount, e.g. "learn_strategy_view". */
+  viewEvent: string;
+  viewData?: Record<string, unknown>;
 }) {
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+      <AnalyticsBeacon event={viewEvent} data={viewData} />
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.07] blur-[140px]"

@@ -37,6 +37,8 @@ export default async function TradingStylePage({ params }: { params: Promise<{ s
   return (
     <LearnChrome
       ctaLocation={`learn-style-${style.slug}`}
+      viewEvent="learn_trading_style_view"
+      viewData={{ slug: style.slug }}
       crumbs={[
         { label: "Learn", href: "/learn" },
         { label: "Trading Styles", href: "/learn/trading-styles" },

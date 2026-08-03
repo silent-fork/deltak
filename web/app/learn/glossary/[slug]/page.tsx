@@ -67,6 +67,8 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <LearnChrome
         ctaLocation={`learn-glossary-${entry.slug}`}
+        viewEvent="learn_glossary_view"
+        viewData={{ slug: entry.slug, category: entry.category }}
         crumbs={[
           { label: "Learn", href: "/learn" },
           { label: "Glossary", href: "/learn/glossary" },

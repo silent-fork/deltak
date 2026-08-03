@@ -35,6 +35,8 @@ export default async function IndexPage({ params }: { params: Promise<{ slug: st
   return (
     <LearnChrome
       ctaLocation={`learn-index-${idx.slug}`}
+      viewEvent="learn_index_view"
+      viewData={{ slug: idx.slug, tradedByDeltaK: idx.tradedByDeltaK }}
       crumbs={[
         { label: "Learn", href: "/learn" },
         { label: "Indices", href: "/learn/indices" },

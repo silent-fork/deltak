@@ -19,7 +19,11 @@ export const metadata: Metadata = {
 
 export default function GlossaryHubPage() {
   return (
-    <LearnChrome ctaLocation="learn-glossary-hub" crumbs={[{ label: "Learn", href: "/learn" }, { label: "Glossary" }]}>
+    <LearnChrome
+      ctaLocation="learn-glossary-hub"
+      viewEvent="learn_glossary_hub_view"
+      crumbs={[{ label: "Learn", href: "/learn" }, { label: "Glossary" }]}
+    >
       <section className="relative mx-auto max-w-4xl px-5 pb-8 pt-4 text-center">
         <h1 className="text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
           Options &amp; Indian F&amp;O glossary

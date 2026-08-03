@@ -23,7 +23,11 @@ const CATEGORIES: StrategyCategory[] = ["Bullish", "Bearish", "Volatility", "Neu
 
 export default function StrategiesHubPage() {
   return (
-    <LearnChrome ctaLocation="learn-strategies-hub" crumbs={[{ label: "Learn", href: "/learn" }, { label: "Strategies" }]}>
+    <LearnChrome
+      ctaLocation="learn-strategies-hub"
+      viewEvent="learn_strategies_hub_view"
+      crumbs={[{ label: "Learn", href: "/learn" }, { label: "Strategies" }]}
+    >
       <section className="relative mx-auto max-w-4xl px-5 pb-8 pt-4 text-center">
         <h1 className="text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
           Options trading strategies, from a single leg to defined-risk advanced structures
