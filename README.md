@@ -1,15 +1,44 @@
 # DeltaK Terminal
 
-An options trading HUD and signal engine for Indian index options, implementing
-the **DeltaK Matrix Strategy (DKMS)** — a hybrid framework pairing Chart of
+An options trading terminal for Indian index options, built around the
+**DeltaK Matrix Strategy (DKMS)** — a hybrid framework pairing Chart of
 Accuracy (COA 1.0 & 2.0) option-chain analysis with a Relative Rotation Graph
-(RRG) multi-strike momentum engine, over Angel One SmartAPI v2.0.
+(RRG) multi-strike momentum engine, over Angel One SmartAPI v2.0. Sign in with
+your own Angel One account, watch the engine read wall migration and rotation
+live, and let it either arm a trade for you to take or take it itself.
 
 Covers **NIFTY 50**, **BANKNIFTY** and **FINNIFTY**.
 
 > **Trading software carries risk.** Paper mode is the default and routes
 > nothing to an exchange. Live mode places real orders with real money. Read
 > [Execution modes](#execution-modes) before switching.
+
+## What's here
+
+- **The DKMS engine** — four protocols (Alpha/Beta/Gamma/Delta), selected live
+  off how the Aegis (support) and Zenith (resistance) walls are actually
+  migrating this session, never a setting anyone chooses. See
+  [The strategy](#the-strategy).
+- **A 4-quadrant option chain** — calls and puts read outward from the strike
+  column, each leg carrying its own RRG quadrant, RS-Ratio, volume, open
+  interest and bid/ask spread.
+- **Autopilot** — an actionable signal fires itself the instant every gate
+  agrees, or waits for a manual Execute click. Same sizing, same risk gates,
+  either way. See [Autopilot](#autopilot).
+- **Risk guards that don't need a tab open** — stop-loss, target and the 3:15
+  PM Daylight Rest flatten run through `/api/watchdog/tick` independently of
+  any open browser tab. See [Watchdog](#watchdog).
+- **A read-only mobile companion** — pair a phone by QR, no separate login;
+  it mirrors the desktop's live signal and trade book and can never place an
+  order. See [Mobile companion](#mobile-companion).
+- **`/learn` — a free, static options-trading wiki** — no login, no user
+  input, nothing computed per-visitor: strategy payoff diagrams, an options
+  and Indian F&O glossary (including this project's own Aegis/Zenith/Quantum
+  Horizon/DKMS vocabulary), trading styles, and index reference. See
+  [Learn — the public wiki](#learn--the-public-wiki).
+- **Paper mode by default** — the whole engine, including Autopilot and every
+  risk guard, runs against simulated fills with no live order ever placed,
+  for as long as you want to watch it work.
 
 ---
 
@@ -162,6 +191,40 @@ lots = floor( (capital × risk%) / (stop_loss_points × lot_size) )
 Then clamped by deployable capital and floored onto NSE lot increments
 (NIFTY 75, BANKNIFTY 15, FINNIFTY 40 by default; resolved live from the scrip
 master).
+
+---
+
+## Learn — the public wiki
+
+`/learn` is a second, entirely separate surface from the terminal above: a
+free, static reference wiki, no login and no data input from a visitor at
+all. Every page is server-rendered from a fixed content module at build time
+— there is no calculator, no form, no per-visitor computation — which is what
+lets the whole section live outside `noindex` and actually rank.
+
+| Section | Pages | Content |
+| --- | --- | --- |
+| `/learn/strategies` | 12 | Long call through iron condor, iron butterfly, call ratio backspread and the jade lizard — each with a payoff diagram computed from the same leg/premium data as its stats panel (`lib/content/payoff.ts`), a worked numeric example, construction, ideal scenario and the mistakes that break it |
+| `/learn/glossary` | 34 | Options basics, the Greeks, Indian F&O rules, market-reading terms — plus this project's own Aegis, Zenith, Quantum Horizon, COA Matrix, RRG Momentum, Zero-OTM Rule and DKMS Protocols, defined as first-class entries rather than left as unexplained jargon inside the terminal |
+| `/learn/trading-styles` | 4 | Intraday, swing and positional options trading compared, plus the buying-vs-selling framing that cuts across all three |
+| `/learn/indices` | 6 | NIFTY, BANKNIFTY, FINNIFTY (lot size and strike step read live from `INDEX_UNIVERSE`, the same constants the engine trades against) plus Midcap Nifty, Sensex and Bankex for reference |
+
+Every strategy's payoff diagram, breakeven(s), max profit/loss and worked
+example are derived from one leg definition per strategy — there is no second
+place a number could drift out of sync with what the chart shows. A handful
+of glossary terms (the Greeks, margin, max pain, PCR, breakeven) get their own
+small illustrative chart rather than prose alone (`components/GreekGauge.tsx`,
+`MarginStack.tsx`, `MaxPainCurve.tsx`, `PcrGauge.tsx`, `BreakevenLine.tsx`).
+
+Every `/learn` page fires a Zaraz page-view event on mount via
+`AnalyticsBeacon` (wired once through `LearnChrome`, not repeated per page) —
+`learn_strategy_view`, `learn_glossary_view`, `learn_trading_style_view`,
+`learn_index_view` and their `*_hub_view` counterparts, each carrying the
+page's slug so content types can be segmented in Zaraz.
+
+The old `/tools/expiry-calendar` page this section replaced 301-redirects to
+`/learn` (`next.config.mjs`), preserving whatever link equity or indexing the
+old URL had already picked up.
 
 ---
 
@@ -507,6 +570,11 @@ whitelisting changes at all.
 | `POST` | `/api/persist` | Append positions, orders and risk events to Supabase, attributed from the session cookie |
 | `GET` | `/api/history/:resource` | Read back this account's persisted positions, orders or risk events |
 | `GET` | `/api/watchdog/tick` | Cron-only (`CRON_SECRET`-gated). Enforces stop/target and the 3:15 PM Daylight Rest flatten on every account's open **paper** positions, using each account's stored session — the guard that runs with no browser tab open |
+| `POST` | `/api/mobile/pair` | Mint a two-minute QR claim ticket for pairing a phone |
+| `GET` | `/api/mobile/pair/claim` | What the QR encodes — a route handler, not a page, since claiming is a one-time mutation. Sets the long-lived `dk_mobile` cookie and redirects to `/terminal` |
+| `GET` | `/api/mobile/state` | What a paired phone polls: the desktop's last-pushed signal mirror plus this account's positions — never touches Angel One |
+| `POST` | `/api/mobile/push` | The desktop's throttled mirror of its own signal state, fire-and-forget |
+| `POST` | `/api/mobile/logout` | Unpair this phone, revoking its session row |
 
 The chain, RRG, DKMS signal and paper-mode ledger have no routes — they run
 entirely client-side in `web/lib/useEngine.ts` and never leave the tab.
@@ -539,10 +607,24 @@ web/
       persist/            Supabase writes, attributed from the cookie
       history/[resource]/ Supabase read-back, scoped to the account
       market/             historical candles, OI, PCR, OI buildup
+      mobile/             pair (mint QR) · pair/claim (scan, mutates) · state
+                          (poll) · push (desktop → mirror) · logout (unpair)
+      watchdog/tick/      cron-only stop/target + Daylight Rest flatten
+    learn/                static wiki — no login, nothing computed per-visitor
+      strategies/[slug]/  12 strategies, payoff diagrams driven by lib/content
+      glossary/[slug]/    34 terms, incl. this project's own vocabulary
+      trading-styles/[slug]/  4 styles
+      indices/[slug]/     6 indices
     page.tsx, layout.tsx  HUD shell
+    not-found.tsx, sitemap.ts, robots.ts, llms.txt/  crawl surface
   components/            HUD panels (chain, RRG scatter, order book, signal panel)
-                         plus the header user pill
+                         plus the header user pill and mobile/ companion views
+    LearnChrome.tsx, PayoffChart.tsx, GreekGauge.tsx, MaxPainCurve.tsx, …
+                         /learn's shared chrome and its illustrative charts
   lib/
+    content/             /learn's data — one leg/definition list per
+                         strategy, glossary term, trading style and index;
+                         payoff.ts computes every chart and stat from it
     engine/
       coa.ts             COA 1.0/2.0 chain builder, Aegis/Zenith
       rrg.ts             RS-Ratio / RS-Momentum engine
@@ -567,7 +649,11 @@ web/
       smartapi.ts        SmartAPI v2.0 REST client (server-only)
       profile.ts         getProfile → normalise → store
       turnstile.ts       Cloudflare Turnstile verification
+      mobile.ts          QR minting/claim, mobile session cookie
+      crypto.ts          AES-256-GCM for the watchdog's stored broker session
+      watchdogMarket.ts  read-only SmartAPI calls for the cron watchdog
     supabase.ts          Supabase client
+    analytics.ts         Zaraz track()/setAnalyticsContext()
     useTurnstile.ts      the non-interactive challenge, browser side
     useEngine.ts         the engine loop itself — runs in the browser
     useMarketData.ts     historical context polling and ΔOI baselining
