@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LearnChrome } from "@/components/LearnChrome";
+import { LotSizeBars } from "@/components/LotSizeBars";
 import { INDICES } from "@/lib/content/indices";
 
 export const metadata: Metadata = {
@@ -28,6 +29,11 @@ export default function IndicesHubPage() {
           Every major index options contract traded on NSE and BSE — DeltaK reads and trades NIFTY,
           BANKNIFTY and FINNIFTY live; the rest are covered here for reference.
         </p>
+      </section>
+
+      <section className="relative mx-auto max-w-4xl px-5 pb-8">
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Lot size by index</h2>
+        <LotSizeBars indices={INDICES} />
       </section>
 
       <section className="relative mx-auto max-w-4xl px-5 pb-8">

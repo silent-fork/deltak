@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LearnChrome } from "@/components/LearnChrome";
+import { TimeHorizonBar } from "@/components/TimeHorizonBar";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
 export const metadata: Metadata = {
@@ -38,11 +39,14 @@ export default function TradingStylesHubPage() {
               href={`/learn/trading-styles/${s.slug}`}
               className="dk-panel group flex flex-col rounded-lg p-4 transition-colors hover:border-zinc-700"
             >
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-                <Clock3 className="h-3 w-3" />
-                {s.horizon}
+              <span className="inline-flex w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                <Clock3 className="h-3 w-3 shrink-0" />
+                {s.durationLabel}
               </span>
-              <h2 className="mt-2.5 text-[14px] font-semibold text-zinc-100">{s.name}</h2>
+              <div className="mt-3">
+                <TimeHorizonBar activeSlug={s.slug} />
+              </div>
+              <h2 className="mt-3 text-[14px] font-semibold text-zinc-100">{s.name}</h2>
               <p className="mt-1.5 flex-1 text-[12px] leading-relaxed text-zinc-500">{s.summary}</p>
               <span className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-zinc-500 transition-colors group-hover:text-quantum">
                 Read more

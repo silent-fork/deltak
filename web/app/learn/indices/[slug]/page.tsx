@@ -43,17 +43,17 @@ export default async function IndexPage({ params }: { params: Promise<{ slug: st
     >
       <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <span className="shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             {idx.exchange}
           </span>
           {idx.tradedByDeltaK ? (
-            <span className="flex items-center gap-1 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-quantum">
-              <CheckCircle2 className="h-3 w-3" />
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-quantum">
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
               Traded by DeltaK
             </span>
           ) : (
-            <span className="flex items-center gap-1 rounded border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-              <XCircle className="h-3 w-3" />
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+              <XCircle className="h-3 w-3 shrink-0" />
               Not traded by DeltaK
             </span>
           )}

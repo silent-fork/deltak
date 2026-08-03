@@ -1,6 +1,8 @@
 export interface TradingStyle {
   slug: string;
   name: string;
+  /** A couple of words for the pill/badge — the full sentence lives in `horizon`. */
+  durationLabel: string;
   horizon: string;
   summary: string;
   howItWorks: string[];
@@ -13,6 +15,7 @@ export const TRADING_STYLES: TradingStyle[] = [
   {
     slug: "intraday-options-trading",
     name: "Intraday Options Trading",
+    durationLabel: "Minutes–Hours",
     horizon: "Minutes to hours — every position closed before the session ends",
     summary:
       "Positions opened and closed inside a single trading session, no overnight exposure to a gap on the next open.",
@@ -33,6 +36,7 @@ export const TRADING_STYLES: TradingStyle[] = [
   {
     slug: "swing-options-trading",
     name: "Swing Options Trading",
+    durationLabel: "Days–Weeks",
     horizon: "A few days to a couple of weeks — typically held across a single expiry cycle",
     summary:
       "Positions held across multiple sessions to capture a move that plays out over days, not minutes — usually inside one weekly or monthly expiry.",
@@ -53,6 +57,7 @@ export const TRADING_STYLES: TradingStyle[] = [
   {
     slug: "positional-options-trading",
     name: "Positional Options Trading",
+    durationLabel: "Weeks–Monthly",
     horizon: "Weeks to a full monthly cycle — a slower-moving thesis, not a single expiry's move",
     summary:
       "Longer-held positions built around a broader view — a sustained trend, a persistent range, an ongoing regime — rather than a single week's expected move.",
@@ -73,6 +78,7 @@ export const TRADING_STYLES: TradingStyle[] = [
   {
     slug: "options-buying-vs-selling",
     name: "Options Buying vs. Options Selling",
+    durationLabel: "Any Horizon",
     horizon: "A framing question, not a time horizon — applies across intraday, swing and positional styles alike",
     summary:
       "The single biggest fork in options trading style: paying premium for defined, capped risk and open-ended reward, versus collecting premium for the opposite trade-off.",

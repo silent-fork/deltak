@@ -4,8 +4,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { LearnChrome } from "@/components/LearnChrome";
+import { MoneynessStrip } from "@/components/MoneynessStrip";
 import { OiBuildupMatrix } from "@/components/OiBuildupMatrix";
+import { ThetaCurve } from "@/components/ThetaCurve";
 import { getGlossaryTerm, GLOSSARY } from "@/lib/content/glossary";
+
+const MONEYNESS_TERMS: Record<string, "itm" | "atm" | "otm" | "moneyness"> = {
+  "at-the-money-atm": "atm",
+  "in-the-money-itm": "itm",
+  "out-of-the-money-otm": "otm",
+  moneyness: "moneyness",
+  "quantum-horizon": "atm",
+};
 
 export const dynamic = "error";
 export const dynamicParams = false;
@@ -53,7 +63,7 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
         ]}
       >
         <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
-          <span className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+          <span className="inline-block shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             {entry.category}
           </span>
           <h1 className="mt-3 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
@@ -75,6 +85,16 @@ export default async function GlossaryTermPage({ params }: { params: Promise<{ s
           {entry.slug === "oi-buildup-matrix" && (
             <div className="mt-4">
               <OiBuildupMatrix />
+            </div>
+          )}
+          {entry.slug in MONEYNESS_TERMS && (
+            <div className="mt-4">
+              <MoneynessStrip emphasis={MONEYNESS_TERMS[entry.slug]} />
+            </div>
+          )}
+          {entry.slug === "theta" && (
+            <div className="dk-panel mt-4 rounded-lg p-4">
+              <ThetaCurve />
             </div>
           )}
         </section>

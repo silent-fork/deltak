@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BuySellBalance } from "@/components/BuySellBalance";
 import { LearnChrome } from "@/components/LearnChrome";
+import { TimeHorizonBar } from "@/components/TimeHorizonBar";
 import { getTradingStyle, TRADING_STYLES } from "@/lib/content/tradingStyles";
 
 export const dynamic = "error";
@@ -42,14 +44,25 @@ export default async function TradingStylePage({ params }: { params: Promise<{ s
       ]}
     >
       <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
-          <Clock3 className="h-3 w-3" />
-          {style.horizon}
+        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
+          <Clock3 className="h-3 w-3 shrink-0" />
+          {style.durationLabel}
         </span>
         <h1 className="mt-4 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">{style.name}</h1>
         <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
           {style.summary}
         </p>
+        <div className="mx-auto mt-5 max-w-sm">
+          <TimeHorizonBar activeSlug={style.slug} />
+        </div>
+        <p className="mx-auto mt-2 max-w-2xl text-balance text-[11.5px] leading-relaxed text-zinc-600">
+          {style.horizon}
+        </p>
+        {style.slug === "options-buying-vs-selling" && (
+          <div className="mx-auto mt-6 max-w-md">
+            <BuySellBalance />
+          </div>
+        )}
       </section>
 
       <section className="relative mx-auto max-w-3xl px-5 pb-8">

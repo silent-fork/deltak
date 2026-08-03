@@ -62,10 +62,10 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
         <section className="relative mx-auto max-w-4xl px-5 pb-6 pt-4">
           <div className="flex flex-wrap items-center gap-2">
             <ComplexityBadge level={strategy.complexity} />
-            <span className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <span className="shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               {strategy.category}
             </span>
-            <span className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <span className="shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               {strategy.legs.length}-leg
             </span>
           </div>
@@ -93,7 +93,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
               {strategy.legs.map((leg, i) => (
                 <span
                   key={i}
-                  className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${
+                  className={`shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[10px] ${
                     leg.action === "buy"
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
                       : "border-rose-500/30 bg-rose-500/10 text-rose-400"

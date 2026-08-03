@@ -101,7 +101,7 @@ export function ComplexityBadge({ level }: { level: string }) {
         : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${tone}`}
+      className={`shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${tone}`}
     >
       {level}
     </span>
