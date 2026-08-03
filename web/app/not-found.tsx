@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Compass } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
@@ -27,9 +27,9 @@ export default function NotFound() {
         className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.08] blur-[110px]"
       />
 
-      <div className="relative flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-          <Compass className="h-4 w-4 text-quantum" />
+      <div className="relative flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
+          <Zap className="h-4 w-4 text-quantum" />
         </div>
         <Wordmark className="text-[16px] tracking-[0.18em]" />
       </div>
@@ -52,20 +52,37 @@ export default function NotFound() {
           quoted to begin with. No wall, no wick, no walk-back.
         </p>
 
-        <div className="mt-6 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
+        <div aria-hidden className="relative mt-5 h-10 w-full">
+          <svg viewBox="0 0 320 40" className="h-full w-full">
+            <path
+              d="M0 20 L110 20 L128 6 L144 34 L160 20 L320 20"
+              fill="none"
+              stroke="#3f3f46"
+              strokeWidth={1.5}
+            />
+            <path d="M160 20 L320 20" fill="none" stroke="#f43f5e" strokeWidth={1.5} strokeDasharray="4 4" />
+            <circle cx={160} cy={20} r={3} fill="#18181b" stroke="#f43f5e" strokeWidth={1.5} />
+          </svg>
+          <span className="absolute right-0 top-0 -translate-y-full font-mono text-[8px] uppercase tracking-wider text-rose-400/80">
+            signal ends here
+          </span>
+        </div>
+
+        <div className="mt-2 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
           <CtaLink
             href="/"
             location="404"
-            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[12px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
+            className="flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-quantum/60 bg-quantum/15 px-5 text-[12px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:w-auto"
           >
-            Back to the Homepage
+            Homepage
           </CtaLink>
           <CtaLink
             href="/terminal"
             location="404"
-            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/60 px-4 text-[12px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:w-auto"
+            className="flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-zinc-700 bg-zinc-900/60 px-5 text-[12px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:w-auto"
           >
-            Open the Terminal
+            Terminal
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
           </CtaLink>
         </div>
       </div>
