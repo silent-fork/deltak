@@ -196,6 +196,15 @@ test("FINNIFTY declares a lower RRG maturity threshold than NIFTY/BANKNIFTY", ()
   assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgMinSamples, undefined);
 });
 
+test("FINNIFTY declares a wider RRG window and momentum lookback than the shared default", () => {
+  assert.ok(INDEX_UNIVERSE.FINNIFTY.rrgWindow! > DEFAULT_CONFIG.rrgWindow);
+  assert.ok(INDEX_UNIVERSE.FINNIFTY.rrgMomentumLookback! > DEFAULT_CONFIG.rrgMomentumLookback);
+  assert.equal(INDEX_UNIVERSE.NIFTY.rrgWindow, undefined);
+  assert.equal(INDEX_UNIVERSE.NIFTY.rrgMomentumLookback, undefined);
+  assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgWindow, undefined);
+  assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgMomentumLookback, undefined);
+});
+
 /* --------------------------------------------------------------------- COA */
 
 test("itm depth and nearest strike", () => {

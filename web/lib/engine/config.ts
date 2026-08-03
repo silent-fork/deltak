@@ -39,6 +39,17 @@ export interface IndexSpec {
    * mature its nodes sooner without changing the bar for every underlying.
    */
   rrgMinSamples?: number;
+  /**
+   * Overrides for `EngineConfig.rrgWindow`/`rrgMomentumLookback`. Omit to use
+   * the shared default. A thinner instrument's genuine price changes are
+   * sparser *and* noisier relative to signal than a liquid one's — averaging
+   * RS-Ratio/RS-Momentum over more of them (not just waiting for fewer of
+   * them, which `rrgMinSamples` already does) keeps its quadrant read stable
+   * rather than flickering, which matters because a LAGGING read bans entry
+   * outright under DKMS.
+   */
+  rrgWindow?: number;
+  rrgMomentumLookback?: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
@@ -78,6 +89,11 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     // for 8 genuine ticks routinely never happens in a session, but 4 is
     // still enough to damp out a couple of noisy opening prints.
     rrgMinSamples: 4,
+    // Wider than the shared 90/15 default for the same reason: each of
+    // FINNIFTY's sparser genuine changes carries proportionally more noise,
+    // so the trend mean and momentum comparison both read over more of them.
+    rrgWindow: 150,
+    rrgMomentumLookback: 25,
   },
 };
 

@@ -741,8 +741,8 @@ export function useEngine(simulate: boolean) {
     const cfg = cfgRef.current;
     for (const u of UNDERLYINGS) {
       const rrg = new RrgEngine(
-        cfg.rrgWindow,
-        cfg.rrgMomentumLookback,
+        INDEX_UNIVERSE[u].rrgWindow ?? cfg.rrgWindow,
+        INDEX_UNIVERSE[u].rrgMomentumLookback ?? cfg.rrgMomentumLookback,
         cfg.rrgTailLength,
         INDEX_UNIVERSE[u].rrgMinSamples,
       );
