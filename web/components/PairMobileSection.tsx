@@ -101,7 +101,13 @@ export function PairMobileSection() {
   const [expanded, setExpanded] = useState(false);
   const expiresAtRef = useRef(0);
 
-  const mint = useCallback(async () => {
+  /**
+   * `isRefresh` distinguishes the QR this section auto-mints the moment it
+   * mounts from one a user explicitly re-minted after the first expired or
+   * failed — same request either way, different signal for how often a
+   * visible "scan this" QR is actually going stale before it gets used.
+   */
+  const mint = useCallback(async (isRefresh: boolean) => {
     setBusy(true);
     setError(null);
     try {
@@ -110,20 +116,21 @@ export function PairMobileSection() {
       setClaimUrl(res.claim_url);
       expiresAtRef.current = new Date(res.expires_at).getTime();
       setSecondsLeft(Math.max(0, Math.round((expiresAtRef.current - Date.now()) / 1000)));
-      track("mobile_pair_qr_minted");
+      track(isRefresh ? "mobile_pair_qr_refreshed" : "mobile_pair_qr_minted");
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Couldn't start pairing.";
       setError(detail);
       setQrSvg(null);
-      track("mobile_pair_qr_failed", { detail });
+      track(isRefresh ? "mobile_pair_qr_refresh_failed" : "mobile_pair_qr_failed", { detail });
     } finally {
       setBusy(false);
     }
   }, []);
 
   useEffect(() => {
-    void mint();
-  }, [mint]);
+    void mint(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!qrSvg) return;
@@ -143,7 +150,7 @@ export function PairMobileSection() {
           expired={expired}
           busy={busy}
           size={176}
-          onReload={expired || error ? () => void mint() : undefined}
+          onReload={expired || error ? () => void mint(true) : undefined}
         />
 
         {error ? (
@@ -168,7 +175,7 @@ export function PairMobileSection() {
         <div className="flex items-center gap-1.5">
           {expired || error ? (
             <button
-              onClick={() => void mint()}
+              onClick={() => void mint(true)}
               disabled={busy}
               className="flex h-6 items-center gap-1 rounded border border-quantum/50 bg-quantum/10 px-2 text-[9.5px] font-semibold uppercase tracking-wider text-quantum hover:bg-quantum/20 disabled:opacity-50"
             >
@@ -202,7 +209,7 @@ export function PairMobileSection() {
         expired={expired}
         busy={busy}
         size={44}
-        onReload={expired || error ? () => void mint() : undefined}
+        onReload={expired || error ? () => void mint(true) : undefined}
       />
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] text-zinc-300 group-hover:text-zinc-100">

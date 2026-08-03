@@ -49,8 +49,8 @@ export default async function TerminalRoute({
 
   const mobileSessionId = (await cookies()).get(MOBILE_SESSION_COOKIE)?.value;
   const clientCode = await mobileSessionClientCode(mobileSessionId);
-  if (clientCode) return <MobileCompanion clientCode={clientCode} />;
-
   const { mobile } = await searchParams;
+  if (clientCode) return <MobileCompanion clientCode={clientCode} justPaired={mobile === "paired"} />;
+
   return <MobilePairScreen expired={mobile === "expired"} />;
 }

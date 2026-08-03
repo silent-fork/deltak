@@ -93,7 +93,14 @@ function PositionRow({ position }: { position: Position }) {
  * panel language as the homepage and the desktop HUD, so this doesn't read
  * as a stripped-down afterthought next to either.
  */
-export function MobileCompanion({ clientCode }: { clientCode: string }) {
+export function MobileCompanion({
+  clientCode,
+  justPaired = false,
+}: {
+  clientCode: string;
+  /** True on the one render immediately after a successful QR claim redirect — see app/terminal/page.tsx. */
+  justPaired?: boolean;
+}) {
   const [data, setData] = useState<MobileStateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -110,6 +117,7 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
           if (!viewTracked.current) {
             viewTracked.current = true;
             setAnalyticsContext({ mobile: true, client_code: res.client_code });
+            if (justPaired) track("mobile_paired", { client_code: res.client_code });
             track("mobile_companion_view", { client_code: res.client_code });
           }
         }
@@ -127,9 +135,11 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
 
   const unpair = async () => {
     setSigningOut(true);
-    track("mobile_unpair", { client_code: clientCode });
     try {
       await api.mobile.logout();
+      track("mobile_unpaired", { client_code: clientCode });
+    } catch (err) {
+      track("mobile_unpair_failed", { client_code: clientCode, detail: err instanceof Error ? err.message : String(err) });
     } finally {
       window.location.reload();
     }

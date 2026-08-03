@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   // expired token) reads the same as "this QR isn't good", not an error.
   const sessionId = token ? await completeMobilePairing(token).catch(() => null) : null;
 
-  const target = new URL(sessionId ? "/terminal" : "/terminal?mobile=expired", request.url);
+  const target = new URL(sessionId ? "/terminal?mobile=paired" : "/terminal?mobile=expired", request.url);
   const res = NextResponse.redirect(target, { status: 302 });
   if (sessionId) {
     res.cookies.set(MOBILE_SESSION_COOKIE, sessionId, MOBILE_SESSION_COOKIE_OPTIONS);
