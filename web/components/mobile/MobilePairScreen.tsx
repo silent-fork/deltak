@@ -14,7 +14,7 @@ import { Wordmark } from "@/components/Wordmark";
  */
 export function MobilePairScreen({ expired }: { expired?: boolean }) {
   return (
-    <main className="dk-scroll dk-grid-bg relative flex min-h-dvh flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-zinc-950 px-6 py-10 text-center">
+    <main className="dk-scroll dk-grid-bg relative flex h-dvh flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-zinc-950 px-6 py-10 text-center">
       <AnalyticsBeacon event="mobile_pair_screen_view" data={{ expired: Boolean(expired) }} />
 
       <div

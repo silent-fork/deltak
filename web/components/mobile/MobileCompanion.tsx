@@ -148,7 +148,7 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
   const mode = data?.signal?.mode ?? "paper";
 
   return (
-    <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+    <main className="dk-grid-bg relative h-dvh overflow-hidden bg-zinc-950">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum/[0.08] blur-[110px]"
@@ -187,9 +187,19 @@ export function MobileCompanion({ clientCode }: { clientCode: string }) {
                 </span>
               </CardHeader>
               <CardContent className="p-0">
-                {["NIFTY", "BANKNIFTY", "FINNIFTY"].map((u) => (
-                  <SignalRow key={u} underlying={u} signal={data?.signal ?? null} />
-                ))}
+                {data?.signal && !data.signal.market_open ? (
+                  <p className="px-3 py-3 text-center text-[11px] leading-snug text-zinc-500">
+                    Market closed — waiting for the next session to open.
+                    <br />
+                    <span className="text-zinc-600">
+                      Nothing armed or muted, there&apos;s just no live tape to read yet.
+                    </span>
+                  </p>
+                ) : (
+                  ["NIFTY", "BANKNIFTY", "FINNIFTY"].map((u) => (
+                    <SignalRow key={u} underlying={u} signal={data?.signal ?? null} />
+                  ))
+                )}
               </CardContent>
             </Card>
 
