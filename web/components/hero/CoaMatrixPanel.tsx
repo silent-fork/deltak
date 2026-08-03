@@ -400,8 +400,9 @@ function EngageCorridor({
   // ambiguous (see the "overlap" state above), not double-armed. Two markers
   // independently pulsing their own colour on top of each other just reads as
   // noise here, so the shared zone gets its own single, distinct treatment —
-  // a moving hazard stripe, not a blink — and each cap's own pulse stands
-  // down for the width of it.
+  // an alternating Aegis/Zenith diagonal weave, scrolling under the same cyan
+  // the spot marker itself glows with, rather than an unrelated warning
+  // colour — and each cap's own pulse stands down for the width of it.
   const overlapping = !!(aegisBand?.armed && zenithBand?.armed && aegisCapEnd > zenithCapStart);
 
   return (
@@ -438,15 +439,22 @@ function EngageCorridor({
         {overlapping ? (
           <div
             title="Overlap — spot sits inside both engage zones at once; Alpha reads this as ambiguous, not double-armed."
-            className="absolute inset-y-0 animate-hazard-scroll"
-            style={{
-              left: `${zenithCapStart}%`,
-              right: `${100 - aegisCapEnd}%`,
-              backgroundImage:
-                "repeating-linear-gradient(135deg, rgba(245,158,11,0.85) 0 4px, rgba(9,9,11,0.85) 4px 8px)",
-              backgroundSize: "16px 16px",
-            }}
-          />
+            className="absolute inset-y-0 overflow-hidden"
+            style={{ left: `${zenithCapStart}%`, right: `${100 - aegisCapEnd}%` }}
+          >
+            <div
+              className="absolute inset-0 animate-hazard-scroll"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, rgba(16,185,129,0.55) 0 6px, rgba(244,63,94,0.55) 6px 12px)",
+                backgroundSize: "24px 24px",
+              }}
+            />
+            <div
+              className="absolute inset-0 animate-pulse-ring"
+              style={{ boxShadow: "inset 0 0 8px rgba(0,240,255,0.7)" }}
+            />
+          </div>
         ) : null}
         {spotPct !== null ? (
           <span
@@ -626,7 +634,7 @@ export const CoaMatrixPanel = memo(function CoaMatrixPanel({
               className={cn(
                 "font-mono text-[9px] font-semibold uppercase tracking-wider",
                 bands.aegis?.armed && bands.zenith?.armed
-                  ? "text-amber-400"
+                  ? "animate-pulse-ring bg-gradient-to-r from-emerald-400 to-rose-400 bg-clip-text text-transparent"
                   : bands.aegis?.armed || bands.zenith?.armed
                     ? "text-quantum"
                     : "text-zinc-600",

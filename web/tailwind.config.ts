@@ -67,7 +67,7 @@ const config: Config = {
         },
         "hazard-scroll": {
           "0%": { backgroundPosition: "0 0" },
-          "100%": { backgroundPosition: "16px 0" },
+          "100%": { backgroundPosition: "24px 0" },
         },
       },
       animation: {
@@ -77,7 +77,7 @@ const config: Config = {
         scan: "scan 5s linear infinite",
         drift: "drift 6s ease-in-out infinite",
         "fade-up": "fade-up 500ms ease-out both",
-        "hazard-scroll": "hazard-scroll 900ms linear infinite",
+        "hazard-scroll": "hazard-scroll 1600ms linear infinite",
       },
     },
   },
