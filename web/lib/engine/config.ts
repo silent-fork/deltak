@@ -50,6 +50,16 @@ export interface IndexSpec {
    */
   rrgWindow?: number;
   rrgMomentumLookback?: number;
+  /**
+   * Override for `RrgScatter`'s "still maturing" bar (`RRG_READY_FRACTION`,
+   * the fraction of expected nodes that must have matured before the plot
+   * stops calling itself unfinished). Omit to use that default. A thinner
+   * instrument's far strikes may go a whole session without a genuine print
+   * at all, so waiting for the same 90% every liquid index clears in a
+   * minute would leave the plot marked "maturing" for the rest of the day
+   * even once enough of it is real to read.
+   */
+  rrgReadyFraction?: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
@@ -94,6 +104,11 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     // so the trend mean and momentum comparison both read over more of them.
     rrgWindow: 150,
     rrgMomentumLookback: 25,
+    // A quarter of its legs matured is enough to read the rotation on an
+    // instrument this thin — the far OTM strikes in a 26-leg span routinely
+    // never print at all, and holding the plot "maturing" until 90% of them
+    // somehow do would mean it almost never clears.
+    rrgReadyFraction: 0.25,
   },
 };
 

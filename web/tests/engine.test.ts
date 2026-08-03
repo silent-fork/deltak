@@ -206,6 +206,12 @@ test("FINNIFTY declares a wider RRG window and momentum lookback than the shared
   assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgMomentumLookback, undefined);
 });
 
+test("FINNIFTY declares a lower RRG ready-fraction so the plot clears sooner on a thin book", () => {
+  assert.ok(INDEX_UNIVERSE.FINNIFTY.rrgReadyFraction! < 0.9);
+  assert.equal(INDEX_UNIVERSE.NIFTY.rrgReadyFraction, undefined);
+  assert.equal(INDEX_UNIVERSE.BANKNIFTY.rrgReadyFraction, undefined);
+});
+
 /* --------------------------------------------------------------------- COA */
 
 test("itm depth and nearest strike", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Heart } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/market/migration";
 import type { Underlying } from "@/lib/types";
 import { useEngine } from "@/lib/useEngine";
+import { fmt } from "@/lib/utils";
 
 const SIMULATE = process.env.NEXT_PUBLIC_SIMULATE === "1";
 
@@ -327,10 +329,18 @@ export function Terminal() {
           </section>
         </div>
 
-        <footer className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 px-3 py-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
-          <span className="flex items-center gap-3">
-            <span>
-              DeltaK Matrix Strategy · COA 1.0 / 2.0 · RRG Multi-Strike Momentum
+        <footer className="shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-t border-zinc-800 px-3 py-0.5 text-[9px] uppercase tracking-wider text-zinc-600">
+          <span className="flex min-w-0 flex-wrap items-center gap-3">
+            {/* What the board below is actually keyed to, in one glance — a
+                live readout instead of a static brand line, so switching
+                instruments or the PCR moving is legible from the footer alone. */}
+            <span
+              className="truncate"
+              title="DeltaK Matrix Strategy — COA 1.0/2.0 wall reads plus RRG multi-strike momentum."
+            >
+              DKMS · {chain?.label ?? selected}
+              {chain?.expiry ? ` · ${chain.expiry}` : ""} · PCR{" "}
+              {chain ? fmt(chain.pcr) : "—"}
             </span>
             {/* Historical reads are an enhancement, never a dependency — say so
                 here rather than raising the degraded banner over them. */}
@@ -340,7 +350,17 @@ export function Terminal() {
               </span>
             ) : null}
           </span>
-          <span className="flex items-center gap-3">
+
+          <span className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap text-zinc-700">
+            Made with{" "}
+            <Heart
+              aria-hidden
+              className="h-2.5 w-2.5 fill-rose-500/70 text-rose-500/70"
+            />{" "}
+            in Bharat
+          </span>
+
+          <span className="flex min-w-0 flex-wrap items-center justify-end gap-3">
             <span>Tokens {engine.trackedTokens}</span>
             <span>Ticks {engine.tickUpdates}</span>
             <span

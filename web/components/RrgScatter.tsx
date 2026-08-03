@@ -143,9 +143,12 @@ export const RrgScatter = memo(function RrgScatter({
     return count;
   }, [chain]);
 
+  const readyFraction =
+    (chain && INDEX_UNIVERSE[chain.underlying]?.rrgReadyFraction) ?? RRG_READY_FRACTION;
+
   // A static replay lands its whole session at once — nothing to wait on.
   const maturing =
-    !settled && expected > 0 && nodes.length < Math.ceil(expected * RRG_READY_FRACTION);
+    !settled && expected > 0 && nodes.length < Math.ceil(expected * readyFraction);
 
   // Symmetric domain around the 100 origin so the quadrants stay square.
   const domain = useMemo(() => {
@@ -165,53 +168,36 @@ export const RrgScatter = memo(function RrgScatter({
     return [100 - pad, 100 + pad] as [number, number];
   }, [visible]);
 
-  // Tails get noisy past a couple of dozen nodes; keep the trace readable.
-  // A node still maturing has a trail of one or two prints, not history —
-  // a handful of those half-formed lines is exactly the visual noise the
-  // 18-node cap below exists to avoid, so the same rule applies here.
-  const withTails = visible.length <= 18 && !maturing;
-  /**
-   * How much trail to draw.
-   *
-   * A live tail is a minute of one-second samples — a short comma behind the
-   * node. A replayed one is a whole session in twelve five-minute jumps, which
-   * sprawls right across the plot and turns four nodes into four pieces of
-   * spaghetti: the lines stop reading as history and start reading as the
-   * chart. Frozen on a finished session, the position is the point, so the
-   * trail is cut to the last few steps into it.
-   */
-  const tailPoints = settled ? 3 : Infinity;
   const withLabels = visible.length <= 12;
 
+  /**
+   * Head-only, no trail.
+   *
+   * A live tail was a minute of one-second samples — a short comma behind the
+   * node — but a replayed session's twelve five-minute jumps sprawled right
+   * across the plot, and filtering to CE/PE alone (fewer nodes, so the trail
+   * count no longer needed the crowd-based cap that used to suppress it) made
+   * the crossed lines the loudest thing on screen instead of the rotation
+   * itself. Position is the point on a live plot as much as a settled one;
+   * this also drops the per-node trail slicing a closed-market replay used to
+   * redo on every batch that landed, for one render pass instead of several.
+   */
   const series = useMemo(
     () =>
-      visible.map((node) => {
-        const trail =
-          tailPoints === Infinity ? node.tail : node.tail.slice(-tailPoints);
-        const tail = withTails
-          ? trail.slice(0, -1).map((p) => ({
-              x: p.rs_ratio,
-              y: p.rs_momentum,
-              node,
-              head: false,
-            }))
-          : [];
-        return {
-          node,
-          data: [
-            ...tail,
-            {
-              x: node.rs_ratio,
-              y: node.rs_momentum,
-              node,
-              head: true,
-              labelled: withLabels,
-              highlighted: node.token === highlightToken,
-            },
-          ],
-        };
-      }),
-    [visible, withTails, tailPoints, withLabels, highlightToken],
+      visible.map((node) => ({
+        node,
+        data: [
+          {
+            x: node.rs_ratio,
+            y: node.rs_momentum,
+            node,
+            head: true,
+            labelled: withLabels,
+            highlighted: node.token === highlightToken,
+          },
+        ],
+      })),
+    [visible, withLabels, highlightToken],
   );
 
   const active = hovered;
@@ -257,7 +243,14 @@ export const RrgScatter = memo(function RrgScatter({
         {/* The plot takes the column's leftover height so the card ends flush. */}
         <div className="relative min-h-[150px] w-full flex-1">
           {visible.length === 0 ? (
-            <SkeletonPanel label="Loading rotation nodes" className="h-full">
+            <SkeletonPanel
+              label={
+                expected > 0
+                  ? `0/${expected} nodes matured — waiting for a genuine price move`
+                  : "Loading rotation nodes"
+              }
+              className="h-full"
+            >
               {/* The plot's own geometry — quadrants and a scatter of nodes —
                   rather than a filled slab where the chart will be. */}
               <div className="relative h-full min-h-0 w-full rounded-md border border-zinc-800/70">
@@ -275,6 +268,21 @@ export const RrgScatter = memo(function RrgScatter({
                     style={{ left, top }}
                   />
                 ))}
+                {/*
+                  A chain that has legs quoting but zero matured nodes is a
+                  different state from "the chain doesn't exist yet" — the
+                  bare geometric skeleton above says the latter; this says the
+                  pipeline is live and is specifically waiting on a real print,
+                  which on a thin instrument can be the actual bottleneck.
+                */}
+                {expected > 0 ? (
+                  <div className="absolute inset-0 flex items-center justify-center gap-1.5 px-2 text-center">
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-quantum" />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                      0/{expected} matured — awaiting a genuine price move
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </SkeletonPanel>
           ) : (
@@ -319,14 +327,7 @@ export const RrgScatter = memo(function RrgScatter({
                     key={node.token}
                     data={data}
                     shape={<NodeDot />}
-                    line={
-                      withTails
-                        ? {
-                            stroke: QUADRANT_META[node.quadrant].hex,
-                            strokeOpacity: 0.3,
-                          }
-                        : false
-                    }
+                    line={false}
                     isAnimationActive={false}
                     onMouseEnter={() => setHovered(node)}
                     onMouseLeave={() => setHovered(null)}
@@ -339,8 +340,7 @@ export const RrgScatter = memo(function RrgScatter({
           {/* Translucent, not opaque — nodes are already real and placed
               correctly, so blacking them out would be lying about how much
               is actually known. This just says the picture isn't finished
-              yet, while `withTails` above keeps the half-formed trails that
-              would otherwise be the loudest thing on screen out of view. */}
+              yet. */}
           {visible.length > 0 && maturing ? (
             <div
               role="status"
