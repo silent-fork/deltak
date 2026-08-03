@@ -87,10 +87,12 @@ function QrThumb({
  * Pair-a-phone QR, inline in the profile dropdown rather than its own modal —
  * small by default, click to expand within the dropdown itself.
  *
- * Mints a ticket the moment this mounts (the dropdown opening is the only
- * thing that mounts it — see `UserPill`), so a small live QR is already
- * sitting there the first time the section is seen, the same "no dead click"
- * choice the funds panel above it makes.
+ * Minted on that first click, not the moment this mounts: the dropdown
+ * opening is the only thing that mounts it, and most opens are for
+ * something else entirely (funds, the trade book) — a QR ticket burned on
+ * every single one of those, whether or not Pair ever gets clicked, is a
+ * live claim URL sitting around unused for its whole two-minute window far
+ * more often than it's actually scanned.
  */
 export function PairMobileSection({
   onExpandedChange,
@@ -144,11 +146,6 @@ export function PairMobileSection({
     } finally {
       setBusy(false);
     }
-  }, []);
-
-  useEffect(() => {
-    void mint(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -295,6 +292,10 @@ export function PairMobileSection({
       onClick={() => {
         setExpanded(true);
         track("mobile_pair_qr_expanded");
+        // Minted on request, not the moment this section mounts — a QR sitting
+        // unused for the entire two minutes an operator spends elsewhere in
+        // the dropdown before ever opening Pair is a wasted ticket.
+        if (!qrSvg && !busy) void mint(false);
       }}
       className="group flex w-full items-center gap-2.5 text-left"
       title="Expand to scan"
@@ -309,7 +310,13 @@ export function PairMobileSection({
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-[11px] text-zinc-300 group-hover:text-zinc-100">
-            {error ? "Pairing failed" : expired ? "QR expired" : "Scan to pair a phone"}
+            {error
+              ? "Pairing failed"
+              : expired
+                ? "QR expired"
+                : qrSvg
+                  ? "Scan to pair a phone"
+                  : "Pair a phone"}
           </span>
           {devicesLoaded && devices.length > 0 ? (
             <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/80 px-1 py-0.5 font-mono text-[8.5px] text-zinc-500">
@@ -318,7 +325,13 @@ export function PairMobileSection({
           ) : null}
         </span>
         <span className="block text-[9.5px] text-zinc-600">
-          {error ? "Tap to retry" : expired ? "Tap for a new one" : "Live from desktop · tap to enlarge"}
+          {error
+            ? "Tap to retry"
+            : expired
+              ? "Tap for a new one"
+              : qrSvg
+                ? "Live from desktop · tap to enlarge"
+                : "Tap to generate a QR"}
         </span>
       </span>
       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-600 group-hover:text-zinc-300" />

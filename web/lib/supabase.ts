@@ -460,6 +460,29 @@ export async function deleteClientSession(clientCode: string): Promise<void> {
   });
 }
 
+/**
+ * Wipe this account's paper-trading history — every paper position and
+ * order, open or closed. Scoped by both `client_code` and `mode=paper`
+ * explicitly: a live-mode row must never be reachable from a "reset my
+ * paper wallet" action, whatever else changes about this function later.
+ */
+export async function resetPaperTrading(clientCode: string): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  const search = new URLSearchParams({
+    client_code: `eq.${clientCode}`,
+    mode: "eq.paper",
+  });
+  await Promise.all(
+    ["positions", "orders"].map((table) =>
+      fetch(`${base()}/${table}?${search.toString()}`, {
+        method: "DELETE",
+        headers: headers("return=minimal"),
+        cache: "no-store",
+      }),
+    ),
+  );
+}
+
 /* -------------------------------------------------------------- mobile companion */
 
 const MOBILE_PAIRINGS = "mobile_pairings";

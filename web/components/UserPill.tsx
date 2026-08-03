@@ -6,11 +6,13 @@ import {
   Check,
   ChevronDown,
   Clock3,
+  Loader2,
   LogOut,
   Mail,
   Pencil,
   Phone,
   RefreshCw,
+  RotateCcw,
   Wallet,
   X,
 } from "lucide-react";
@@ -18,8 +20,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
 import { PairMobileSection } from "@/components/PairMobileSection";
+import { track } from "@/lib/analytics";
 import { api } from "@/lib/api";
-import { istParts } from "@/lib/engine/config";
+import { DEFAULT_CONFIG, istParts } from "@/lib/engine/config";
 import type { ExecutionMode, LedgerSnapshot, UserProfile } from "@/lib/types";
 import { cn, money, pnlTone, signedMoney } from "@/lib/utils";
 
@@ -255,10 +258,22 @@ function EditableRow({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  /** A small icon-button in the title row — a section-scoped action, not worth its own row. */
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="border-t border-zinc-800/80 px-3 py-2">
-      <div className="dk-label mb-1 text-[8px]">{title}</div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="dk-label text-[8px]">{title}</div>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -302,6 +317,9 @@ export function UserPill({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pairExpanded, setPairExpanded] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Same contract as the log menu: click-away closes, Escape closes.
@@ -336,6 +354,21 @@ export function UserPill({
       await engine.refreshProfile();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function resetWallet() {
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      await engine.resetPaper();
+      setConfirmReset(false);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Reset failed";
+      setResetError(detail);
+      track("paper_wallet_reset_failed", { detail });
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -479,7 +512,51 @@ export function UserPill({
             play here, so this is the one balance that actually moves when a
             trade opens or closes, for either device to show.
           */}
-          <Section title={`Paper Wallet · ${mode}`}>
+          <Section
+            title={`Paper Wallet · ${mode}`}
+            action={
+              <button
+                onClick={() => setConfirmReset((v) => !v)}
+                title="Reset paper wallet — clears all paper trade history"
+                className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            }
+          >
+            {confirmReset ? (
+              <div className="mb-2 rounded border border-rose-500/50 bg-rose-500/10 p-2">
+                <p className="text-[10px] leading-snug text-rose-200">
+                  Reset the paper wallet? Every paper position and order —
+                  open and closed — is deleted, and capital returns to{" "}
+                  {money(DEFAULT_CONFIG.paperCapital, 0)}. This can&apos;t be undone.
+                </p>
+                {resetError ? (
+                  <p className="mt-1.5 text-[10px] text-rose-300">{resetError}</p>
+                ) : null}
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <button
+                    onClick={resetWallet}
+                    disabled={resetBusy}
+                    className="flex h-6 items-center gap-1 rounded border border-rose-500/60 bg-rose-500/20 px-2 text-[9.5px] font-semibold uppercase tracking-wider text-rose-200 hover:bg-rose-500/30 disabled:opacity-50"
+                  >
+                    {resetBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                    Confirm reset
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmReset(false);
+                      setResetError(null);
+                    }}
+                    disabled={resetBusy}
+                    className="flex h-6 items-center rounded border border-zinc-700 bg-zinc-900/60 px-2 text-[9.5px] font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/70">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-quantum/50 to-quantum transition-[width] duration-500"

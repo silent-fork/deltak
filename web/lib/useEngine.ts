@@ -1379,10 +1379,19 @@ export function useEngine(simulate: boolean) {
     }
   }, [bookExit, log]);
 
-  const resetPaper = useCallback(() => {
+  /**
+   * Wipes the DB's paper history first — every paper position and order,
+   * open or closed, for this account — and only resets the in-tab ledger
+   * once that's confirmed. Doing it the other way round (reset locally,
+   * clear the DB best-effort after) would leave a tab reading "fresh start"
+   * while a failed clear left the old trades still sitting in Supabase.
+   */
+  const resetPaper = useCallback(async () => {
+    await api.resetPaper();
     ledgerRef.current.reset();
     scaledRef.current.clear();
-    log("INFO", "Paper ledger reset to starting capital.");
+    log("INFO", "Paper wallet reset — history cleared, capital back to starting.");
+    track("paper_wallet_reset");
   }, [log]);
 
   return {

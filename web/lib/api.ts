@@ -202,6 +202,9 @@ export const api = {
       `/api/history/${resource}?${new URLSearchParams(params).toString()}`,
     ),
 
+  /** Wipe this account's paper-trading history — every paper position and order, open or closed. */
+  resetPaper: () => request<{ ok: boolean }>("/api/paper/reset", { method: "POST" }),
+
   /** The read-only mobile companion — pairing from the desktop, reading back on the phone. */
   mobile: {
     /** Desktop mints a fresh QR. Requires the one active trading session. */
