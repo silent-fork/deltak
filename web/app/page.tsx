@@ -15,6 +15,7 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
+import Link from "next/link";
 
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
