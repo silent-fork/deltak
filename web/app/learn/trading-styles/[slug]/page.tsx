@@ -1,0 +1,105 @@
+import { AlertTriangle, Clock3 } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { LearnChrome } from "@/components/LearnChrome";
+import { getTradingStyle, TRADING_STYLES } from "@/lib/content/tradingStyles";
+
+export const dynamic = "error";
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return TRADING_STYLES.map((s) => ({ slug: s.slug }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const style = getTradingStyle(slug);
+  if (!style) return {};
+  return {
+    title: `${style.name} — How It Works, Who It Suits, Key Risks`,
+    description: style.summary,
+    keywords: style.keywords,
+    alternates: { canonical: `/learn/trading-styles/${style.slug}` },
+  };
+}
+
+export default async function TradingStylePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const style = getTradingStyle(slug);
+  if (!style) notFound();
+
+  const others = TRADING_STYLES.filter((s) => s.slug !== style.slug);
+
+  return (
+    <LearnChrome
+      ctaLocation={`learn-style-${style.slug}`}
+      crumbs={[
+        { label: "Learn", href: "/learn" },
+        { label: "Trading Styles", href: "/learn/trading-styles" },
+        { label: style.name },
+      ]}
+    >
+      <section className="relative mx-auto max-w-3xl px-5 pb-6 pt-4">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
+          <Clock3 className="h-3 w-3" />
+          {style.horizon}
+        </span>
+        <h1 className="mt-4 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">{style.name}</h1>
+        <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
+          {style.summary}
+        </p>
+      </section>
+
+      <section className="relative mx-auto max-w-3xl px-5 pb-8">
+        <div className="dk-panel space-y-3 rounded-lg p-5">
+          <h2 className="text-[13px] font-semibold text-zinc-100">How it works</h2>
+          {style.howItWorks.map((p, i) => (
+            <p key={i} className="text-[12.5px] leading-relaxed text-zinc-400">
+              {p}
+            </p>
+          ))}
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-3xl px-5 pb-8">
+        <div className="dk-panel rounded-lg p-5">
+          <h2 className="text-[13px] font-semibold text-zinc-100">Who it suits</h2>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-400">{style.suitedFor}</p>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-3xl px-5 pb-10">
+        <div className="dk-panel rounded-lg p-5">
+          <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-zinc-100">
+            <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+            Key risks
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {style.risks.map((r, i) => (
+              <li key={i} className="text-[12.5px] leading-relaxed text-zinc-400">
+                · {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-3xl px-5 pb-10">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Other trading styles</h2>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {others.map((o) => (
+            <Link
+              key={o.slug}
+              href={`/learn/trading-styles/${o.slug}`}
+              className="dk-panel rounded-lg p-3 text-[12.5px] font-semibold text-zinc-200 transition-colors hover:border-zinc-700"
+            >
+              {o.name}
+            </Link>
+          ))}
+        </div>
+      </section>
+    </LearnChrome>
+  );
+}

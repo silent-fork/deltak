@@ -2,6 +2,8 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Bot,
+  BookOpen,
+  CalendarDays,
   Layers,
   LockKeyhole,
   Radar,
@@ -336,6 +338,22 @@ export default function HomePage() {
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
           loss. Paper mode only, for now — every fill here is simulated.
+        </p>
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
+          <Link
+            href="/learn"
+            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
+          >
+            <BookOpen className="h-3 w-3" />
+            Options strategies &amp; F&amp;O glossary
+          </Link>
+          <Link
+            href="/learn/indices"
+            className="inline-flex items-center gap-1.5 text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-quantum hover:decoration-quantum/60"
+          >
+            <CalendarDays className="h-3 w-3" />
+            NIFTY / BANKNIFTY / FINNIFTY contract specs
+          </Link>
         </p>
         {/* A literal tricolour swatch rather than relying on an emoji flag
             rendering consistently across platforms — three real stripes,
