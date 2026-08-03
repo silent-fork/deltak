@@ -182,7 +182,7 @@ export default function HomePage() {
           <CtaLink
             href="/learn"
             location="nav-learn"
-            className="hidden text-[11px] font-semibold uppercase tracking-wider text-zinc-400 transition-colors hover:text-zinc-100 sm:block"
+            className="hidden h-9 items-center rounded-md border border-zinc-700 bg-zinc-900/60 px-3.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:flex"
           >
             Learn
           </CtaLink>
