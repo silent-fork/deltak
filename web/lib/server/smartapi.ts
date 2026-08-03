@@ -1,6 +1,7 @@
 import "server-only";
 
 import { withRetry } from "@/lib/retry";
+import { RateLimiter } from "./rateLimiter";
 
 /**
  * Angel One SmartAPI v2.0 client for route handlers.
@@ -34,6 +35,32 @@ export const API_KEY = process.env.DK_API_KEY ?? "";
 export const CLIENT_LOCAL_IP = process.env.DK_CLIENT_LOCAL_IP ?? "127.0.0.1";
 export const CLIENT_PUBLIC_IP = process.env.DK_CLIENT_PUBLIC_IP ?? "127.0.0.1";
 export const MAC_ADDRESS = process.env.DK_MAC_ADDRESS ?? "00:00:00:00:00:00";
+
+/**
+ * Angel One's own published throttling, per endpoint — request/second,
+ * request/minute, request/hour where documented. `getOIData`,
+ * `putCallRatio` and `OIBuildup` aren't in Angel One's published table; 1/sec
+ * is a deliberately conservative default for them, not a documented number.
+ *
+ * Every call to a given endpoint shares one budget here regardless of which
+ * browser tab or operator triggered it — see `rateLimiter.ts` for why that
+ * has to live here rather than in the browser's own request queue.
+ */
+const limiters: Record<string, RateLimiter> = {
+  [CANDLE_URL]: new RateLimiter([
+    { ms: 1_000, max: 3 },
+    { ms: 60_000, max: 150 },
+    { ms: 3_600_000, max: 5_000 },
+  ]),
+  [OI_DATA_URL]: new RateLimiter([{ ms: 1_000, max: 1 }]),
+  [PCR_URL]: new RateLimiter([{ ms: 1_000, max: 1 }]),
+  [OI_BUILDUP_URL]: new RateLimiter([{ ms: 1_000, max: 1 }]),
+  [MARGIN_BATCH_URL]: new RateLimiter([
+    { ms: 1_000, max: 10 },
+    { ms: 60_000, max: 500 },
+    { ms: 3_600_000, max: 5_000 },
+  ]),
+};
 
 export class SmartApiError extends Error {
   constructor(
@@ -78,6 +105,12 @@ export async function smartApiCall<T = Record<string, unknown>>(
       503,
     );
   }
+
+  // Waits its turn against every other call this deployment is making to the
+  // same endpoint, from any request — not just this one. An endpoint with no
+  // configured limiter (order placement, login, profile — none of which this
+  // module's callers hit today) proceeds unthrottled.
+  await limiters[url]?.acquire();
 
   let res: Response;
   try {
