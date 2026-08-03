@@ -19,16 +19,38 @@ export const SMART_STREAM_URL = "wss://smartapisocket.angelone.in/smart-stream";
 
 export interface IndexSpec {
   label: string;
-  /** Scrip-master `name` values that identify the index spot in NSE_CM. */
+  /** Which cash/F&O pair this index's spot and options actually list on. */
+  exchange: "NSE" | "BSE";
+  /**
+   * Scrip-master `name`/`symbol` values that identify the index spot on its
+   * cash segment. Matched case- and whitespace-insensitively (see
+   * `normalizeSpotAlias` in `/api/master`), so this only needs to cover real
+   * *wording* variants, not casing or double-spacing.
+   */
   spotAliases: string[];
-  spotTokenFallback: string;
+  /**
+   * Used only if the live master's own name lookup fails to find the spot row
+   * that session — a last-resort so the board still gets *some* print rather
+   * than none. Left unset where a token hasn't been independently confirmed;
+   * an unresolved spot fails visibly (an empty chain, not a bad trade) rather
+   * than risking a silently wrong instrument.
+   */
+  spotTokenFallback?: string;
   strikeStep: number;
+  /**
+   * Bootstrap value only — `ScripMaster.lotSize()` reads the real, current
+   * lot size straight off the live master's own contracts the moment it
+   * loads, and that's what sizing actually uses. SEBI revises these
+   * periodically; this constant is what a signal shows before the master has
+   * loaded, nothing more.
+   */
   lotSize: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   NIFTY: {
     label: "NIFTY 50",
+    exchange: "NSE",
     spotAliases: ["nifty 50", "nifty"],
     spotTokenFallback: "99926000",
     strikeStep: 50,
@@ -36,6 +58,7 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   },
   BANKNIFTY: {
     label: "BANK NIFTY",
+    exchange: "NSE",
     spotAliases: ["nifty bank", "banknifty"],
     spotTokenFallback: "99926009",
     strikeStep: 100,
@@ -43,18 +66,49 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   },
   FINNIFTY: {
     label: "FIN NIFTY",
-    spotAliases: ["nifty fin service", "finnifty"],
+    exchange: "NSE",
+    // Widened past the single "nifty fin service" guess this shipped with —
+    // NSE's own long-form index name, the derivative's own ticker, and a
+    // no-space variant some feeds use, all normalized the same way at match
+    // time. If the spot still doesn't resolve from a live master under all
+    // of these, the fallback token below is what's carrying it, not a name
+    // match — see `masterDiagnostics` in `/api/master` for which one fired.
+    spotAliases: [
+      "nifty fin service",
+      "nifty financial services",
+      "niftyfinservice",
+      "finnifty",
+    ],
     spotTokenFallback: "99926037",
     strikeStep: 50,
     lotSize: 40,
+  },
+  BANKEX: {
+    label: "BANKEX",
+    exchange: "BSE",
+    spotAliases: ["bankex", "bse bankex", "s&p bse bankex"],
+    // No fallback token: BSE's spot token for this wasn't independently
+    // confirmed from a live session. Resolution here is name-match only —
+    // an unresolved spot is a visible empty chain, not a guessed-wrong one.
+    strikeStep: 100,
+    lotSize: 15,
+  },
+  SENSEX: {
+    label: "SENSEX",
+    exchange: "BSE",
+    spotAliases: ["sensex", "bse sensex", "s&p bse sensex"],
+    strikeStep: 100,
+    lotSize: 10,
   },
 };
 
 export const UNDERLYINGS = Object.keys(INDEX_UNIVERSE);
 
-/** SmartStream exchange type codes. */
+/** SmartStream exchange type codes — Angel One's WebSocket 2.0 enum, not the REST API's string segment names below. */
 export const EXCHANGE_NSE_CM = 1;
 export const EXCHANGE_NSE_FO = 2;
+export const EXCHANGE_BSE_CM = 3;
+export const EXCHANGE_BSE_FO = 4;
 
 export interface EngineConfig {
   /** Strikes either side of ATM retained in the 4-quadrant matrix. */

@@ -15,13 +15,15 @@ export interface IndexProfile {
 }
 
 /**
- * The three DeltaK actually trades get exact, live-config-sourced lot size
- * and strike step (INDEX_UNIVERSE — the same constants the engine runs on).
- * MidCap Nifty, Sensex and Bankex are real, heavily-traded contracts this
- * wiki should still cover for anyone comparing across the whole Indian F&O
- * landscape, but their lot sizes get revised by exchange circular often
- * enough that hardcoding a number here would go stale — those three point
- * to the live contract note instead of printing a figure.
+ * The five DeltaK actually trades get exact, live-config-sourced lot size
+ * and strike step (INDEX_UNIVERSE — the same constants the engine runs on;
+ * BANKEX and SENSEX run on BSE's cash/F&O segments rather than NSE's, same
+ * as the terminal itself does under the hood). MidCap Nifty is a real,
+ * heavily-traded contract this wiki should still cover for anyone comparing
+ * across the whole Indian F&O landscape, but DeltaK doesn't trade it yet and
+ * its lot size gets revised by exchange circular often enough that
+ * hardcoding a number here would go stale — it points to the live contract
+ * note instead of printing a figure.
  */
 export const INDICES: IndexProfile[] = [
   {
@@ -105,11 +107,11 @@ export const INDICES: IndexProfile[] = [
       "With only 30 constituents against NIFTY's 50, Sensex is a narrower large-cap basket — in practice its moves track NIFTY closely most sessions, since the two indices share many of the same heavyweight names, though the smaller constituent count means any single name's move carries more relative weight here than in NIFTY.",
       "Options liquidity on Sensex has historically run well behind NIFTY's, concentrated more heavily in the weekly, near-the-money strikes around expiry — a real consideration for anyone used to NIFTY's depth further out on the chain.",
     ],
-    tradedByDeltaK: false,
-    lotSize: null,
-    strikeStep: null,
+    tradedByDeltaK: true,
+    lotSize: INDEX_UNIVERSE.SENSEX.lotSize,
+    strikeStep: INDEX_UNIVERSE.SENSEX.strikeStep,
     specNote:
-      "Not currently traded by DeltaK. BSE has revised the Sensex contract's lot size as part of the same SEBI notional-value rationalization that's affected NSE contracts — check BSE's current contract specifications before sizing a position rather than relying on a figure printed here.",
+      "Lot size and strike step are read from DeltaK's own live engine configuration, the same constants the terminal trades against.",
     keywords: ["sensex options trading", "sensex lot size", "bse sensex options india"],
   },
   {
@@ -122,11 +124,11 @@ export const INDICES: IndexProfile[] = [
       "Shares the same sector-concentration character as BANKNIFTY — a handful of large banks carrying outsized weight, so the same earnings-day and rate-policy sensitivity that makes BANKNIFTY the more volatile of NSE's two flagships applies here on the BSE side too.",
       "As the less-traded of BSE's two index contracts, Bankex liquidity sits behind both Sensex and NIFTY/BANKNIFTY — worth confirming actual depth on the live chain rather than assuming NSE-level liquidity carries over.",
     ],
-    tradedByDeltaK: false,
-    lotSize: null,
-    strikeStep: null,
+    tradedByDeltaK: true,
+    lotSize: INDEX_UNIVERSE.BANKEX.lotSize,
+    strikeStep: INDEX_UNIVERSE.BANKEX.strikeStep,
     specNote:
-      "Not currently traded by DeltaK. Check BSE's current contract specifications for the live lot size and strike interval rather than relying on a figure printed here.",
+      "Lot size and strike step are read from DeltaK's own live engine configuration, the same constants the terminal trades against.",
     keywords: ["bankex options trading", "bankex lot size", "bse bankex options india"],
   },
 ];

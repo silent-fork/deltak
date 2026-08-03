@@ -17,6 +17,8 @@ import type {
 } from "@/lib/types";
 import {
   DEFAULT_CONFIG,
+  EXCHANGE_BSE_CM,
+  EXCHANGE_BSE_FO,
   EXCHANGE_NSE_CM,
   EXCHANGE_NSE_FO,
   INDEX_UNIVERSE,
@@ -284,12 +286,14 @@ export function useEngine(simulate: boolean) {
       if (sess.authenticated && sess.feedToken && sess.clientCode && sess.apiKey) {
         const client = new SmartStreamClient(onTick, setStreamStatus);
         streamRef.current = client;
-        const { spotTokens, optionTokens } = masterRef.current.subscriptionTokens(
+        const { nse, bse } = masterRef.current.subscriptionTokens(
           spotMap(),
           cfgRef.current.chainDepth,
         );
-        client.track(EXCHANGE_NSE_CM, spotTokens);
-        client.track(EXCHANGE_NSE_FO, optionTokens);
+        client.track(EXCHANGE_NSE_CM, nse.spotTokens);
+        client.track(EXCHANGE_NSE_FO, nse.optionTokens);
+        if (bse.spotTokens.length) client.track(EXCHANGE_BSE_CM, bse.spotTokens);
+        if (bse.optionTokens.length) client.track(EXCHANGE_BSE_FO, bse.optionTokens);
         client.start({
           clientCode: sess.clientCode,
           feedToken: sess.feedToken,
@@ -637,12 +641,14 @@ export function useEngine(simulate: boolean) {
         resyncRef.current = RESYNC_EVERY_TICKS;
         const client = streamRef.current;
         if (client && client.status === "live") {
-          const { spotTokens, optionTokens } = master.subscriptionTokens(
+          const { nse, bse } = master.subscriptionTokens(
             spotMap(),
             cfgRef.current.chainDepth,
           );
-          client.subscribeNew(EXCHANGE_NSE_CM, spotTokens);
-          client.subscribeNew(EXCHANGE_NSE_FO, optionTokens);
+          client.subscribeNew(EXCHANGE_NSE_CM, nse.spotTokens);
+          client.subscribeNew(EXCHANGE_NSE_FO, nse.optionTokens);
+          if (bse.spotTokens.length) client.subscribeNew(EXCHANGE_BSE_CM, bse.spotTokens);
+          if (bse.optionTokens.length) client.subscribeNew(EXCHANGE_BSE_FO, bse.optionTokens);
         }
       }
 

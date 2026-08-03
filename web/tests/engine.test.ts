@@ -36,6 +36,11 @@ import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
 import {
   DEFAULT_CONFIG,
+  EXCHANGE_BSE_CM,
+  EXCHANGE_BSE_FO,
+  EXCHANGE_NSE_CM,
+  EXCHANGE_NSE_FO,
+  INDEX_UNIVERSE,
   nextMidnightIst,
   secondsToDaylightRest,
   secondsToNextOpen,
@@ -81,6 +86,69 @@ test("invalid stop is rejected and lot helpers behave", () => {
   assert.equal(roundToLot(163, 75), 150);
   assert.equal(resolveLotSize("FINNIFTY"), 40);
   assert.equal(resolveLotSize("BANKNIFTY"), 15);
+});
+
+/* ---------------------------------------------------------- index universe */
+
+test("every configured index declares which exchange it actually trades on", () => {
+  assert.equal(INDEX_UNIVERSE.NIFTY.exchange, "NSE");
+  assert.equal(INDEX_UNIVERSE.BANKNIFTY.exchange, "NSE");
+  assert.equal(INDEX_UNIVERSE.FINNIFTY.exchange, "NSE");
+  assert.equal(INDEX_UNIVERSE.BANKEX.exchange, "BSE");
+  assert.equal(INDEX_UNIVERSE.SENSEX.exchange, "BSE");
+});
+
+test("FINNIFTY's spot aliases cover more than one real naming variant", () => {
+  // The single-alias guess this shipped with ("nifty fin service") is exactly
+  // the kind of brittle match that silently breaks a spot trace — this
+  // pins the widened list so a future edit can't quietly narrow it back down.
+  const aliases = INDEX_UNIVERSE.FINNIFTY.spotAliases;
+  assert.ok(aliases.includes("finnifty"));
+  assert.ok(aliases.length >= 3);
+});
+
+test("subscriptionTokens splits NSE and BSE indices into separate buckets", () => {
+  const payload: MasterPayload = {
+    generatedAt: new Date().toISOString(),
+    totalRecords: 2,
+    spots: {
+      NIFTY: {
+        token: "99926000", symbol: "NIFTY", name: "NIFTY", exchSeg: "NSE",
+        strike: 0, lotSize: 1, expiry: null, optionType: null,
+      },
+      SENSEX: {
+        token: "99919000", symbol: "SENSEX", name: "SENSEX", exchSeg: "BSE",
+        strike: 0, lotSize: 1, expiry: null, optionType: null,
+      },
+    },
+    options: {
+      NIFTY: [
+        { token: "1", symbol: "NIFTY24500CE", name: "NIFTY", exchSeg: "NFO",
+          strike: 24_500, lotSize: 75, expiry: EXPIRY, optionType: "CE" },
+      ],
+      SENSEX: [
+        { token: "2", symbol: "SENSEX80000CE", name: "SENSEX", exchSeg: "BFO",
+          strike: 80_000, lotSize: 10, expiry: EXPIRY, optionType: "CE" },
+      ],
+    },
+  };
+  const master = new ScripMaster(payload);
+  const { nse, bse } = master.subscriptionTokens(
+    { NIFTY: 24_500, SENSEX: 80_000 },
+    12,
+  );
+  assert.ok(nse.spotTokens.includes("99926000"));
+  assert.ok(nse.optionTokens.includes("1"));
+  assert.ok(!nse.spotTokens.includes("99919000"));
+
+  assert.ok(bse.spotTokens.includes("99919000"));
+  assert.ok(bse.optionTokens.includes("2"));
+  assert.ok(!bse.spotTokens.includes("99926000"));
+});
+
+test("SmartStream exchange type codes are the four documented segments, all distinct", () => {
+  const codes = new Set([EXCHANGE_NSE_CM, EXCHANGE_NSE_FO, EXCHANGE_BSE_CM, EXCHANGE_BSE_FO]);
+  assert.equal(codes.size, 4);
 });
 
 test("the single-position concentration cap can bind tighter than capital affordability", () => {

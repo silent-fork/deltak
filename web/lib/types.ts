@@ -3,6 +3,8 @@
  * Keep both sides in step — the SSE snapshot is the single payload the HUD renders.
  */
 
+import type { INDEX_UNIVERSE } from "./engine/config";
+
 export type ExecutionMode = "paper" | "live";
 /**
  * Who fires an actionable signal. `auto` is the browser's own tick loop —
@@ -261,8 +263,12 @@ export interface EngineStatus {
   capital: number;
 }
 
-export const UNDERLYINGS = ["NIFTY", "BANKNIFTY", "FINNIFTY"] as const;
-export type Underlying = (typeof UNDERLYINGS)[number];
+// Sourced from INDEX_UNIVERSE (lib/engine/config.ts) rather than a second
+// hardcoded list — this file used to carry its own separate copy, which is
+// exactly the kind of drift that left FINNIFTY (and later BANKEX/SENSEX)
+// out of step across the codebase.
+export { UNDERLYINGS } from "./engine/config";
+export type Underlying = keyof typeof INDEX_UNIVERSE;
 
 /* ---------------------------------------------------------------- historical */
 
