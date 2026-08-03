@@ -399,10 +399,10 @@ function EngageCorridor({
   // then sit inside both trigger zones at once, which Protocol Alpha reads as
   // ambiguous (see the "overlap" state above), not double-armed. Two markers
   // independently pulsing their own colour on top of each other just reads as
-  // noise here, so the shared zone gets its own single, distinct treatment —
-  // an alternating Aegis/Zenith diagonal weave, scrolling under the same cyan
-  // the spot marker itself glows with, rather than an unrelated warning
-  // colour — and each cap's own pulse stands down for the width of it.
+  // noise here, so the shared zone gets its own single, distinct treatment — a
+  // smooth Aegis-to-Zenith blend through the same cyan the spot marker itself
+  // glows with, rather than an unrelated warning colour or pattern — and each
+  // cap's own pulse stands down for the width of it.
   const overlapping = !!(aegisBand?.armed && zenithBand?.armed && aegisCapEnd > zenithCapStart);
   // Spot's own marker turns amber the instant it is standing inside the
   // ambiguous zone itself, not just whenever the zone exists — the cyan
@@ -446,35 +446,31 @@ function EngageCorridor({
           <div
             title="Overlap — spot sits inside both engage zones at once; Alpha reads this as ambiguous, not double-armed."
             className="absolute inset-y-0 overflow-hidden"
-            style={{
-              left: `${zenithCapStart}%`,
-              right: `${100 - aegisCapEnd}%`,
-              maskImage: "linear-gradient(to right, transparent, black 14%, black 86%, transparent)",
-              WebkitMaskImage:
-                "linear-gradient(to right, transparent, black 14%, black 86%, transparent)",
-            }}
+            style={{ left: `${zenithCapStart}%`, right: `${100 - aegisCapEnd}%` }}
           >
+            {/* Aegis bleeds through the quantum's own cyan into Zenith — the
+                terminal's three signature colours blended, not a fourth,
+                unrelated warning motif. */}
             <div
-              className="absolute inset-0 animate-hazard-scroll"
+              className="absolute inset-0"
               style={{
-                backgroundImage:
-                  "repeating-linear-gradient(45deg, rgba(16,185,129,0.5) 0 7px, rgba(244,63,94,0.5) 7px 14px)",
-                backgroundSize: "28px 28px",
+                background:
+                  "linear-gradient(90deg, rgba(16,185,129,0.75), rgba(0,240,255,0.4), rgba(244,63,94,0.75))",
               }}
+            />
+            <div
+              className="absolute inset-0 animate-pulse-ring"
+              style={{ boxShadow: "inset 0 0 10px rgba(0,240,255,0.85)" }}
             />
             {spotInOverlap && spotPct !== null ? (
               <div
-                className="absolute inset-y-0 w-12 -translate-x-1/2"
+                className="absolute inset-y-0 w-8 -translate-x-1/2"
                 style={{
                   left: `${((spotPct - zenithCapStart) / (aegisCapEnd - zenithCapStart)) * 100}%`,
-                  background: "radial-gradient(circle, rgba(252,211,77,0.6) 0%, transparent 72%)",
+                  background: "radial-gradient(circle, rgba(252,211,77,0.35) 0%, transparent 65%)",
                 }}
               />
             ) : null}
-            <div
-              className="absolute inset-0 animate-pulse-ring"
-              style={{ boxShadow: "inset 0 0 8px rgba(0,240,255,0.7)" }}
-            />
           </div>
         ) : null}
         {spotPct !== null ? (
@@ -487,7 +483,7 @@ function EngageCorridor({
             style={{
               left: `${spotPct}%`,
               boxShadow: spotInOverlap
-                ? "0 0 8px rgba(252,211,77,0.9)"
+                ? "0 0 4px rgba(252,211,77,0.6)"
                 : "0 0 6px rgba(0,240,255,0.8)",
             }}
           />

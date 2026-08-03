@@ -65,10 +65,6 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
-        "hazard-scroll": {
-          "0%": { backgroundPosition: "0 0" },
-          "100%": { backgroundPosition: "24px 0" },
-        },
       },
       animation: {
         "tick-up": "tick-up 620ms ease-out",
@@ -77,7 +73,6 @@ const config: Config = {
         scan: "scan 5s linear infinite",
         drift: "drift 6s ease-in-out infinite",
         "fade-up": "fade-up 500ms ease-out both",
-        "hazard-scroll": "hazard-scroll 1600ms linear infinite",
       },
     },
   },
