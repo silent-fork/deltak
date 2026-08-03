@@ -1,11 +1,10 @@
 import "server-only";
 
-import os from "node:os";
-
-import { NSEClient } from "nse-bse-api";
+import { pooledMap } from "@/lib/server/pool";
 
 import { fetchConstituents } from "./constituents";
 import { fetchLatestEquityCloses } from "./equityBhavcopy";
+import { fetchFnoLots } from "./fnoLots";
 import type { SectorPick, SectorRotationPoint } from "./types";
 
 export type { SectorPick } from "./types";
@@ -13,7 +12,7 @@ export type { SectorPick } from "./types";
 /**
  * Top F&O-eligible movers inside a leading sector — the user's own
  * constraint, verbatim: "stock with fno available only to be suggested".
- * `getFnoLots()` is the authoritative F&O-eligibility list (its keys are
+ * `fetchFnoLots()` is the authoritative F&O-eligibility list (its keys are
  * exactly the underlyings NSE runs futures/options on); a sector's
  * constituent list is intersected against it before anything is ranked, so
  * a stock that is only in the cash market never reaches the output.
@@ -22,26 +21,6 @@ export type { SectorPick } from "./types";
  * live call — see that file for why: the live per-symbol endpoint 403'd
  * outright under real use.
  */
-
-let client: NSEClient | null = null;
-function nse(): NSEClient {
-  client ??= new NSEClient(os.tmpdir(), { server: true, timeout: 15_000 });
-  return client;
-}
-
-interface FnoCacheEntry {
-  at: number;
-  value: Record<string, number>;
-}
-let fnoCache: FnoCacheEntry | null = null;
-const FNO_TTL_MS = 60 * 60_000;
-
-async function fnoLots(): Promise<Record<string, number>> {
-  if (fnoCache && Date.now() - fnoCache.at < FNO_TTL_MS) return fnoCache.value;
-  const value = await nse().options.getFnoLots();
-  fnoCache = { at: Date.now(), value };
-  return value;
-}
 
 /**
  * Top 3 F&O-eligible movers (by the latest session's own change%) inside one
@@ -61,7 +40,7 @@ export async function topPicksForSector(sector: SectorRotationPoint): Promise<Se
   try {
     const [constituents, lots, closes] = await Promise.all([
       fetchConstituents(sector.constituentSlug),
-      fnoLots(),
+      fetchFnoLots(),
       fetchLatestEquityCloses(),
     ]);
 
@@ -85,24 +64,6 @@ export async function topPicksForSector(sector: SectorRotationPoint): Promise<Se
   } catch {
     return [];
   }
-}
-
-async function pooledMap<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) return;
-      results[i] = await fn(items[i]!);
-    }
-  }
-  await Promise.all(Array.from({ length: limit }, worker));
-  return results;
 }
 
 /** Top picks for the leading sectors only — the dashboard's actual ask. */

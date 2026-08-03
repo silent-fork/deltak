@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, Zap } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ToolFooterMark } from "@/components/tools/ToolPageShell";
 import type { SectorRotationApiResponse } from "@/lib/sectors/types";
 
 import { MarketPulse } from "./MarketPulse";
@@ -106,6 +107,8 @@ export function SectorDashboard() {
             <PanelBootOverlay label="top picks" />
           </CardContent>
         </Card>
+
+        <ToolFooterMark sourceNote="Sourced from NSE bhavcopy & niftyindices.com" />
       </div>
     );
   }
@@ -162,24 +165,7 @@ export function SectorDashboard() {
 
       <TopPicks entries={data.picks} />
 
-      <div className="flex shrink-0 flex-col items-center justify-center gap-1.5 py-2">
-        <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-700">
-          <Zap className="h-2.5 w-2.5" />
-          Sourced from NSE bhavcopy &amp; niftyindices.com
-        </span>
-        {/* Same tricolour-swatch treatment as the homepage footer. */}
-        <span className="flex items-center gap-1.5 text-[10px] text-zinc-600">
-          <span
-            aria-hidden
-            className="inline-flex h-2 w-3 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
-          >
-            <span className="h-1/3 w-full bg-[#FF9933]" />
-            <span className="h-1/3 w-full bg-white" />
-            <span className="h-1/3 w-full bg-[#138808]" />
-          </span>
-          Made with <span className="text-rose-400">♥</span> in Bharat
-        </span>
-      </div>
+      <ToolFooterMark sourceNote="Sourced from NSE bhavcopy & niftyindices.com" />
     </div>
   );
 }

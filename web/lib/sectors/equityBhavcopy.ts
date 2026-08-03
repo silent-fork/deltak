@@ -23,9 +23,20 @@ export interface EquityClose {
   close: number;
   prevClose: number;
   changePct: number;
+  /** Total traded value for the session, in rupees — a liquidity/activity weight. */
+  turnover: number;
 }
 
 export type EquityCloses = Map<string, EquityClose>;
+
+/** One session's high/low for every equity — the range-radar's raw material. */
+export interface EquityDayRange {
+  symbol: string;
+  high: number;
+  low: number;
+}
+
+export type EquityDayRanges = Map<string, EquityDayRange>;
 
 let client: NSEClient | null = null;
 function nse(): NSEClient {
@@ -33,37 +44,79 @@ function nse(): NSEClient {
   return client;
 }
 
+interface Cols {
+  seriesIdx: number;
+  symIdx: number;
+  closeIdx: number;
+  prevIdx: number;
+  turnoverIdx: number;
+  highIdx: number;
+  lowIdx: number;
+}
+
+function findCols(header: string[]): Cols {
+  return {
+    seriesIdx: header.indexOf("SctySrs"),
+    symIdx: header.indexOf("TckrSymb"),
+    closeIdx: header.indexOf("ClsPric"),
+    prevIdx: header.indexOf("PrvsClsgPric"),
+    turnoverIdx: header.indexOf("TtlTrfVal"),
+    highIdx: header.indexOf("HghPric"),
+    lowIdx: header.indexOf("LwPric"),
+  };
+}
+
 function parse(text: string): EquityCloses {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return new Map();
 
-  const header = lines[0]!.split(",");
-  const seriesIdx = header.indexOf("SctySrs");
-  const symIdx = header.indexOf("TckrSymb");
-  const closeIdx = header.indexOf("ClsPric");
-  const prevIdx = header.indexOf("PrvsClsgPric");
-  if ([seriesIdx, symIdx, closeIdx, prevIdx].some((i) => i < 0)) return new Map();
+  const c = findCols(lines[0]!.split(","));
+  if ([c.seriesIdx, c.symIdx, c.closeIdx, c.prevIdx].some((i) => i < 0)) return new Map();
 
   const closes: EquityCloses = new Map();
   for (const line of lines.slice(1)) {
     const cols = line.split(",");
     // "EQ" is the ordinary equity series — bonds, ETFs and other instrument
     // types share this same bhavcopy file under other series codes.
-    if (cols[seriesIdx] !== "EQ") continue;
-    const symbol = cols[symIdx]?.trim();
-    const close = Number(cols[closeIdx]);
-    const prevClose = Number(cols[prevIdx]);
+    if (cols[c.seriesIdx] !== "EQ") continue;
+    const symbol = cols[c.symIdx]?.trim();
+    const close = Number(cols[c.closeIdx]);
+    const prevClose = Number(cols[c.prevIdx]);
     if (!symbol || !Number.isFinite(close) || !Number.isFinite(prevClose) || prevClose <= 0) {
       continue;
     }
+    const turnover = c.turnoverIdx >= 0 ? Number(cols[c.turnoverIdx]) : NaN;
     closes.set(symbol, {
       symbol,
       close,
       prevClose,
       changePct: ((close - prevClose) / prevClose) * 100,
+      turnover: Number.isFinite(turnover) ? turnover : 0,
     });
   }
   return closes;
+}
+
+function parseRanges(text: string): EquityDayRanges {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return new Map();
+
+  const c = findCols(lines[0]!.split(","));
+  if ([c.seriesIdx, c.symIdx, c.highIdx, c.lowIdx].some((i) => i < 0)) return new Map();
+
+  const ranges: EquityDayRanges = new Map();
+  for (const line of lines.slice(1)) {
+    const cols = line.split(",");
+    if (cols[c.seriesIdx] !== "EQ") continue;
+    const symbol = cols[c.symIdx]?.trim();
+    const high = Number(cols[c.highIdx]);
+    const low = Number(cols[c.lowIdx]);
+    if (!symbol || !Number.isFinite(high) || !Number.isFinite(low) || low <= 0 || high < low) {
+      continue;
+    }
+    ranges.set(symbol, { symbol, high, low });
+  }
+  return ranges;
 }
 
 interface CacheEntry {
@@ -94,4 +147,24 @@ export async function fetchLatestEquityCloses(): Promise<EquityCloses> {
     }
   }
   return new Map();
+}
+
+/**
+ * One exact session's high/low for every equity, or `null` if that date has
+ * no published bhavcopy (weekend, holiday, or too recent). Building block
+ * for a rolling N-day range — see `lib/tools/marketScanner.ts` — rather
+ * than a per-symbol live lookup: that endpoint (`historical.
+ * fetchEquityHistoricalData`, the one source that carries a genuine
+ * 52-week figure) proved too unreliable to build a real feature on,
+ * confirmed live going from 5/5 successful to 0/20 failed within the same
+ * session.
+ */
+export async function fetchEquityRangesForDate(date: Date): Promise<EquityDayRanges | null> {
+  try {
+    const path = await nse().equityBhavcopy(date);
+    const ranges = parseRanges(fs.readFileSync(path, "utf-8"));
+    return ranges.size > 0 ? ranges : null;
+  } catch {
+    return null;
+  }
 }
