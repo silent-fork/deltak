@@ -1,6 +1,12 @@
 "use client";
 
-import { EXCHANGE_NSE_CM, EXCHANGE_NSE_FO, SMART_STREAM_URL } from "@/lib/engine/config";
+import {
+  EXCHANGE_BSE_CM,
+  EXCHANGE_BSE_FO,
+  EXCHANGE_NSE_CM,
+  EXCHANGE_NSE_FO,
+  SMART_STREAM_URL,
+} from "@/lib/engine/config";
 import { type Tick, emptyTick } from "./ticks";
 
 /**
@@ -100,6 +106,8 @@ export class SmartStreamClient {
   private tracked: Record<number, Set<string>> = {
     [EXCHANGE_NSE_CM]: new Set(),
     [EXCHANGE_NSE_FO]: new Set(),
+    [EXCHANGE_BSE_CM]: new Set(),
+    [EXCHANGE_BSE_FO]: new Set(),
   };
 
   status: StreamStatus = "idle";

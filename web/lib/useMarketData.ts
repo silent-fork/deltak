@@ -134,8 +134,16 @@ const EMPTY: MarketData = {
   error: null,
 };
 
-/** Every index this terminal covers — sourced from INDEX_UNIVERSE rather than a second hardcoded list. */
-const UNDERLYING_NAMES = Object.keys(INDEX_UNIVERSE);
+/**
+ * PCR and OI-buildup come from Angel One's NSE F&O-wide gainers/losers-style
+ * endpoints — there's no BSE equivalent product to poll, so BANKEX and
+ * SENSEX simply never populate these two (both signals are already
+ * "permissive when absent" in `dkms.ts`, so a missing entry just means one
+ * fewer confirming layer, not a blocked signal).
+ */
+const NSE_UNDERLYING_NAMES = Object.entries(INDEX_UNIVERSE)
+  .filter(([, spec]) => spec.exchange === "NSE")
+  .map(([u]) => u);
 
 /**
  * Poll `run` on a schedule that widens when the market is shut.
@@ -302,7 +310,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
       setState((s) => ({ ...s, loading: true }));
       try {
         const res = await fetchCandles({
-          exchange: "NSE",
+          exchange: INDEX_UNIVERSE[focus]?.exchange ?? "NSE",
           symboltoken: spotToken,
           interval: "ONE_MINUTE",
           ...sessionWindow(CANDLE_LOOKBACK_DAYS),
@@ -349,7 +357,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         try {
           const res = await fetchCandles(
             {
-              exchange: "NSE",
+              exchange: INDEX_UNIVERSE[underlying]?.exchange ?? "NSE",
               symboltoken: token,
               interval: "ONE_MINUTE",
               ...sessionWindow(CANDLE_LOOKBACK_DAYS),
@@ -637,7 +645,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         const res = await fetchPcr();
         const today = istDate();
         const byUnderlying: Record<string, number> = {};
-        for (const underlying of UNDERLYING_NAMES) {
+        for (const underlying of NSE_UNDERLYING_NAMES) {
           const row = pcrForUnderlying(res.rows, underlying, today);
           if (row) byUnderlying[underlying] = row.pcr;
         }
@@ -661,7 +669,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
           OI_BUILDUP_TYPES.map((datatype) => fetchBuildup(datatype, "NEAR")),
         );
         const next: Partial<Record<string, OiBuildupType>> = {};
-        for (const underlying of UNDERLYING_NAMES) {
+        for (const underlying of NSE_UNDERLYING_NAMES) {
           for (let i = 0; i < OI_BUILDUP_TYPES.length; i++) {
             if (buildupIncludesUnderlying(results[i].rows, underlying)) {
               next[underlying] = OI_BUILDUP_TYPES[i];

@@ -82,15 +82,19 @@ export async function GET() {
     const name = (row.name ?? "").trim();
     const symbol = (row.symbol ?? "").trim();
 
-    if (seg === "NSE") {
+    if (seg === "NSE" || seg === "BSE") {
       const key = SPOT_LOOKUP[normalizeSpotAlias(name)] ?? SPOT_LOOKUP[normalizeSpotAlias(symbol)];
+      // A row only counts for an underlying actually listed on this segment —
+      // BSE and NSE both carry plenty of unrelated index/equity spots that
+      // could otherwise collide on a loose name match.
+      if (key && INDEX_UNIVERSE[key].exchange !== seg) continue;
       // Index spots carry no expiry; the futures/options rows do.
       if (key && !spots[key] && !(row.expiry ?? "")) {
         spots[key] = {
           token: String(row.token),
           symbol: symbol || name,
           name: key,
-          exchSeg: "NSE",
+          exchSeg: seg,
           strike: 0,
           lotSize: 1,
           expiry: null,
@@ -100,11 +104,16 @@ export async function GET() {
       continue;
     }
 
-    if (seg !== "NFO") continue;
+    if (seg !== "NFO" && seg !== "BFO") continue;
     if ((row.instrumenttype ?? "").toUpperCase() !== "OPTIDX") continue;
 
     const underlying = name.toUpperCase();
-    if (!(underlying in INDEX_UNIVERSE)) continue;
+    const spec = INDEX_UNIVERSE[underlying];
+    if (!spec) continue;
+    // Same cross-segment guard as the spot branch above.
+    if ((seg === "NFO" && spec.exchange !== "NSE") || (seg === "BFO" && spec.exchange !== "BSE")) {
+      continue;
+    }
 
     const expiry = parseExpiry(row.expiry ?? "");
     if (!expiry) continue;
@@ -116,7 +125,7 @@ export async function GET() {
       token: String(row.token),
       symbol,
       name: underlying,
-      exchSeg: "NFO",
+      exchSeg: seg,
       // Scrip-master strikes are quoted in paise.
       strike: Number(row.strike ?? 0) / 100,
       lotSize: Math.trunc(Number(row.lotsize ?? 0)) || 0,
@@ -145,7 +154,7 @@ export async function GET() {
       token: spec.spotTokenFallback,
       symbol: spec.label,
       name: underlying,
-      exchSeg: "NSE",
+      exchSeg: spec.exchange,
       strike: 0,
       lotSize: 1,
       expiry: null,

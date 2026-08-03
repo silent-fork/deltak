@@ -19,9 +19,11 @@ export const SMART_STREAM_URL = "wss://smartapisocket.angelone.in/smart-stream";
 
 export interface IndexSpec {
   label: string;
+  /** Which cash/F&O pair this index's spot and options actually list on. */
+  exchange: "NSE" | "BSE";
   /**
-   * Scrip-master `name`/`symbol` values that identify the index spot in
-   * NSE_CM. Matched case- and whitespace-insensitively (see
+   * Scrip-master `name`/`symbol` values that identify the index spot on its
+   * cash segment. Matched case- and whitespace-insensitively (see
    * `normalizeSpotAlias` in `/api/master`), so this only needs to cover real
    * *wording* variants, not casing or double-spacing.
    */
@@ -65,6 +67,7 @@ export interface IndexSpec {
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   NIFTY: {
     label: "NIFTY 50",
+    exchange: "NSE",
     spotAliases: ["nifty 50", "nifty"],
     spotTokenFallback: "99926000",
     strikeStep: 50,
@@ -72,6 +75,7 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   },
   BANKNIFTY: {
     label: "BANK NIFTY",
+    exchange: "NSE",
     spotAliases: ["nifty bank", "banknifty"],
     spotTokenFallback: "99926009",
     strikeStep: 100,
@@ -79,6 +83,7 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
   },
   FINNIFTY: {
     label: "FIN NIFTY",
+    exchange: "NSE",
     // Widened past the single "nifty fin service" guess this shipped with —
     // NSE's own long-form index name, the derivative's own ticker, and a
     // no-space variant some feeds use, all normalized the same way at match
@@ -110,13 +115,42 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     // somehow do would mean it almost never clears.
     rrgReadyFraction: 0.25,
   },
+  // BANKEX and SENSEX list on BSE's own cash/F&O segments, not NSE's — spot
+  // tokens, strike step and lot size below were confirmed directly against a
+  // live scrip master fetch (146,573-instrument file, checked 2026-08-03):
+  // both carry real, currently-listed BFO/OPTIDX chains (BANKEX 1,004
+  // contracts across 3 monthly expiries; SENSEX 3,204 across 20 — SENSEX
+  // runs a weekly cadence, BANKEX monthly-only), not just a spot ticker with
+  // nothing behind it.
+  BANKEX: {
+    label: "BANKEX",
+    exchange: "BSE",
+    spotAliases: ["bankex", "bse bankex", "s&p bse bankex"],
+    // The BSE cash segment carries two BANKEX rows — a modern AMXIDX-tagged
+    // one and a legacy duplicate with no instrumenttype at all (NIFTY has
+    // the identical pair on NSE, e.g. 99926000 vs the legacy 26000). This is
+    // the AMXIDX one, independently confirmed live rather than guessed.
+    spotTokenFallback: "99919012",
+    strikeStep: 100,
+    lotSize: 30,
+  },
+  SENSEX: {
+    label: "SENSEX",
+    exchange: "BSE",
+    spotAliases: ["sensex", "bse sensex", "s&p bse sensex"],
+    spotTokenFallback: "99919000",
+    strikeStep: 100,
+    lotSize: 20,
+  },
 };
 
 export const UNDERLYINGS = Object.keys(INDEX_UNIVERSE);
 
-/** SmartStream exchange type codes. */
+/** SmartStream exchange type codes — Angel One's WebSocket 2.0 enum, not the REST API's string segment names below. */
 export const EXCHANGE_NSE_CM = 1;
 export const EXCHANGE_NSE_FO = 2;
+export const EXCHANGE_BSE_CM = 3;
+export const EXCHANGE_BSE_FO = 4;
 
 export interface EngineConfig {
   /** Strikes either side of ATM retained in the 4-quadrant matrix. */

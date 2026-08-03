@@ -5,7 +5,7 @@ import { INDEX_UNIVERSE } from "./config";
  *
  * The raw scrip master is ~40 MB, far too much to ship to a browser. The
  * `/api/master` route handler does the download and projection server-side and
- * returns only the NIFTY/BANKNIFTY/FINNIFTY index-option slice, which is a few
+ * returns only the five-index option slice (INDEX_UNIVERSE), which is a few
  * hundred KB. This module holds the client-side model over that slice.
  */
 
@@ -13,7 +13,7 @@ export interface Instrument {
   token: string;
   symbol: string;
   name: string;
-  exchSeg: "NFO" | "NSE";
+  exchSeg: "NFO" | "NSE" | "BSE" | "BFO";
   strike: number;
   lotSize: number;
   /** ISO date, or null for index spots. */
@@ -128,23 +128,28 @@ export class ScripMaster {
     );
   }
 
-  /** Every token the feed should subscribe to, split by exchange segment. */
+  /**
+   * Every token the feed should subscribe to, split first by exchange (NSE
+   * vs BSE ride different SmartStream exchange-type codes and can't share a
+   * subscription message) and then by segment within it.
+   */
   subscriptionTokens(spotByUnderlying: Record<string, number>, chainDepth: number) {
-    const spotTokens: string[] = [];
-    const optionTokens: string[] = [];
+    const nse = { spotTokens: [] as string[], optionTokens: [] as string[] };
+    const bse = { spotTokens: [] as string[], optionTokens: [] as string[] };
 
     for (const [underlying, cfg] of Object.entries(INDEX_UNIVERSE)) {
+      const bucket = cfg.exchange === "BSE" ? bse : nse;
       const token = this.spotToken(underlying);
-      if (token) spotTokens.push(token);
+      if (token) bucket.spotTokens.push(token);
 
       const spot = spotByUnderlying[underlying] ?? 0;
       const band = cfg.strikeStep * (chainDepth + 2);
       for (const inst of this.contracts(underlying)) {
         if (spot <= 0 || Math.abs(inst.strike - spot) <= band) {
-          optionTokens.push(inst.token);
+          bucket.optionTokens.push(inst.token);
         }
       }
     }
-    return { spotTokens, optionTokens };
+    return { nse, bse };
   }
 }
