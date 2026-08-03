@@ -11,7 +11,7 @@ import {
   Sunrise,
   Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EventLogMenu } from "@/components/EventLogMenu";
 import { LoginModal } from "@/components/LoginModal";
@@ -20,7 +20,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEngineContext } from "@/components/EngineProvider";
-import { istParts } from "@/lib/engine/config";
+import { INDEX_UNIVERSE, istParts } from "@/lib/engine/config";
 import type {
   EngineSnapshot,
   ExecutionMode,
@@ -30,6 +30,9 @@ import type {
 import type { StreamState } from "@/lib/useEngine";
 import { useCountdown, useTickFlash } from "@/lib/useEngine";
 import { cn, countdown, fmt, signed } from "@/lib/utils";
+
+/** Sensex ahead of Bankex in the header rail — the more heavily-traded of BSE's two. */
+const BSE_TICKER_ORDER: Record<string, number> = { SENSEX: 0, BANKEX: 1 };
 
 /**
  * Exchange wall clock.
@@ -70,7 +73,7 @@ function SpotTicker({
     <button
       onClick={onSelect}
       className={cn(
-        "flex h-9 w-[148px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
+        "flex h-9 w-[162px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
         active
           ? "border-quantum/60 bg-quantum/10"
           : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
@@ -139,6 +142,22 @@ export function Header({
 }) {
   const [loginOpen, setLoginOpen] = useState(false);
 
+  /**
+   * NSE's own three first, then BSE's two — grouped by exchange rather than
+   * INDEX_UNIVERSE's declaration order, with a thin divider between the two
+   * clusters so the rail reads as "one exchange, then the other" rather than
+   * five same-looking tiles in a row. Sensex ahead of Bankex within the BSE
+   * cluster specifically, since that's the more heavily-traded of the two.
+   */
+  const { nseSpots, bseSpots } = useMemo(() => {
+    const all = Object.values(snapshot?.spots ?? {});
+    const nse = all.filter((q) => INDEX_UNIVERSE[q.underlying]?.exchange !== "BSE");
+    const bse = all
+      .filter((q) => INDEX_UNIVERSE[q.underlying]?.exchange === "BSE")
+      .sort((a, b) => (BSE_TICKER_ORDER[a.underlying] ?? 99) - (BSE_TICKER_ORDER[b.underlying] ?? 99));
+    return { nseSpots: nse, bseSpots: bse };
+  }, [snapshot?.spots]);
+
   const engine = useEngineContext();
   const seconds = useCountdown(snapshot?.seconds_to_daylight_rest);
   const toOpen = useCountdown(snapshot?.seconds_to_open);
@@ -197,7 +216,21 @@ export function Header({
 
         {/* Instruments — a scrolling rail, never a wrapping grid */}
         <div className="dk-scroll order-last flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-0.5 lg:order-none lg:w-auto lg:flex-1">
-          {Object.values(snapshot?.spots ?? {}).map((quote) => (
+          {nseSpots.map((quote) => (
+            <SpotTicker
+              key={quote.underlying}
+              quote={quote}
+              active={quote.underlying === selected}
+              onSelect={() => onSelect(quote.underlying)}
+            />
+          ))}
+          {nseSpots.length > 0 && bseSpots.length > 0 ? (
+            <span
+              aria-hidden
+              className="h-6 w-px shrink-0 self-center bg-zinc-700"
+            />
+          ) : null}
+          {bseSpots.map((quote) => (
             <SpotTicker
               key={quote.underlying}
               quote={quote}
