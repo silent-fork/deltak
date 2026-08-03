@@ -4,7 +4,7 @@ import os from "node:os";
 
 import { NSEClient } from "nse-bse-api";
 
-import type { Holiday } from "@/lib/types";
+import type { Holiday, NseOptionChainResponse, NseOptionLeg } from "@/lib/types";
 
 /**
  * NSE's own public holiday calendar — not Angel One.
@@ -66,4 +66,68 @@ export async function fetchUpcomingHolidays(): Promise<Holiday[]> {
     })
     .filter((h): h is Holiday => h !== null && h.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+interface RawOptionLeg {
+  strikePrice?: number;
+  openInterest?: number;
+  changeinOpenInterest?: number;
+  totalTradedVolume?: number;
+  lastPrice?: number;
+}
+
+interface RawOptionRow {
+  strikePrice?: number;
+  CE?: RawOptionLeg;
+  PE?: RawOptionLeg;
+}
+
+/**
+ * NSE's own option-chain snapshot — a single point-in-time read (whatever
+ * NSE last computed), never a series. Confirmed live that this still serves
+ * the last session's numbers after the 15:30 close rather than erroring, so
+ * it stands in for exactly what a closed market has no fresher number for:
+ * each strike's OI, its change since the session's own open, volume and
+ * last price, plus the underlying's own last value.
+ *
+ * NSE-listed underlyings only ("NIFTY", "BANKNIFTY", "FINNIFTY" — the same
+ * strings this app already uses as `Underlying` keys, which is also NSE's
+ * own symbol convention for its index option chains). BSE has no equivalent
+ * endpoint in this package, so BANKEX/SENSEX are the caller's responsibility
+ * to exclude before calling this.
+ */
+export async function fetchOptionChainSnapshot(
+  underlying: string,
+): Promise<NseOptionChainResponse> {
+  const raw = (await nse().options.getOptionChain(underlying)) as {
+    records?: {
+      data?: RawOptionRow[];
+      underlyingValue?: number;
+      timestamp?: string;
+    };
+  };
+
+  const legs: NseOptionLeg[] = [];
+  for (const row of raw?.records?.data ?? []) {
+    for (const side of ["CE", "PE"] as const) {
+      const leg = row[side];
+      const strike = row.strikePrice ?? leg?.strikePrice;
+      if (!leg || !strike) continue;
+      legs.push({
+        strike,
+        side,
+        oi: leg.openInterest ?? 0,
+        changeInOi: leg.changeinOpenInterest ?? 0,
+        volume: leg.totalTradedVolume ?? 0,
+        ltp: leg.lastPrice ?? 0,
+      });
+    }
+  }
+
+  return {
+    underlying,
+    spot: raw?.records?.underlyingValue ?? 0,
+    timestamp: raw?.records?.timestamp ?? "",
+    legs,
+  };
 }

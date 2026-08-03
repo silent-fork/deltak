@@ -32,6 +32,7 @@ import {
   weakeningCorroborated,
 } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
+import { applyNseSnapshot } from "../lib/engine/nseSnapshot";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
@@ -1045,4 +1046,111 @@ test("withRetry recovers once a later attempt succeeds", async () => {
   }, 3, 1);
   assert.equal(result, "recovered");
   assert.equal(calls, 2);
+});
+
+/* ------------------------------------------------- NSE snapshot & the open/close switch */
+
+test("applyNseSnapshot fills a token that has no data yet", () => {
+  const master = makeMaster();
+  const ticks = new TickStore();
+  const strike = 24_500;
+  const token = master.find("NIFTY", strike, "CE")!.token;
+
+  applyNseSnapshot(ticks, master, "NIFTY", {
+    underlying: "NIFTY",
+    spot: 24_774.3,
+    timestamp: "03-Aug-2026 15:40:00",
+    legs: [{ strike, side: "CE", oi: 12_345, changeInOi: 100, volume: 500, ltp: 42.5 }],
+  });
+
+  const tick = ticks.get(token)!;
+  assert.equal(tick.oi, 12_345);
+  assert.equal(tick.volume, 500);
+  assert.equal(tick.ltp, 42.5);
+});
+
+test("applyNseSnapshot never overwrites a token that already has real OI", () => {
+  const master = makeMaster();
+  // Angel One's own replay (or a live print before the tab was left open
+  // overnight) already seeded every contract's OI to 10,000 by default.
+  const ticks = fillTicks(master, new TickStore());
+  const strike = 24_500;
+  const token = master.find("NIFTY", strike, "CE")!.token;
+  const before = ticks.get(token)!.oi;
+
+  applyNseSnapshot(ticks, master, "NIFTY", {
+    underlying: "NIFTY",
+    spot: 24_774.3,
+    timestamp: "03-Aug-2026 15:40:00",
+    legs: [{ strike, side: "CE", oi: 999_999, changeInOi: 0, volume: 0, ltp: 0 }],
+  });
+
+  // NSE's number is a different source of the same fact; whichever source
+  // got there first is authoritative, so it must be left untouched.
+  assert.equal(ticks.get(token)!.oi, before);
+});
+
+test("applyNseSnapshot seeds the spot only while it is still missing", () => {
+  const master = makeMaster();
+  const ticks = new TickStore();
+  const spotToken = master.spotToken("NIFTY");
+
+  applyNseSnapshot(ticks, master, "NIFTY", {
+    underlying: "NIFTY",
+    spot: 24_774.3,
+    timestamp: "03-Aug-2026 15:40:00",
+    legs: [],
+  });
+  assert.equal(ticks.get(spotToken)!.ltp, 24_774.3);
+
+  applyNseSnapshot(ticks, master, "NIFTY", {
+    underlying: "NIFTY",
+    spot: 25_000,
+    timestamp: "03-Aug-2026 15:45:00",
+    legs: [],
+  });
+  // A second, different reading must not clobber the first.
+  assert.equal(ticks.get(spotToken)!.ltp, 24_774.3);
+});
+
+test("applyNseSnapshot silently skips a leg with no matching contract", () => {
+  const master = makeMaster();
+  const ticks = new TickStore();
+
+  assert.doesNotThrow(() =>
+    applyNseSnapshot(ticks, master, "NIFTY", {
+      underlying: "NIFTY",
+      spot: 24_774.3,
+      timestamp: "03-Aug-2026 15:40:00",
+      // Far outside makeMaster()'s ±20-strike ladder — no contract to resolve to.
+      legs: [{ strike: 999_999, side: "CE", oi: 1, changeInOi: 0, volume: 0, ltp: 0 }],
+    }),
+  );
+});
+
+test("a live tick always supersedes a seeded one once the market reopens", () => {
+  const ticks = new TickStore();
+  ticks.seedQuote("1001", { oi: 500, ltp: 42 });
+
+  const live = emptyTick("1001");
+  live.oi = 900;
+  live.ltp = 45;
+  ticks.apply(live);
+
+  assert.equal(ticks.ltp("1001"), 45);
+  assert.equal(ticks.get("1001")!.oi, 900);
+});
+
+test("a live frame that omits a field carries the seeded value forward instead of zeroing it", () => {
+  const ticks = new TickStore();
+  ticks.seedQuote("1001", { oi: 500 });
+
+  // A snap-quote frame that happens to omit OI this tick must not read as
+  // "OI is now zero" — the whole reason TickStore carries fields forward.
+  const live = emptyTick("1001");
+  live.ltp = 45;
+  ticks.apply(live);
+
+  assert.equal(ticks.get("1001")!.oi, 500);
+  assert.equal(ticks.ltp("1001"), 45);
 });

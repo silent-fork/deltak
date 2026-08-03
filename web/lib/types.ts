@@ -413,3 +413,25 @@ export interface HolidayResponse {
   holidays: Holiday[];
   fetched_at: string;
 }
+
+/** One strike's CE or PE leg, from NSE's own option-chain snapshot. */
+export interface NseOptionLeg {
+  strike: number;
+  side: "CE" | "PE";
+  oi: number;
+  changeInOi: number;
+  volume: number;
+  ltp: number;
+}
+
+/**
+ * NSE's own option-chain snapshot — a point-in-time read, not a series.
+ * Populated only for NSE-listed underlyings (NIFTY/BANKNIFTY/FINNIFTY); BSE
+ * has no equivalent public endpoint.
+ */
+export interface NseOptionChainResponse {
+  underlying: string;
+  spot: number;
+  timestamp: string;
+  legs: NseOptionLeg[];
+}

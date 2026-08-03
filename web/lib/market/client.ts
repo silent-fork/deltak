@@ -6,6 +6,7 @@ import type {
   HolidayResponse,
   MarginPosition,
   MarginResponse,
+  NseOptionChainResponse,
   OiResponse,
   PcrResponse,
 } from "@/lib/types";
@@ -191,4 +192,15 @@ export function fetchBuildup(
  */
 export function fetchHolidays(ttlMs = 15 * 60_000) {
   return cached<HolidayResponse>("holidays", ttlMs, () => api.market.holidays());
+}
+
+/**
+ * NSE's own option-chain snapshot for one underlying — a closed-market
+ * gap-filler, not a live feed. Long TTL: it is a single point-in-time read
+ * that will not change again until NSE's next session.
+ */
+export function fetchNseOptionChain(underlying: string, ttlMs = 20 * 60_000) {
+  return cached<NseOptionChainResponse>(`nse-oc:${underlying}`, ttlMs, () =>
+    api.market.nseOptionChain(underlying),
+  );
 }

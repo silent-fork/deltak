@@ -6,6 +6,7 @@ import type {
   Automation,
   EngineSnapshot,
   ExecutionMode,
+  NseOptionChainResponse,
   OptionChain,
   Position,
   RiskEvent,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/engine/config";
 import { ChainBuilder } from "@/lib/engine/coa";
 import { SignalEngine } from "@/lib/engine/dkms";
+import { applyNseSnapshot } from "@/lib/engine/nseSnapshot";
 import { RrgEngine } from "@/lib/engine/rrg";
 import { Ledger, applySlippage } from "@/lib/engine/ledger";
 import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
@@ -938,6 +940,22 @@ export function useEngine(simulate: boolean) {
     [],
   );
 
+  /**
+   * NSE's own option-chain snapshot, closed-market only — a second,
+   * independent source layered underneath everything above it, never in
+   * place of it. NSE's snapshot has no BSE equivalent, but `useMarketData`
+   * already gates this callback to NSE-listed underlyings before it ever
+   * fires. The actual fold — fill gaps only, never overwrite — lives in
+   * `applyNseSnapshot`, tested directly against a bare `TickStore` and
+   * `ScripMaster` rather than through this hook.
+   */
+  const onNseOptionChain = useCallback(
+    (underlying: string, snapshot: NseOptionChainResponse) => {
+      applyNseSnapshot(ticksRef.current, masterRef.current, underlying, snapshot);
+    },
+    [],
+  );
+
   const market = useMarketData({
     enabled: session.authenticated,
     focus,
@@ -947,6 +965,7 @@ export function useEngine(simulate: boolean) {
     wallTokens,
     onOiBaseline,
     onContractSession,
+    onNseOptionChain,
   });
   marketRef.current = market;
 

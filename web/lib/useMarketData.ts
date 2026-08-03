@@ -5,11 +5,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { INDEX_UNIVERSE, isMarketOpen, optionExchange } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
-import { fetchBatch, fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
+import {
+  fetchBatch,
+  fetchBuildup,
+  fetchCandles,
+  fetchNseOptionChain,
+  fetchOi,
+  fetchPcr,
+} from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
 import { OI_BUILDUP_TYPES, type OiBuildupType } from "@/lib/market/constants";
 import { buildupIncludesUnderlying, pcrForUnderlying } from "@/lib/market/parse";
-import type { Candle, OiPoint, SessionStats } from "@/lib/types";
+import type { Candle, NseOptionChainResponse, OiPoint, SessionStats } from "@/lib/types";
 
 /**
  * Historical and market-data context for the terminal.
@@ -121,6 +128,12 @@ export interface MarketDataInput {
     token: string,
     replay: { pairs: [number, number][]; lastClose: number; volume: number },
   ) => void;
+  /**
+   * Called out of hours with NSE's own option-chain snapshot for the
+   * focused underlying (NSE-listed only) — a second, independent
+   * closed-market source, additive on top of everything above.
+   */
+  onNseOptionChain?: (underlying: string, snapshot: NseOptionChainResponse) => void;
 }
 
 const EMPTY: MarketData = {
@@ -204,6 +217,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     wallTokens,
     onOiBaseline,
     onContractSession,
+    onNseOptionChain,
   } = input;
 
   const [state, setState] = useState<MarketData>(EMPTY);
@@ -226,6 +240,8 @@ export function useMarketData(input: MarketDataInput): MarketData {
   baselineRef.current = onOiBaseline;
   const replayRef = useRef(onContractSession);
   replayRef.current = onContractSession;
+  const nseSnapshotRef = useRef(onNseOptionChain);
+  nseSnapshotRef.current = onNseOptionChain;
   // The spot session doubles as the RRG benchmark, read at call time so the
   // replay does not restart every time a candle poll lands.
   const spotCandlesRef = useRef(state.candles);
@@ -576,6 +592,39 @@ export function useMarketData(input: MarketDataInput): MarketData {
       else ok();
     }, [wallKey, sessionDate, focus, fail, ok]),
   );
+
+  /* ------------------------------------- NSE option-chain snapshot (closed only) */
+
+  /**
+   * A second, wholly independent closed-market source: NSE's own
+   * option-chain snapshot for the focused underlying, NSE-listed only.
+   * Everything above this block — the Angel One seeding pass, the wall
+   * curves, the closed-market replay it folds into — is untouched; this
+   * effect only ever fires when the market is shut, and only calls a
+   * callback the caller opted into. It fetches once per focus (the
+   * snapshot will not change again until NSE's next session), not on a
+   * poll, since there is nothing to keep re-reading.
+   */
+  useEffect(() => {
+    if (!enabled || isMarketOpen() || INDEX_UNIVERSE[focus]?.exchange !== "NSE") return;
+    const callback = nseSnapshotRef.current;
+    if (!callback) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snapshot = await fetchNseOptionChain(focus);
+        if (!cancelled) callback(focus, snapshot);
+      } catch {
+        // Best-effort only — Angel One's own closed-market replay above is
+        // the primary source and needs nothing from this to keep working.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, focus]);
 
   /* -------------------------------------------------------------- pcr */
 
