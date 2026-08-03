@@ -141,7 +141,13 @@ export function fetchOi(req: CandleRequest, ttlMs = 120_000) {
  * happens to re-render.
  */
 export function fetchBatch(
-  body: { date: string; tokens: string[]; oi?: boolean; candles?: boolean },
+  body: {
+    date: string;
+    tokens: string[];
+    oi?: boolean;
+    candles?: boolean;
+    exchange?: HistoricalExchange;
+  },
   ttlMs = 120_000,
 ) {
   return cached<BatchResponse>(`batch:${JSON.stringify(body)}`, ttlMs, () =>

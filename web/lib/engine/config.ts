@@ -146,6 +146,17 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
 
 export const UNDERLYINGS = Object.keys(INDEX_UNIVERSE);
 
+/**
+ * The historical-API F&O segment matching an index's own cash exchange —
+ * NSE trades index options on NFO, BSE on BFO. Every per-contract historical
+ * call (session seeding, wall OI curves, closed-market replay) needs this,
+ * not just the spot candle fetches that already read `IndexSpec.exchange`
+ * directly.
+ */
+export function optionExchange(underlying: string): "NFO" | "BFO" {
+  return INDEX_UNIVERSE[underlying]?.exchange === "BSE" ? "BFO" : "NFO";
+}
+
 /** SmartStream exchange type codes — Angel One's WebSocket 2.0 enum, not the REST API's string segment names below. */
 export const EXCHANGE_NSE_CM = 1;
 export const EXCHANGE_NSE_FO = 2;

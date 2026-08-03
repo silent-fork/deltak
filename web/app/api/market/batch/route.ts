@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { isInterval, type HistoricalInterval } from "@/lib/market/constants";
+import { isExchange, isInterval, type HistoricalInterval } from "@/lib/market/constants";
 import { candleDate, parseCandles, parseOiSeries } from "@/lib/market/parse";
 import { readJson } from "@/lib/market/request";
 import {
@@ -86,6 +86,10 @@ export async function POST(request: Request) {
   const interval: HistoricalInterval = isInterval(raw?.interval)
     ? raw.interval
     : "FIVE_MINUTE";
+  // Every token in one call is one underlying's own chain, so one exchange
+  // covers the whole batch — NIFTY/BANKNIFTY/FINNIFTY's options are on NFO,
+  // BANKEX/SENSEX's are on BFO. Default keeps existing callers unchanged.
+  const exchange = isExchange(raw?.exchange) ? raw.exchange : "NFO";
 
   if (!DATE_PATTERN.test(date)) {
     return NextResponse.json({ detail: "date must be YYYY-MM-DD." }, { status: 400 });
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
       try {
         const data = await smartApiCall<unknown>(CANDLE_URL, {
           method: "POST",
-          body: { exchange: "NFO", symboltoken: token, interval, fromdate: from, todate: to },
+          body: { exchange, symboltoken: token, interval, fromdate: from, todate: to },
           jwt: session.jwtToken,
         });
         // Pinned to the requested day, so the ladder cannot mix sessions.
@@ -139,7 +143,7 @@ export async function POST(request: Request) {
         const data = await smartApiCall<unknown>(OI_DATA_URL, {
           method: "POST",
           body: {
-            exchange: "NFO",
+            exchange,
             symboltoken: token,
             interval: "FIFTEEN_MINUTE",
             fromdate: from,

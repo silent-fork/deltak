@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Loader2, TrendingDown, TrendingUp, Waves } from "lucide-react";
+import { ArrowLeftRight, Loader2, Moon, TrendingDown, TrendingUp, Waves } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -209,15 +209,15 @@ export const RrgScatter = memo(function RrgScatter({
       <CardHeader className="shrink-0">
         <div className="flex min-w-0 items-center gap-2">
           <CardTitle className="truncate">RRG Momentum</CardTitle>
-          {/* Rotation is a claim about movement. When the market is shut this
-              plot is a photograph of the last session, and says so rather than
-              letting a still frame pass for a live one. */}
+          {/* Rotation is a claim about movement, and the market being shut
+              means there is none to show — the body below carries the actual
+              "closed" message; this is just the at-a-glance tag. */}
           {settled ? (
             <span
-              title={`Static — the rotation is the last completed session${asOf ? ` (${asOf})` : ""}, replayed from historical candles. Nothing advances until the next print.`}
+              title={`Market closed${asOf ? ` — last session ${asOf}` : ""}. RRG does not reconstruct a rotation from replayed candles; it resumes at the next live print.`}
               className="shrink-0 rounded border border-zinc-700 px-1 font-mono text-[8px] uppercase tracking-wider text-zinc-500"
             >
-              Static{asOf ? ` · ${asOf.slice(5)}` : ""}
+              Closed{asOf ? ` · ${asOf.slice(5)}` : ""}
             </span>
           ) : null}
         </div>
@@ -242,7 +242,20 @@ export const RrgScatter = memo(function RrgScatter({
       <CardContent className="dk-scroll flex min-h-0 flex-col overflow-y-auto p-2">
         {/* The plot takes the column's leftover height so the card ends flush. */}
         <div className="relative min-h-[150px] w-full flex-1">
-          {visible.length === 0 ? (
+          {settled ? (
+            // Rotation is not reconstructed from a replay: a shape built out
+            // of five-minute jumps reads as noise, not history, and the
+            // ladder itself already carries Friday's closing prices without
+            // it. This says plainly why the plot has nothing to show rather
+            // than sitting on the "still maturing" spinner until the market
+            // reopens, which is what the same 0-nodes state read as before.
+            <div className="flex h-full flex-col items-center justify-center gap-1.5 rounded-md border border-zinc-800/70 bg-zinc-950/40">
+              <Moon className="h-4 w-4 text-zinc-600" />
+              <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                Market closed — rotation resumes at the 9:15 bell
+              </span>
+            </div>
+          ) : visible.length === 0 ? (
             <SkeletonPanel
               label={
                 expected > 0

@@ -900,24 +900,20 @@ export function useEngine(simulate: boolean) {
   }, []);
 
   /**
-   * Replay a contract's last session into its rotation window.
+   * Replay a contract's last session into the ladder — price only, not RRG.
    *
-   * The RRG is a series, not a snapshot: with no feed it has nothing to rotate,
-   * and every node sits at the origin however long you leave the terminal open.
-   * Feeding it the session's bars gives it exactly what the feed would have —
-   * premium against spot, in order — and the closing premium doubles as the
-   * ladder's last price so the chain reads as Friday's close rather than dashes.
+   * This only ever runs while the market is shut (the effect that calls it in
+   * `useMarketData` skips outright while it's open), so it seeds the option
+   * chain with the closing premium rather than leaving every cell dashed, but
+   * does not feed the RRG windows: a rotation reconstructed from five-minute
+   * replay jumps reads as noise, not history, and the plot shows a plain
+   * "market closed" state instead rather than pretending to have rotated.
    */
   const onContractSession = useCallback(
     (
       token: string,
       replay: { pairs: [number, number][]; lastClose: number; volume: number },
     ) => {
-      const underlying = masterRef.current.instrument(token)?.name;
-      const rrg = underlying ? rrgRef.current[underlying] : undefined;
-      if (rrg) {
-        for (const [premium, spot] of replay.pairs) rrg.update(token, premium, spot);
-      }
       ticksRef.current.seedQuote(token, {
         ltp: replay.lastClose,
         volume: replay.volume,

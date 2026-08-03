@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { INDEX_UNIVERSE, isMarketOpen } from "@/lib/engine/config";
+import { INDEX_UNIVERSE, isMarketOpen, optionExchange } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
 import { fetchBatch, fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
@@ -439,6 +439,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
               tokens: chunk,
               oi: true,
               candles: wantBars,
+              exchange: optionExchange(focus),
             });
           } catch (err) {
             if (!cancelled) fail(err);
@@ -498,7 +499,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     return () => {
       cancelled = true;
     };
-  }, [enabled, seedKey, sessionDate, benchmarkReady, flush, fail, ok]);
+  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, flush, fail, ok]);
 
   /* ---------------------------------------------------------- wall curves */
 
@@ -514,7 +515,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
       for (const token of wallKey.split(",").filter(Boolean)) {
         try {
           const res = await fetchOi({
-            exchange: "NFO",
+            exchange: optionExchange(focus),
             symboltoken: token,
             interval: "FIFTEEN_MINUTE",
             fromdate: `${date} ${MARKET_OPEN_STAMP}`,
@@ -543,7 +544,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
           break;
         }
       }
-    }, [wallKey, sessionDate, fail, ok]),
+    }, [wallKey, sessionDate, focus, fail, ok]),
   );
 
   /* ------------------------------------------ closed-market session replay */
@@ -581,7 +582,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         try {
           const res = await fetchCandles(
             {
-              exchange: "NFO",
+              exchange: optionExchange(focus),
               symboltoken: token,
               interval: REPLAY_INTERVAL,
               ...sessionWindow(CANDLE_LOOKBACK_DAYS),
@@ -632,7 +633,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     return () => {
       cancelled = true;
     };
-  }, [enabled, seedKey, sessionDate, benchmarkReady, fail, ok]);
+  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, fail, ok]);
 
   /* -------------------------------------------------------------- pcr */
 
