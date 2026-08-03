@@ -1088,6 +1088,14 @@ export function useEngine(simulate: boolean) {
    * `MOBILE_PUSH_MS` regardless of how often this effect re-runs. Fires
    * whether or not any phone is actually paired to read it, same as every
    * other best-effort write here.
+   *
+   * Open positions ride along here too, not just the ledger's totals —
+   * without them a phone's per-position P&L was only as fresh as the last
+   * `CHECKPOINT_EVERY_TICKS` write to `positions` (up to a minute), while the
+   * aggregate open_pnl above updated every `MOBILE_PUSH_MS`. The DB
+   * checkpoint stays exactly what it was: the failsafe a phone falls back to
+   * once this tab stops pushing (closed tab, dead network) rather than
+   * freezing on stale numbers with no source of truth at all.
    */
   useEffect(() => {
     if (!session.authenticated || !snapshot) return;
@@ -1099,6 +1107,7 @@ export function useEngine(simulate: boolean) {
         mode: snapshot.mode,
         market_open: snapshot.market_open,
         signals: snapshot.signals,
+        open_positions: snapshot.ledger.open_positions,
         ledger: {
           capital: snapshot.ledger.capital,
           equity: snapshot.ledger.equity,

@@ -142,7 +142,12 @@ export function MobileCompanion({
     return <BootScreen stages={[{ done: false }]} lines={BOOT_LINES} />;
   }
 
-  const open = data?.positions.filter((p) => p.status === "OPEN") ?? [];
+  // The desktop's own push is the live source for what's open (as fresh as
+  // its last MOBILE_PUSH_MS beat); `data.positions` — read straight off the
+  // DB checkpoint — is the fallback for a snapshot that predates this field
+  // and for whenever the desktop itself has gone quiet (closed tab, dead
+  // network), the exact case that checkpoint exists to cover.
+  const open = data?.signal?.open_positions ?? data?.positions.filter((p) => p.status === "OPEN") ?? [];
   const closed = data?.positions.filter((p) => p.status === "CLOSED").slice(0, 20) ?? [];
   const ledger = data?.signal?.ledger;
   const mode = data?.signal?.mode ?? "paper";

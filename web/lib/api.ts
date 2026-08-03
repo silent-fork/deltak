@@ -244,6 +244,14 @@ export interface MobileStateResponse {
     mode: ExecutionMode;
     market_open: boolean;
     signals: Record<string, Signal>;
+    /**
+     * The desktop's own open positions, pushed on the same throttle as
+     * everything else above — up to `MOBILE_PUSH_MS` fresh. Absent on older
+     * cached snapshots (a phone paired before this shipped) and whenever this
+     * whole `signal` object is stale or null, in which case `positions` below
+     * (read straight from the DB, checkpointed independently) is the fallback.
+     */
+    open_positions?: Position[];
     ledger: {
       capital: number;
       equity: number;
