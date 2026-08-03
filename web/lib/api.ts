@@ -3,6 +3,7 @@ import type {
   BuildupResponse,
   CandleResponse,
   ExecutionMode,
+  HolidayResponse,
   MarginResponse,
   OiResponse,
   PcrResponse,
@@ -195,6 +196,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    /** NSE's own F&O holiday calendar — not Angel One, no JWT involved. */
+    holidays: () => request<HolidayResponse>("/api/market/holidays"),
   },
 
   history: (resource: string, params: Record<string, string> = {}) =>

@@ -400,3 +400,16 @@ export interface BuildupResponse {
   rows: OiBuildupRow[];
   fetched_at: string;
 }
+
+/** One row of NSE's F&O trading-holiday calendar. */
+export interface Holiday {
+  /** ISO, `YYYY-MM-DD`. */
+  date: string;
+  weekday: string;
+  description: string;
+}
+
+export interface HolidayResponse {
+  holidays: Holiday[];
+  fetched_at: string;
+}

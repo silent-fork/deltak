@@ -3,6 +3,7 @@ import type {
   BatchResponse,
   BuildupResponse,
   CandleResponse,
+  HolidayResponse,
   MarginPosition,
   MarginResponse,
   OiResponse,
@@ -180,4 +181,14 @@ export function fetchBuildup(
   return cached<BuildupResponse>(`buildup:${expirytype}:${datatype}`, ttlMs, () =>
     api.market.buildup({ datatype, expirytype }),
   );
+}
+
+/**
+ * NSE's F&O holiday calendar. A 15-minute TTL matches `HolidayMenu`'s own
+ * poll cadence — the calendar itself barely ever changes, so this exists to
+ * cap how often a stray extra poll can actually reach NSE, not because the
+ * data goes stale that fast.
+ */
+export function fetchHolidays(ttlMs = 15 * 60_000) {
+  return cached<HolidayResponse>("holidays", ttlMs, () => api.market.holidays());
 }

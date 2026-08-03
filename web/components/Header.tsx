@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { EventLogMenu } from "@/components/EventLogMenu";
+import { HolidayMenu } from "@/components/HolidayMenu";
 import { LoginModal } from "@/components/LoginModal";
 import { UserPill } from "@/components/UserPill";
 import { Wordmark } from "@/components/Wordmark";
@@ -258,6 +259,8 @@ export function Header({
             <Activity className="h-3 w-3" />
             {marketOpen ? "Open" : "Closed"}
           </Badge>
+
+          <HolidayMenu />
 
           <Badge
             title={
