@@ -12,7 +12,7 @@ const SITE_URL =
     : "http://localhost:3000");
 
 /**
- * "/", everything under "/learn", and "/fno-sector-rotation" are what's
+ * "/", everything under "/learn", and everything under "/tools" are what's
  * meant to rank — real content with no login gate. "/terminal" is the app
  * itself, marked `noindex` on its own page (see app/terminal/page.tsx):
  * Google's own guidance is to leave noindex pages out of the sitemap rather
@@ -29,7 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
-    { url: `${SITE_URL}/fno-sector-rotation`, changeFrequency: "daily", priority: 0.8 },
+    { url: `${SITE_URL}/tools/fno-sector-rotation`, changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE_URL}/learn`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/learn/strategies`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/glossary`, changeFrequency: "monthly", priority: 0.7 },

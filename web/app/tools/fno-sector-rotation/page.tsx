@@ -10,6 +10,11 @@ import { SectorDashboard } from "@/components/fno/SectorDashboard";
  * from NSE's own bhavcopy/constituent data via `nse-bse-api` and
  * niftyindices.com). Unlike `/terminal`, this route *is* indexed: there is
  * real, unique content behind it without any gate.
+ *
+ * Lives under `/tools/` rather than at the root — the first of what's meant
+ * to become a small family of free, no-login market-data utilities, so the
+ * URL says that from the start instead of needing a redirect once a second
+ * one exists.
  */
 export const metadata: Metadata = {
   title: "F&O Sector Rotation Dashboard — NSE Sector RRG & Top F&O Stock Picks",
@@ -19,7 +24,7 @@ export const metadata: Metadata = {
     "top F&O-eligible stock picks from the leading sectors. Built on NSE's own public " +
     "bhavcopy and constituent data.",
   alternates: {
-    canonical: "/fno-sector-rotation",
+    canonical: "/tools/fno-sector-rotation",
   },
   robots: {
     index: true,

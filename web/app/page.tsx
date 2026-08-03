@@ -256,7 +256,7 @@ export default function HomePage() {
             just naming it.
           */}
           <CtaLink
-            href="/fno-sector-rotation"
+            href="/tools/fno-sector-rotation"
             location="hero-fno"
             className="group mt-2 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10"
           >
