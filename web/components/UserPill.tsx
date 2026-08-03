@@ -462,13 +462,17 @@ export function UserPill({
             />
           </Section>
 
-          <Section title="Segments enabled">
-            <Chips values={profile?.exchanges ?? []} empty="Not reported" />
-          </Section>
+          {pairExpanded ? null : (
+            <>
+              <Section title="Segments enabled">
+                <Chips values={profile?.exchanges ?? []} empty="Not reported" />
+              </Section>
 
-          <Section title="Product types">
-            <Chips values={profile?.products ?? []} empty="Not reported" />
-          </Section>
+              <Section title="Product types">
+                <Chips values={profile?.products ?? []} empty="Not reported" />
+              </Section>
+            </>
+          )}
 
           {/*
             The paper ledger, not the broker's RMS — there's no live mode in
