@@ -20,27 +20,38 @@ import type {
 /**
  * Browser client for the historical and market-data routes.
  *
- * Angel One meters these endpoints per API key, at a few requests a second —
- * far below what a 25-strike chain would ask for if each panel fetched
- * independently. So every call in the tab funnels through one queue that
- * spaces requests out, and identical requests share a single flight and a
- * short-lived cache. The rest of the app can then ask for what it wants,
- * whenever it wants, without any component knowing about the limit.
+ * Angel One's own per-endpoint rate now has an authoritative gate server-side
+ * (`RateLimiter` in `lib/server/smartapi.ts`, shared across every request
+ * hitting this deployment, not just this tab) — so this queue's job is no
+ * longer to approximate that limit itself, only to keep identical requests
+ * deduped and cached, and to stop this one tab from opening an unbounded
+ * pile of sockets to its own server.
+ *
+ * That distinction matters: a low `MAX_IN_FLIGHT` here used to also be the
+ * only thing standing between the browser and Angel One's limiter. Now that
+ * the server paces the real upstream calls, a low cap here does nothing but
+ * head-of-line-block unrelated fast requests behind one slow one — a batch
+ * request seeding a 24-token near-ATM band now legitimately takes many
+ * seconds server-side (each leg's own OI call queued behind its endpoint's
+ * real rate), and with only 3 client-side slots, that single slow request
+ * could occupy a third of them for its whole duration, stalling the four
+ * background-index candle polls (NSE and BSE alike — neither depends on the
+ * batch route at all) behind it for no reason connected to any real limit.
  */
 
-const BASE_GAP_MS = 340;
+const BASE_GAP_MS = 60;
 const MAX_GAP_MS = 4_000;
 /**
- * Requests allowed in flight at once.
+ * Requests allowed in flight at once, from this tab to this deployment.
  *
- * Angel One publishes a *rate*, and a strictly serial queue does not deliver
- * it: waiting for each reply before dispatching the next caps throughput at
- * 1/(gap + round trip), which with a half-second round trip is barely one
- * request a second however small the gap. That is what made a 22-contract
- * ladder fill one strike at a time. Dispatching on the clock and letting a few
- * overlap fills the pipe up to the documented rate and no further.
+ * High enough to cover every distinct thing `useMarketData` can legitimately
+ * have in flight together on a fresh load — the focused underlying's candles
+ * and its batch seed, four background-index candle polls, two wall curves,
+ * PCR, buildup, holidays, an NSE snapshot — without any of them queueing
+ * behind another just because a client-side number said no. The real ceiling
+ * against Angel One is the server-side limiter, not this.
  */
-const MAX_IN_FLIGHT = 3;
+const MAX_IN_FLIGHT = 12;
 
 let gapMs = BASE_GAP_MS;
 let lastDispatch = 0;
