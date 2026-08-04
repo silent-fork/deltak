@@ -452,6 +452,13 @@ export function useMarketData(input: MarketDataInput): MarketData {
       } catch (err) {
         setState((s) => ({ ...s, loading: false }));
         fail(err);
+        // `usePoll` only stops rescheduling a closed-market cycle once it
+        // *lands* — which it reads purely off whether this callback throws,
+        // not off `fail()`. Catching and reporting without re-throwing (the
+        // bug: confirmed live via Angel One historical timeouts) let a
+        // failed fetch look "landed" and freeze the board on stale prices
+        // with no further retry until focus happened to change.
+        throw err;
       }
     }, [spotToken, focus, fail, ok]),
   );
@@ -497,16 +504,30 @@ export function useMarketData(input: MarketDataInput): MarketData {
         ),
       );
       const landed: Record<string, SessionStats> = {};
+      let anyFailed = false;
       results.forEach((result, i) => {
         // A background quote is the most expendable thing here; the focused
         // instrument's own failures are what the error banner is for.
-        if (result.status !== "fulfilled" || !result.value.stats) return;
+        if (result.status !== "fulfilled" || !result.value.stats) {
+          anyFailed = true;
+          return;
+        }
         const [underlying] = pairs[i];
         landed[underlying] = result.value.stats;
       });
       if (Object.keys(landed).length) {
         setState((s) => ({ ...s, spotStats: { ...s.spotStats, ...landed } }));
       }
+      // This callback used to resolve normally either way, "expendable"
+      // meaning only "no error banner" — but `usePoll` reads that same
+      // normal resolution as the cycle having *landed*, and stops
+      // rescheduling once the market is closed. A background quote that
+      // never landed then froze on whatever it last had (confirmed: Angel
+      // One's historical endpoints timing out repeatedly against this exact
+      // deployment) with no further retry until focus happened to change
+      // and gave it a fresh key. Throwing keeps the slow closed-market
+      // retry alive instead — still silent, just not permanent.
+      if (anyFailed) throw new Error("background spot fetch incomplete");
     }, [backgroundKey]),
   );
 
@@ -693,8 +714,15 @@ export function useMarketData(input: MarketDataInput): MarketData {
       if (newlyBaselined) {
         setState((s) => ({ ...s, seeded: seenRef.current.size }));
       }
-      if (sawError) fail(sawError);
-      else ok();
+      // Same `usePoll` "landed" pitfall as the candles poll above: reporting
+      // via `fail()` alone, without re-throwing, let a wall curve that
+      // failed outright still count as a landed closed-market cycle and
+      // freeze without retrying.
+      if (sawError) {
+        fail(sawError);
+        throw sawError;
+      }
+      ok();
     }, [wallKey, sessionDate, focus, fail, ok]),
   );
 
@@ -757,7 +785,11 @@ export function useMarketData(input: MarketDataInput): MarketData {
         setState((s) => ({ ...s, pcr: byUnderlying, pcrAt: res.fetched_at }));
         ok();
       } catch (err) {
+        // Re-thrown for the same reason as the candles/walls polls above —
+        // `usePoll` needs the throw itself to know a closed-market cycle
+        // didn't actually land, or it stops retrying a failure entirely.
         fail(err);
+        throw err;
       }
     }, [fail, ok]),
   );
@@ -785,7 +817,9 @@ export function useMarketData(input: MarketDataInput): MarketData {
         setState((s) => ({ ...s, buildup: next }));
         ok();
       } catch (err) {
+        // Same re-throw as the other closed-market polls in this file.
         fail(err);
+        throw err;
       }
     }, [fail, ok]),
   );
