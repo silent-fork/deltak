@@ -322,7 +322,7 @@ export const GLOSSARY: GlossaryTerm[] = [
     slug: "max-pain",
     term: "Max Pain",
     category: "Reading the Market",
-    shortDef: "The strike at which the total value of all outstanding options (calls and puts combined) would be lowest at expiry — where option writers as a group lose the least.",
+    shortDef: "The strike where total outstanding option value would be lowest at expiry — where option writers as a group lose the least.",
     body: [
       "The theory behind max pain is that large option writers have some influence pulling spot toward that strike into expiry, though the evidence for it as a reliable predictor is mixed at best and it should be treated as one context data point, not a target level to trade against blindly.",
       "Max pain is typically recalculated throughout the session as OI shifts, rather than fixed once at the start of the week — a strike that looked like max pain on Monday can easily be a different strike entirely by Thursday once enough OI has moved.",

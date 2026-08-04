@@ -17,9 +17,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const idx = getIndex(slug);
   if (!idx) return {};
+  // "Nifty Midcap Select (MIDCPNIFTY)" (32 chars) is the longest index name —
+  // `— Lot Size` keeps every combination under 70 with the root layout's
+  // " · DeltaK Terminal" template suffix appended.
   return {
-    title: `${idx.name} Options — Lot Size, Strike Step & Contract Details`,
-    description: idx.description,
+    title: `${idx.name} — Lot Size`,
+    description: idx.metaDescription,
     keywords: idx.keywords,
     alternates: { canonical: `/learn/indices/${idx.slug}` },
   };

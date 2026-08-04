@@ -12,9 +12,8 @@ import { ToolPageShell } from "@/components/tools/ToolPageShell";
 export const metadata: Metadata = {
   title: "Market Scanner — NSE Sector Heatmap & Range Radar",
   description:
-    "A free NSE market scanner — a sector heatmap sized by turnover and coloured by today's " +
-    "move, plus a range radar showing which F&O-eligible stocks are nearest their ~20-session " +
-    "high or low. Built on NSE's own public bhavcopy data.",
+    "Free NSE market scanner — a turnover-weighted sector heatmap plus a range " +
+    "radar for F&O stocks near their 20-session high or low.",
   alternates: {
     canonical: "/tools/market-scanner",
   },

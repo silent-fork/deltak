@@ -14,12 +14,10 @@ import { ToolPageShell } from "@/components/tools/ToolPageShell";
  * utilities listed on the `/tools` hub.
  */
 export const metadata: Metadata = {
-  title: "F&O Sector Rotation Dashboard — NSE Sector RRG & Top F&O Stock Picks",
+  title: "NSE F&O Sector Rotation & RRG Dashboard",
   description:
-    "A free NSE F&O sector rotation dashboard — a live Relative Rotation Graph " +
-    "(RRG) across every NSE sector index versus the Nifty 50, a sector leaderboard, and " +
-    "top F&O-eligible stock picks from the leading sectors. Built on NSE's own public " +
-    "bhavcopy and constituent data.",
+    "Free NSE F&O sector rotation dashboard — live RRG vs Nifty 50, a sector " +
+    "leaderboard, and top F&O stock picks from leading sectors.",
   alternates: {
     canonical: "/tools/fno-sector-rotation",
   },

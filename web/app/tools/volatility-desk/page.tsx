@@ -9,11 +9,10 @@ import { VolatilityDeskDashboard } from "@/components/tools/volatility-desk/Vola
  * `optionMetrics.ts`, `vix.ts`). Never touches Angel One.
  */
 export const metadata: Metadata = {
-  title: "Volatility Desk — F&O OI Buildup, Max Pain, PCR & India VIX",
+  title: "Volatility Desk — OI Buildup, Max Pain, PCR & VIX",
   description:
-    "A free NSE options volatility desk — an OI-buildup compass across every F&O stock's " +
-    "near-month future, max pain and PCR for NIFTY, BANKNIFTY and FINNIFTY, and an India VIX " +
-    "regime tracker. Built on NSE's own public F&O bhavcopy, option chain and VIX history.",
+    "Free NSE volatility desk — OI buildup, max pain, PCR for NIFTY, BANKNIFTY, " +
+    "FINNIFTY, and an India VIX regime tracker.",
   alternates: {
     canonical: "/tools/volatility-desk",
   },

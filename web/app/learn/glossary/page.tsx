@@ -5,9 +5,10 @@ import { LearnChrome } from "@/components/LearnChrome";
 import { GLOSSARY, GLOSSARY_CATEGORIES } from "@/lib/content/glossary";
 
 export const metadata: Metadata = {
-  title: "Options & Indian F&O Glossary — Terms, Greeks & Rules Explained",
+  title: "Options & F&O Glossary — Terms, Greeks & Rules",
   description:
-    "Every term worth knowing to trade Indian index F&O — strike price, the Greeks, margin and settlement rules, OI reading, plus DeltaK's own Aegis, Zenith, Quantum Horizon and DKMS terminology, defined in full.",
+    "Every term to trade Indian F&O — strikes, the Greeks, margin, OI reading, " +
+    "plus DeltaK's own Aegis, Zenith and Quantum Horizon defined.",
   keywords: [
     "options trading glossary india",
     "fno terms and definitions",

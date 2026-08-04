@@ -39,8 +39,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const entry = getGlossaryTerm(slug);
   if (!entry) return {};
+  // `${entry.term} — F&O` keeps the longest real term (43 chars — "Securities
+  // Transaction Tax (STT) on Options") under 70 once " · DeltaK Terminal" is
+  // appended by the root layout's title template.
   return {
-    title: `${entry.term} — Options & F&O Glossary`,
+    title: `${entry.term} — F&O`,
     description: entry.shortDef,
     keywords: entry.keywords,
     alternates: { canonical: `/learn/glossary/${entry.slug}` },

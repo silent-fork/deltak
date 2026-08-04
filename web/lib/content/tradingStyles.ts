@@ -94,7 +94,7 @@ export const TRADING_STYLES: TradingStyle[] = [
     durationLabel: "Any Horizon",
     horizon: "A framing question, not a time horizon — applies across intraday, swing and positional styles alike",
     summary:
-      "The single biggest fork in options trading style: paying premium for defined, capped risk and open-ended reward, versus collecting premium for the opposite trade-off.",
+      "The biggest fork in options style: paying premium for capped risk and open-ended reward, versus collecting premium for the opposite trade-off.",
     howItWorks: [
       "A buyer pays premium upfront, has a hard-capped maximum loss (the premium itself), and needs the underlying to move enough, and fast enough, to overcome theta decay before profit shows up. Time is the buyer's enemy on every single held day.",
       "A seller collects premium upfront, has a maximum profit capped at that premium (unless spread-protected), and needs the underlying to not move too far, or not move at all, for the position to work. Time is the seller's ally on every single held day — theta decay is income, not a cost.",

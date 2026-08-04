@@ -7,9 +7,10 @@ import { LotSizeBars } from "@/components/LotSizeBars";
 import { INDICES } from "@/lib/content/indices";
 
 export const metadata: Metadata = {
-  title: "Indian F&O Indices — NIFTY, BANKNIFTY, FINNIFTY, Sensex & More",
+  title: "Indian F&O Indices — NIFTY, BANKNIFTY & Sensex",
   description:
-    "Every major Indian index F&O contract compared — NIFTY 50, Bank Nifty, Fin Nifty, Midcap Nifty on NSE, plus Sensex and Bankex on BSE — lot size, strike step and which ones DeltaK actually trades.",
+    "Every major Indian index F&O contract compared — NIFTY, Bank Nifty, Sensex, " +
+    "Bankex — lot size, strike step and exchange.",
   keywords: [
     "indian fno indices",
     "nifty banknifty finnifty lot size",

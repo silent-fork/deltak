@@ -19,8 +19,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const strategy = getStrategy(slug);
   if (!strategy) return {};
-  const title = `${strategy.name} Options Strategy: Setup, Payoff Diagram & Rules`;
-  const description = `${strategy.summary} How to build it, when to deploy it, and the mistakes that break it — with a live payoff diagram against an illustrative ${STRATEGY_EXAMPLE.underlying} example.`;
+  // Every strategy's own `summary` already lands well inside Google's ~160-char
+  // display limit on its own (measured 69–158 across all twelve) — appending
+  // the old fixed sentence pushed every single one past 300 characters.
+  const title = `${strategy.name} — Payoff, Setup & Rules`;
+  const description = strategy.summary;
   return {
     title,
     description,

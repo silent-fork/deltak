@@ -9,9 +9,10 @@ import { STRATEGIES } from "@/lib/content/strategies";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
 export const metadata: Metadata = {
-  title: "Learn — Options Strategies, Glossary & Indian F&O Reference | DeltaK",
+  title: "Learn — Options Strategies, Glossary & F&O Reference",
   description:
-    "DeltaK's free options trading wiki — strategy setups with payoff diagrams, a full options and F&O glossary (including Aegis, Zenith and the Quantum Horizon), trading styles, and every major Indian index F&O contract compared.",
+    "DeltaK's free options trading wiki — strategy payoff diagrams, a full F&O " +
+    "glossary, trading styles and Indian index reference.",
   keywords: [
     "options trading wiki india",
     "learn options trading nifty banknifty",

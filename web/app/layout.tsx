@@ -31,11 +31,16 @@ const SITE_URL =
     : "http://localhost:3000");
 
 const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal for Angel One";
+/**
+ * Google truncates a meta description around 155–160 characters — the old
+ * 330-character version wasn't wrong, just invisible past the cut, so every
+ * search result rendered a mid-sentence ellipsis instead of a full pitch.
+ * Kept under 160 everywhere it's reused below (page <meta>, OG, Twitter,
+ * JSON-LD) for the same reason.
+ */
 const DESCRIPTION =
-  "DeltaK Matrix Strategy (DKMS): a live options trading terminal for Angel One SmartAPI, " +
-  "built around the Quantum Horizon — a live ITM/OTM open-interest profile at spot. " +
-  "COA support/resistance wall tracking, RRG relative-strength rotation and signal-driven " +
-  "Autopilot execution across NIFTY, BANKNIFTY and FINNIFTY futures & options.";
+  "DeltaK: a live Angel One options terminal built on the Quantum Horizon — COA walls, " +
+  "RRG rotation, Autopilot across NIFTY, BANKNIFTY, FINNIFTY.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

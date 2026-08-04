@@ -10,11 +10,10 @@ import { ToolPageShell } from "@/components/tools/ToolPageShell";
  * `blockDeals.ts`). Never touches Angel One.
  */
 export const metadata: Metadata = {
-  title: "Corporate Calendar — F&O Results, Actions & IPO Tracker",
+  title: "Corporate Calendar — F&O Results & IPO Tracker",
   description:
-    "A free NSE corporate calendar — upcoming results, dividends/splits/bonuses and IPO " +
-    "milestones for the week ahead, F&O-eligible names flagged, plus today's block deals and " +
-    "recent IPO listings. Built on NSE's own public corporate and IPO data.",
+    "Free NSE corporate calendar — results, corporate actions and IPO milestones " +
+    "this week, plus today's block deals and recent listings.",
   alternates: {
     canonical: "/tools/corporate-calendar",
   },

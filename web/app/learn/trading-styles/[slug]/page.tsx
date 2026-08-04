@@ -19,8 +19,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const style = getTradingStyle(slug);
   if (!style) return {};
+  // "Options Buying vs. Options Selling" (34 chars) is the longest style
+  // name — `— How It Works` keeps every combination under 70 with the
+  // root layout's " · DeltaK Terminal" template suffix appended.
   return {
-    title: `${style.name} — How It Works, Who It Suits, Key Risks`,
+    title: `${style.name} — How It Works`,
     description: style.summary,
     keywords: style.keywords,
     alternates: { canonical: `/learn/trading-styles/${style.slug}` },

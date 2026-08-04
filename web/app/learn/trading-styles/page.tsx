@@ -7,9 +7,10 @@ import { TimeHorizonBar } from "@/components/TimeHorizonBar";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
 export const metadata: Metadata = {
-  title: "Options Trading Styles — Intraday, Swing, Positional & Buying vs. Selling",
+  title: "Options Styles — Intraday, Swing & Positional",
   description:
-    "How intraday, swing and positional options trading actually differ in Indian F&O, and the buying-vs-selling decision that cuts across all three — time horizon, risk profile and who each style suits.",
+    "Intraday, swing and positional options trading compared — time horizon, " +
+    "risk profile, and options buying vs. selling.",
   keywords: [
     "options trading styles india",
     "intraday vs swing vs positional trading",

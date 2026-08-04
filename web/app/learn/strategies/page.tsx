@@ -7,9 +7,10 @@ import { PayoffChart } from "@/components/PayoffChart";
 import { STRATEGIES, STRATEGY_EXAMPLE, type StrategyCategory } from "@/lib/content/strategies";
 
 export const metadata: Metadata = {
-  title: "Options Trading Strategies — Payoff Diagrams & Rules for Indian F&O",
+  title: "Options Strategies — Payoff Diagrams for Indian F&O",
   description:
-    "Twelve options strategies from a plain long call through iron condors, iron butterflies and the jade lizard — each with a payoff diagram, construction, ideal scenario and the mistakes that break it.",
+    "Twelve options strategies, long call to iron condors and the jade lizard — " +
+    "each with a payoff diagram, construction and common mistakes.",
   keywords: [
     "options trading strategies india",
     "advanced options strategies",
