@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 export default function VolatilityDeskPage() {
   return (
-    <ToolPageShell title="Volatility Desk" navLocation="volatility-desk-nav">
+    <ToolPageShell title="Volatility Desk" navLocation="volatility-desk-nav" viewEvent="tools_volatility_desk_view">
       <VolatilityDeskDashboard />
     </ToolPageShell>
   );

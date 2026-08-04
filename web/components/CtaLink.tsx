@@ -13,12 +13,17 @@ import { track } from "@/lib/analytics";
 export function CtaLink({
   href,
   location,
+  event = "cta_click",
+  data,
   className,
   children,
 }: {
   href: string;
   /** Which of the page's several identical CTAs this is — nav, hero, closing. */
   location: string;
+  /** Override for a link that isn't really a call-to-action, e.g. a hub's tool card. */
+  event?: string;
+  data?: Record<string, unknown>;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -26,7 +31,7 @@ export function CtaLink({
     <Link
       href={href}
       className={className}
-      onClick={() => track("cta_click", { location })}
+      onClick={() => track(event, { location, ...data })}
     >
       {children}
     </Link>

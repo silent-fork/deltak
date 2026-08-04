@@ -156,14 +156,23 @@ export function useEngine(simulate: boolean) {
 
   // Keeps every analytics event tagged with the session facts that matter
   // most for segmenting a trading terminal's usage, without re-sending them
-  // from every individual call site.
+  // from every individual call site. `user_id` is the field Amplitude/GA4's
+  // Zaraz components key identity off of; `client_code` rides along too
+  // since it's the more recognisable name for the same value on this site's
+  // own dashboards. Angel One's client code is a broker account ID, not the
+  // operator's name/email/mobile — those stay out of third-party analytics
+  // entirely, same discipline as `login_failed` never sending its detail.
+  // Clears back to `undefined` on sign-out rather than leaking the last
+  // session's identity onto whatever an now-anonymous tab does next.
   useEffect(() => {
     setAnalyticsContext({
       authenticated: session.authenticated,
       automation,
       focused_underlying: focus,
+      user_id: session.clientCode ?? undefined,
+      client_code: session.clientCode ?? undefined,
     });
-  }, [session.authenticated, automation, focus]);
+  }, [session.authenticated, session.clientCode, automation, focus]);
 
   /**
    * Which index gets watched most is itself worth seeing, not just the

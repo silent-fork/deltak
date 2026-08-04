@@ -33,7 +33,7 @@ export const dynamic = "force-dynamic";
 
 export default function FnoRotationPage() {
   return (
-    <ToolPageShell title="F&O Sector Rotation" navLocation="fno-nav">
+    <ToolPageShell title="F&O Sector Rotation" navLocation="fno-nav" viewEvent="tools_fno_sector_rotation_view">
       <SectorDashboard />
     </ToolPageShell>
   );

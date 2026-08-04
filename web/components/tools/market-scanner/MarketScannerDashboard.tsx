@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToolFooterMark } from "@/components/tools/ToolPageShell";
+import { track } from "@/lib/analytics";
 import type { MarketScannerResponse } from "@/lib/tools/marketScannerTypes";
 import { timeAgo } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ export function MarketScannerDashboard() {
         status: "error",
         message: err instanceof Error ? err.message : "Market scanner fetch failed.",
       });
+      track("tool_fetch_error", { tool: "market_scanner" });
     } finally {
       inFlight.current = false;
     }
@@ -100,7 +102,10 @@ export function MarketScannerDashboard() {
           EOD bhavcopy · data {timeAgo(fetchedAt)}
         </span>
         <button
-          onClick={load}
+          onClick={() => {
+            track("tool_refresh", { tool: "market_scanner" });
+            void load();
+          }}
           className="rounded border border-zinc-700 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500 hover:border-quantum/50 hover:text-quantum"
         >
           Refresh

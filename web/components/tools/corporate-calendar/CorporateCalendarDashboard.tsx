@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToolFooterMark } from "@/components/tools/ToolPageShell";
+import { track } from "@/lib/analytics";
 import type { CorporateCalendarResponse } from "@/lib/tools/corporateCalendarTypes";
 import { timeAgo } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export function CorporateCalendarDashboard() {
         status: "error",
         message: err instanceof Error ? err.message : "Corporate calendar fetch failed.",
       });
+      track("tool_fetch_error", { tool: "corporate_calendar" });
     } finally {
       inFlight.current = false;
     }
@@ -59,7 +61,11 @@ export function CorporateCalendarDashboard() {
           <CardHeader>
             <CardTitle>This Week</CardTitle>
           </CardHeader>
-          <CardContent className="relative min-h-[200px]">
+          {/* A real week's worth of results/actions/IPO rows runs well past 200px
+              once it's actually on screen (measured ~700px+ on a dense week) —
+              sized closer to that so the panel doesn't visibly grow the moment
+              data lands. */}
+          <CardContent className="relative min-h-[260px] lg:min-h-[480px]">
             <PanelBootOverlay label="event calendar" />
           </CardContent>
         </Card>
@@ -67,15 +73,17 @@ export function CorporateCalendarDashboard() {
           <CardHeader>
             <CardTitle>Block Deals</CardTitle>
           </CardHeader>
-          <CardContent className="relative min-h-[80px]">
-            <PanelBootOverlay label="block deals" />
+          {/* One row of chips is genuinely this short — matching it (rather than
+              the old 80px) avoids a visible shrink on load. */}
+          <CardContent className="relative min-h-[48px]">
+            <PanelBootOverlay label="block deals" compact />
           </CardContent>
         </Card>
         <Card className="min-h-0 shrink-0">
           <CardHeader>
             <CardTitle>Recent IPOs</CardTitle>
           </CardHeader>
-          <CardContent className="relative min-h-[140px]">
+          <CardContent className="relative min-h-[180px]">
             <PanelBootOverlay label="recent IPOs" />
           </CardContent>
         </Card>
@@ -109,7 +117,10 @@ export function CorporateCalendarDashboard() {
           NSE corporate &amp; IPO data · data {timeAgo(fetchedAt)}
         </span>
         <button
-          onClick={load}
+          onClick={() => {
+            track("tool_refresh", { tool: "corporate_calendar" });
+            void load();
+          }}
           className="rounded border border-zinc-700 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500 hover:border-quantum/50 hover:text-quantum"
         >
           Refresh

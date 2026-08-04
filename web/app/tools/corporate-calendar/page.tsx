@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 
 export default function CorporateCalendarPage() {
   return (
-    <ToolPageShell title="Corporate Calendar" navLocation="corporate-calendar-nav">
+    <ToolPageShell title="Corporate Calendar" navLocation="corporate-calendar-nav" viewEvent="tools_corporate_calendar_view">
       <CorporateCalendarDashboard />
     </ToolPageShell>
   );

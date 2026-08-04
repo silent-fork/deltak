@@ -79,7 +79,11 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       // The TOTP is single-use — never keep it around after submission.
       setTotp("");
       setPin("");
-      track("login_success");
+      // Passed explicitly rather than waiting on the ambient context effect
+      // in useEngine (keyed off `session.clientCode`) to catch up — this
+      // fires the instant login resolves, so the very first event of the
+      // session already carries the ID Amplitude identifies the user by.
+      track("login_success", { client_code: clientCode.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setTotp("");

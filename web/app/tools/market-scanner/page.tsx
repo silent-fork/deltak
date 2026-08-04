@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 
 export default function MarketScannerPage() {
   return (
-    <ToolPageShell title="Market Scanner" navLocation="market-scanner-nav">
+    <ToolPageShell title="Market Scanner" navLocation="market-scanner-nav" viewEvent="tools_market_scanner_view">
       <MarketScannerDashboard />
     </ToolPageShell>
   );

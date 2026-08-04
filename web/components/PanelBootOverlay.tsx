@@ -14,7 +14,30 @@ import { Loader2, Zap } from "lucide-react";
  * on-brand vocabulary — not a bare spinner easy to miss over a panel that
  * otherwise looks finished.
  */
-export function PanelBootOverlay({ label }: { label: string }) {
+/**
+ * `compact` is a single-row rendition for panels too thin to hold the
+ * stacked emblem-over-label layout without overflowing it (e.g. a ~50px
+ * status strip) — same vocabulary, laid out horizontally instead.
+ */
+export function PanelBootOverlay({ label, compact = false }: { label: string; compact?: boolean }) {
+  if (compact) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-md bg-zinc-950/80 backdrop-blur-[2px]"
+      >
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-quantum/40 bg-quantum/10">
+          <Zap className="h-2.5 w-2.5 text-quantum" />
+        </div>
+        <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
+          <Loader2 className="h-3 w-3 animate-spin text-quantum" />
+          Loading {label}…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       role="status"

@@ -2,6 +2,7 @@ import { ArrowRight, Zap } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 
 export const metadata: Metadata = {
@@ -125,6 +126,7 @@ const TOOLS = [
 export default function ToolsHubPage() {
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+      <AnalyticsBeacon event="tools_hub_view" />
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-0 h-[480px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.07] blur-[140px]"
@@ -165,9 +167,11 @@ export default function ToolsHubPage() {
       <section className="relative mx-auto max-w-6xl px-5 pb-16">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {TOOLS.map((t) => (
-            <Link
+            <CtaLink
               key={t.href}
               href={t.href}
+              location={t.href}
+              event="tool_open"
               className="dk-panel group flex gap-4 rounded-xl p-4 transition-colors hover:border-quantum/40 sm:p-5"
             >
               <div className="h-16 w-16 shrink-0 rounded-lg border border-zinc-800 bg-zinc-950/60 p-2 sm:h-20 sm:w-20">
@@ -191,7 +195,7 @@ export default function ToolsHubPage() {
                   </span>
                 </div>
               </div>
-            </Link>
+            </CtaLink>
           ))}
         </div>
       </section>

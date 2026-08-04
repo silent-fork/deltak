@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToolFooterMark } from "@/components/tools/ToolPageShell";
+import { track } from "@/lib/analytics";
 import type { SectorRotationApiResponse } from "@/lib/sectors/types";
 
 import { MarketPulse } from "./MarketPulse";
@@ -50,6 +51,9 @@ export function SectorDashboard() {
         status: "error",
         message: err instanceof Error ? err.message : "Sector rotation fetch failed.",
       });
+      // No error detail here, same discipline as `login_failed` — just that
+      // this tool's fetch failed, not why.
+      track("tool_fetch_error", { tool: "fno_sector_rotation" });
     } finally {
       inFlight.current = false;
       setRefreshing(false);
@@ -77,7 +81,7 @@ export function SectorDashboard() {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="relative h-[52px] shrink-0 overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-900/40 shadow-panel backdrop-blur-sm">
-          <PanelBootOverlay label="market pulse" />
+          <PanelBootOverlay label="market pulse" compact />
         </div>
 
         <div className="grid min-h-0 grid-cols-1 gap-3 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -139,7 +143,10 @@ export function SectorDashboard() {
         asOf={data.asOf}
         fetchedAt={fetchedAt}
         loading={refreshing}
-        onRefresh={load}
+        onRefresh={() => {
+          track("tool_refresh", { tool: "fno_sector_rotation" });
+          void load();
+        }}
       />
 
       {/*

@@ -1,6 +1,7 @@
 import { ArrowRight, ChevronRight, Zap } from "lucide-react";
 import Link from "next/link";
 
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 
 /**
@@ -20,16 +21,20 @@ import { CtaLink } from "@/components/CtaLink";
 export function ToolPageShell({
   title,
   navLocation,
+  viewEvent,
   children,
 }: {
   /** Short header label — hidden below `sm`, same as the sector-rotation page. */
   title: string;
   /** `CtaLink`'s `location` for this page's Terminal button click. */
   navLocation: string;
+  /** Snake_case Zaraz event fired once on mount, e.g. "tools_market_scanner_view". */
+  viewEvent: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950 lg:h-dvh lg:overflow-hidden">
+      <AnalyticsBeacon event={viewEvent} />
       <header className="shrink-0 border-b border-zinc-800/70 bg-zinc-900/40 px-3 py-3 backdrop-blur-sm sm:px-6">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-1.5">
           <Link href="/tools" className="flex items-center gap-2">
