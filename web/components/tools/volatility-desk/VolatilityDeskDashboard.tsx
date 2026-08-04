@@ -69,7 +69,9 @@ export function VolatilityDeskDashboard() {
             <CardHeader>
               <CardTitle>India VIX</CardTitle>
             </CardHeader>
-            <CardContent className="relative min-h-[160px]">
+            {/* Taller now that the market-breadth read fills what used to be
+                dead space below the regime gauge. */}
+            <CardContent className="relative min-h-[280px]">
               <PanelBootOverlay label="VIX" />
             </CardContent>
           </Card>
@@ -124,7 +126,7 @@ export function VolatilityDeskDashboard() {
 
       <div className="grid min-h-0 grid-cols-1 gap-3 lg:flex-1 lg:grid-cols-[1.3fr_1fr]">
         <OiCompass stocks={data.oiBuildup} />
-        <VixStrip vix={data.vix} />
+        <VixStrip vix={data.vix} oiBuildup={data.oiBuildup} indices={data.indices} />
       </div>
 
       <MaxPainSkyline indices={data.indices} />
