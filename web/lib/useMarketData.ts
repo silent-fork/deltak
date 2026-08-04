@@ -207,10 +207,18 @@ function usePoll(
       }
       if (cancelled) return;
       if (landed && !isMarketOpen()) return;
-      timer = setTimeout(
-        cycle,
-        baseMs * (isMarketOpen() ? 1 : CLOSED_MULTIPLIER),
-      );
+      // The 10x-slower closed-market cadence is for "nothing to refresh,
+      // just don't be wasteful" — it assumes the last cycle actually landed.
+      // A *failed* cycle earns the normal open-market cadence even while
+      // closed, confirmed-flaky upstream or not: there is still no real
+      // data on screen, an operator is plausibly watching it not load, and
+      // Angel One's own endpoints have been observed timing out/502ing in
+      // exactly this closed-market window — waiting the full 10x interval
+      // before trying again turns one transient failure into a ~20-minute
+      // stall (see the closed-market poll-freeze fix this cadence itself
+      // was born alongside).
+      const delay = landed ? baseMs * (isMarketOpen() ? 1 : CLOSED_MULTIPLIER) : baseMs;
+      timer = setTimeout(cycle, delay);
     };
     void cycle();
 
