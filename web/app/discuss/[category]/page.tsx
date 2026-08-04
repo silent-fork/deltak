@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
 import { NewThreadForm } from "@/components/discuss/NewThreadForm";
 import { getForumCategory } from "@/lib/content/forumCategories";
+import { ACCENT_CLASSES } from "@/lib/content/forumCategoryStyle";
 import { excerptFromMarkdown } from "@/lib/discuss/markdown";
 import { getViewerIdentity } from "@/lib/server/firebaseAuth";
 import { listPosts, listThreads } from "@/lib/server/forum";
@@ -68,6 +69,7 @@ export default async function DiscussCategoryPage({
     }),
   );
   const excerpts = new Map(excerptEntries);
+  const accent = ACCENT_CLASSES[cat.accent];
 
   return (
     <DiscussChrome
@@ -110,11 +112,13 @@ export default async function DiscussCategoryPage({
                 <Link
                   key={t.id}
                   href={`/discuss/${category}/${t.id}`}
-                  className="dk-panel group rounded-lg p-5 transition-colors hover:border-quantum/30 hover:bg-white/[0.02]"
+                  className={`dk-panel group rounded-lg p-5 transition-colors hover:bg-white/[0.02] ${accent.hoverBorder}`}
                 >
                   <div className="flex items-center gap-1.5">
-                    {t.pinned ? <Pin className="h-3 w-3 shrink-0 text-quantum" /> : null}
-                    <span className="flex items-center gap-1 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-quantum">
+                    {t.pinned ? <Pin className={`h-3 w-3 shrink-0 ${accent.text}`} /> : null}
+                    <span
+                      className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider ${accent.border} ${accent.bg} ${accent.text}`}
+                    >
                       <FileText className="h-2.5 w-2.5" />
                       Article
                     </span>
@@ -122,7 +126,9 @@ export default async function DiscussCategoryPage({
                       {t.authorName} · {timeAgo(t.createdAt)}
                     </span>
                   </div>
-                  <h2 className="mt-2 text-balance text-lg font-semibold leading-snug text-zinc-50 group-hover:text-quantum">
+                  <h2
+                    className={`mt-2 text-balance text-lg font-semibold leading-snug text-zinc-50 ${accent.groupHoverText}`}
+                  >
                     {t.title}
                   </h2>
                   {excerpts.get(t.id) ? (
@@ -138,7 +144,7 @@ export default async function DiscussCategoryPage({
                 <Link
                   key={t.id}
                   href={`/discuss/${category}/${t.id}`}
-                  className="dk-panel flex items-center gap-3 rounded-lg px-4 py-3.5 transition-colors hover:border-quantum/30 hover:bg-white/[0.02]"
+                  className={`dk-panel flex items-center gap-3 rounded-lg px-4 py-3.5 transition-colors hover:bg-white/[0.02] ${accent.hoverBorder}`}
                 >
                   {t.postType === "feed" ? (
                     <Rss className="h-4 w-4 shrink-0 text-amber-400/70" />
@@ -147,7 +153,7 @@ export default async function DiscussCategoryPage({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      {t.pinned ? <Pin className="h-3 w-3 shrink-0 text-quantum" /> : null}
+                      {t.pinned ? <Pin className={`h-3 w-3 shrink-0 ${accent.text}`} /> : null}
                       {t.postType === "feed" ? (
                         <span className="shrink-0 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-amber-400">
                           News

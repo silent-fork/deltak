@@ -5,12 +5,16 @@
  * Firestore means the `/discuss` hub never needs a database round trip just
  * to know what topics exist.
  */
+/** One of the terminal's own semantic accents, reused here purely for visual variety between categories — no signal meaning the way they carry inside the engine. */
+export type ForumCategoryAccent = "quantum" | "aegis" | "amber" | "zenith";
+
 export interface ForumCategory {
   slug: string;
   name: string;
   description: string;
   /** One line for the hub card and the category page's own meta description. */
   tagline: string;
+  accent: ForumCategoryAccent;
 }
 
 export const FORUM_CATEGORIES: ForumCategory[] = [
@@ -20,6 +24,7 @@ export const FORUM_CATEGORIES: ForumCategory[] = [
     tagline: "Setups, adjustments and the trade-offs between them",
     description:
       "Options strategy discussion — construction, adjustments, and why one setup fits a read better than another.",
+    accent: "quantum",
   },
   {
     slug: "market-talk",
@@ -27,18 +32,21 @@ export const FORUM_CATEGORIES: ForumCategory[] = [
     tagline: "Sectors, indices and what today's tape is doing",
     description:
       "Live market and sector discussion — index moves, sector rotation, and what the tape is actually doing today.",
+    accent: "aegis",
   },
   {
     slug: "feedback",
     name: "Feedback",
     tagline: "Bugs, requests and what DeltaK should build next",
     description: "Site feedback and bug reports — what's broken, what's missing, what to build next.",
+    accent: "amber",
   },
   {
     slug: "general",
     name: "General",
     tagline: "Everything else worth a thread",
     description: "General discussion — anything about trading, the markets, or DeltaK that doesn't fit elsewhere.",
+    accent: "zenith",
   },
 ];
 

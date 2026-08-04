@@ -88,7 +88,7 @@ export async function DiscussChrome({
           page — compact, asymmetric, one non-text element earning its keep —
           pointed the other direction here: a thread mentions gamma or a
           collar, the mechanics behind it are a click away on Learn. */}
-      <section className="relative mx-auto max-w-5xl px-5 pb-12">
+      <section className="relative mx-auto max-w-2xl px-5 pb-12">
         <div className="dk-panel relative flex flex-col items-center gap-4 overflow-hidden rounded-xl px-5 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
           <div
             aria-hidden
