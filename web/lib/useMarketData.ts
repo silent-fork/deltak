@@ -244,10 +244,14 @@ export function useMarketData(input: MarketDataInput): MarketData {
    * snapshot) off until it resolves — reading the stored snapshot and
    * re-fetching from Angel One at the same time would race, and the whole
    * point is to skip the fetch when the store already has it. `"live"` means
-   * either the market is open (this mechanism never applies then) or it's
-   * closed and the store had nothing fresh, so the normal pipeline runs
-   * exactly as it always has. `"hydrated"` means the store answered and nothing
-   * below should fetch at all.
+   * either the market is open (this mechanism never applies then), the store
+   * had nothing fresh, or what it had wasn't from *today's* own close — a
+   * snapshot only ever gets written by a browser tab that was actually open
+   * at the bell (see `useEngine.ts`'s save-on-close effect), so a stale row
+   * just means no tab happened to be open then, not that nothing fresher
+   * exists; the normal pipeline still runs and supersedes it. `"hydrated"`
+   * means the store answered with *today's* own close and nothing below
+   * should fetch at all — there is genuinely nothing fresher to find.
    */
   const [ready, setReady] = useState<"checking" | "hydrated" | "live">("checking");
   /** Open, or closed with nothing left to wait on — every gated effect below reads this one flag. */
@@ -403,7 +407,13 @@ export function useMarketData(input: MarketDataInput): MarketData {
           timestamp: res.updatedAt,
           legs: res.payload.legs,
         });
-        setReady("hydrated");
+        // Paints immediately either way — the difference is only whether the
+        // pipeline below is trusted to stop there. A same-day row is; an
+        // older one (a weekend/holiday gap, or just no tab open at the last
+        // close) gets this as a fast first paint, then still lets candles,
+        // the seed pass and the NSE chain snapshot below run and bring the
+        // board current instead of freezing it on an old session.
+        setReady(res.sessionDate === istDate() ? "hydrated" : "live");
       } catch {
         // No stored snapshot to fall back on either — the live pipeline
         // below is exactly what would have run without this effect.
