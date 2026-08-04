@@ -9,7 +9,6 @@ import {
   Layers,
   LineChart,
   LockKeyhole,
-  Orbit,
   Radar,
   Repeat2,
   Rocket,
@@ -249,22 +248,34 @@ export default function HomePage() {
           {/*
             Not a third button in the Terminal/Learn pair — that would imply
             it's a third way into the same gated app, when it's the one
-            surface on this whole site nobody has to sign in for at all. A
-            standalone banner earns that distinction: the live-pulse dot
-            reads as "this is a running dashboard, not a page," and the
-            orbiting-dot mark previews the RRG scatter itself rather than
-            just naming it. Points at the /tools hub rather than any single
-            dashboard now that there are four of them — Sector Rotation was
-            the first, not the whole story anymore.
+            surface on this whole site nobody has to sign in for at all,
+            reads without an account, and isn't DeltaK talking at you. A
+            standalone banner earns that distinction, reskinned around
+            people rather than a dashboard: three overlapping initials
+            stand in for real threads across three of Discuss's own
+            categories (matching their own accent colors — see
+            lib/content/forumCategoryStyle.tsx) instead of one icon naming
+            a feature, and the ping sits on the frontmost avatar rather
+            than centered, so it reads as "someone's here" and not just
+            "this pill is decorative."
           */}
           <CtaLink
-            href="/tools"
-            location="hero-tools"
-            className="group mt-2 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10"
+            href="/discuss"
+            location="hero-discuss"
+            className="group mt-2 inline-flex items-center gap-3 rounded-full border border-quantum/30 bg-quantum/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-quantum/50 hover:bg-quantum/10"
           >
-            <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-              <span className="absolute h-6 w-6 animate-ping rounded-full bg-emerald-400/20" />
-              <Orbit className="relative h-4 w-4 text-emerald-400" />
+            <span className="flex shrink-0 items-center -space-x-2">
+              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-zenith/20 text-[9px] font-bold text-zenith">
+                G
+              </span>
+              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-aegis/20 text-[9px] font-bold text-aegis">
+                M
+              </span>
+              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-quantum/20 text-[9px] font-bold text-quantum">
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-ping rounded-full bg-quantum/70" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-quantum" />
+                S
+              </span>
             </span>
             {/*
               Two copy lengths, not one wrapped one — a phone-width pill
@@ -273,14 +284,14 @@ export default function HomePage() {
               keeps it one line everywhere instead.
             */}
             <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
-              <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — a free NSE F&amp;O toolkit
+              <span className="font-semibold uppercase tracking-wider text-quantum">Quantum Horizon</span>{" "}
+              — real traders, real threads
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
-              <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — a free NSE F&amp;O toolkit: sector RRG, scanner, volatility desk &amp; more
+              <span className="font-semibold uppercase tracking-wider text-quantum">Quantum Horizon</span>{" "}
+              — strategy, market talk &amp; more, from real traders, not DeltaK
             </span>
-            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-400 transition-transform group-hover:translate-x-0.5" />
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-quantum transition-transform group-hover:translate-x-0.5" />
           </CtaLink>
         </div>
 
