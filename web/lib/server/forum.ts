@@ -26,6 +26,12 @@ const TITLE_MIN = 5;
 const TITLE_MAX = 140;
 const BODY_MIN = 2;
 const BODY_MAX = 8_000;
+/**
+ * A "long article" thread's opening post — a write-up, not a chat message.
+ * ~20,000 characters is roughly 3,500 words, generous for a deep-dive piece
+ * while still bounded (Firestore documents cap at 1 MiB regardless).
+ */
+const ARTICLE_BODY_MAX = 20_000;
 const DISPLAY_NAME_MIN = 2;
 const DISPLAY_NAME_MAX = 40;
 
@@ -85,6 +91,8 @@ export async function createForumProfile(
 
 /* -------------------------------------------------------------- threads */
 
+export type ForumPostType = "discussion" | "article";
+
 export interface ForumThread {
   id: string;
   category: string;
@@ -96,6 +104,8 @@ export interface ForumThread {
   lastActivityAt: string;
   pinned: boolean;
   locked: boolean;
+  /** "article" threads render their opening post as a long-form piece, not a chat bubble. */
+  postType: ForumPostType;
 }
 
 function threadFromDoc(doc: FirestoreDoc): ForumThread {
@@ -112,6 +122,7 @@ function threadFromDoc(doc: FirestoreDoc): ForumThread {
     lastActivityAt: iso(f.lastActivityAt ?? f.createdAt),
     pinned: Boolean(f.pinned ?? false),
     locked: Boolean(f.locked ?? false),
+    postType: f.postType === "article" ? "article" : "discussion",
   };
 }
 
@@ -137,9 +148,13 @@ export async function createThread(
   body: string,
   author: { uid: string; name: string },
   idToken: string,
+  postType: ForumPostType = "discussion",
 ): Promise<{ thread: ForumThread; post: ForumPost }> {
   const cleanTitle = assertLen(title, TITLE_MIN, TITLE_MAX, "Title");
-  const cleanBody = assertLen(body, BODY_MIN, BODY_MAX, "Post");
+  const cleanBody =
+    postType === "article"
+      ? assertLen(body, BODY_MIN, ARTICLE_BODY_MAX, "Article")
+      : assertLen(body, BODY_MIN, BODY_MAX, "Post");
   const now = new Date();
 
   const threadDoc = await createDocument(
@@ -154,6 +169,7 @@ export async function createThread(
       lastActivityAt: now,
       pinned: false,
       locked: false,
+      postType,
     },
     idToken,
   );

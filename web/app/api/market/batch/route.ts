@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   }
 
   const from = `${date} 09:15`;
-  const to = `${date} 15:30`;
+  const to = `${date} 15:40`;
   let rateLimited = false;
 
   const contracts = await pooled(tokens, async (token) => {

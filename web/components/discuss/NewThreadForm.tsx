@@ -3,14 +3,21 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { RichTextEditor } from "@/components/discuss/RichTextEditor";
+
+type PostType = "discussion" | "article";
+
 /** Inline, not a modal — a category page with zero threads yet has nothing else competing for the space. */
 export function NewThreadForm({ category }: { category: string }) {
   const [open, setOpen] = useState(false);
+  const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const isArticle = postType === "article";
+  const bodyMax = isArticle ? 20_000 : 8_000;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,7 +27,7 @@ export function NewThreadForm({ category }: { category: string }) {
       const res = await fetch("/api/discuss/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, title, body }),
+        body: JSON.stringify({ category, title, body, postType }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.detail ?? "Couldn't start the thread.");
@@ -45,23 +52,51 @@ export function NewThreadForm({ category }: { category: string }) {
 
   return (
     <form onSubmit={submit} className="dk-panel flex flex-col gap-2.5 rounded-lg p-4">
+      <div className="flex items-center gap-1 self-start rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5 font-mono text-[10px] uppercase tracking-wider">
+        <button
+          type="button"
+          onClick={() => setPostType("discussion")}
+          className={`rounded px-2.5 py-1 transition-colors ${
+            !isArticle ? "bg-quantum/15 text-quantum" : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          Discussion
+        </button>
+        <button
+          type="button"
+          onClick={() => setPostType("article")}
+          className={`rounded px-2.5 py-1 transition-colors ${
+            isArticle ? "bg-quantum/15 text-quantum" : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          Long article
+        </button>
+      </div>
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Thread title"
+        placeholder={isArticle ? "Article headline" : "Thread title"}
         maxLength={140}
         required
         className="h-9 rounded-md border border-zinc-800 bg-zinc-950/60 px-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
       />
-      <textarea
+      <RichTextEditor
         value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="What do you want to discuss?"
-        maxLength={8000}
-        required
-        rows={4}
-        className="resize-none rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+        onChange={setBody}
+        placeholder={
+          isArticle
+            ? "Write the full piece — analysis, a deep dive, a guide. Blank lines start new paragraphs."
+            : "What do you want to discuss?"
+        }
+        maxLength={bodyMax}
+        rows={isArticle ? 16 : 4}
       />
+      {isArticle ? (
+        <p className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">
+          {body.trim().length ? body.trim().split(/\s+/).length : 0} words · up to{" "}
+          {bodyMax.toLocaleString("en-IN")} characters
+        </p>
+      ) : null}
       {error ? <p className="text-[11px] leading-relaxed text-rose-400">{error}</p> : null}
       <div className="flex items-center gap-2">
         <button
@@ -69,7 +104,7 @@ export function NewThreadForm({ category }: { category: string }) {
           disabled={busy}
           className="flex h-9 items-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 disabled:opacity-50"
         >
-          {busy ? "Posting…" : "Post thread"}
+          {busy ? "Posting…" : isArticle ? "Publish article" : "Post thread"}
         </button>
         <button
           type="button"

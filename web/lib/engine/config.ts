@@ -302,7 +302,14 @@ export function istParts(at: Date = new Date()) {
 }
 
 export const MARKET_OPEN_MIN = 9 * 60 + 15;
-export const MARKET_CLOSE_MIN = 15 * 60 + 30;
+/**
+ * 3:40 PM IST — NSE's F&O close, extended 10 minutes from 3:30 PM effective
+ * 3 Aug 2026 to align with the cash market's new Closing Auction Session
+ * (continuous trading to 3:15 PM, CAS 3:15–3:35 PM, F&O itself continues to
+ * 3:40 PM). Non-F&O cash equities are unaffected and still close at 3:30 PM,
+ * but this app only ever trades F&O.
+ */
+export const MARKET_CLOSE_MIN = 15 * 60 + 40;
 export const DAYLIGHT_REST_MIN = 15 * 60 + 15;
 
 export function istMinutes(at: Date = new Date()): number {

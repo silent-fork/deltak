@@ -582,7 +582,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
             fromdate: `${date} ${MARKET_OPEN_STAMP}`,
             // A closed session is finished, so its curve is asked for whole and
             // then cached; a live one is asked for up to the minute.
-            todate: date === istDate() ? window.todate : `${date} 15:30`,
+            todate: date === istDate() ? window.todate : `${date} 15:40`,
           }),
         ),
       );

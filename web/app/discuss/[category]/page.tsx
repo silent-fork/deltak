@@ -1,4 +1,4 @@
-import { AlertTriangle, MessageCircle, Pin } from "lucide-react";
+import { AlertTriangle, FileText, MessageCircle, Pin } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -97,10 +97,19 @@ export default async function DiscussCategoryPage({
                 href={`/discuss/${category}/${t.id}`}
                 className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
               >
-                <MessageCircle className="h-4 w-4 shrink-0 text-zinc-600" />
+                {t.postType === "article" ? (
+                  <FileText className="h-4 w-4 shrink-0 text-quantum/70" />
+                ) : (
+                  <MessageCircle className="h-4 w-4 shrink-0 text-zinc-600" />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {t.pinned ? <Pin className="h-3 w-3 shrink-0 text-quantum" /> : null}
+                    {t.postType === "article" ? (
+                      <span className="shrink-0 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-quantum">
+                        Article
+                      </span>
+                    ) : null}
                     <span className="truncate text-[13.5px] font-medium text-zinc-100">
                       {t.title}
                     </span>

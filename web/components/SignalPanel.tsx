@@ -220,7 +220,7 @@ export function SignalPanel({
   const daysToExpiry = useMemo(() => {
     if (!chain?.expiry) return null;
     const days = Math.round(
-      (Date.parse(`${chain.expiry}T15:30:00+05:30`) - Date.now()) / 86_400_000,
+      (Date.parse(`${chain.expiry}T15:40:00+05:30`) - Date.now()) / 86_400_000,
     );
     return Number.isFinite(days) ? Math.max(0, days) : null;
   }, [chain?.expiry]);

@@ -39,10 +39,12 @@ export async function POST(request: Request) {
     category?: unknown;
     title?: unknown;
     body?: unknown;
+    postType?: unknown;
   } | null;
   const category = String(raw?.category ?? "");
   const title = String(raw?.title ?? "");
   const body = String(raw?.body ?? "");
+  const postType = raw?.postType === "article" ? "article" : "discussion";
 
   if (!getForumCategory(category)) {
     return NextResponse.json({ detail: "Unknown category." }, { status: 400 });
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
       body,
       { uid: session.uid, name: profile?.displayName ?? "Member" },
       session.idToken,
+      postType,
     );
     return applyRefreshedCookie(NextResponse.json({ thread, post }, { status: 201 }), session);
   } catch (err) {

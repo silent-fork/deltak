@@ -186,7 +186,7 @@ export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
   }
 }
 
-/** 3:15 PM IST — flatten everything ahead of the 3:30 PM close. */
+/** 3:15 PM IST — flatten everything ahead of the 3:40 PM close. */
 export async function checkDaylightRest(d: GuardDeps): Promise<void> {
   if (d.daylightRestDone) return;
   if (secondsToDaylightRest() > 0) return;

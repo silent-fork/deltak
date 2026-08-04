@@ -2,10 +2,12 @@ import { AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { ArticleBody } from "@/components/discuss/ArticleBody";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
 import { ReplyForm } from "@/components/discuss/ReplyForm";
 import { ReportButton } from "@/components/discuss/ReportButton";
 import { getForumCategory } from "@/lib/content/forumCategories";
+import { renderForumMarkdown } from "@/lib/discuss/markdown";
 import { getViewerIdentity } from "@/lib/server/firebaseAuth";
 import { getThread, listPosts } from "@/lib/server/forum";
 import { timeAgo } from "@/lib/utils";
@@ -74,6 +76,12 @@ export default async function DiscussThreadPage({
   }
   if (!thread || thread.category !== category) notFound();
 
+  const isArticle = thread.postType === "article";
+  const articlePost = isArticle ? posts[0] : null;
+  const comments = isArticle ? posts.slice(1) : posts;
+  const wordCount = articlePost ? articlePost.body.trim().split(/\s+/).filter(Boolean).length : 0;
+  const readMins = Math.max(1, Math.round(wordCount / 200));
+
   return (
     <DiscussChrome
       crumbs={[
@@ -84,17 +92,46 @@ export default async function DiscussThreadPage({
       viewEvent="discuss_thread_view"
     >
       <section className="relative mx-auto max-w-3xl px-5 pb-4 pt-2">
-        <h1 className="text-balance text-2xl font-bold tracking-tight text-zinc-50">
+        {isArticle ? (
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-quantum">
+            Article · {readMins} min read
+          </p>
+        ) : null}
+        <h1
+          className={
+            isArticle
+              ? "text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-4xl"
+              : "text-balance text-2xl font-bold tracking-tight text-zinc-50"
+          }
+        >
           {thread.title}
         </h1>
         <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-wider text-zinc-600">
-          Started by {thread.authorName} · {timeAgo(thread.createdAt)}
+          {isArticle ? "By" : "Started by"} {thread.authorName} · {timeAgo(thread.createdAt)}
         </p>
       </section>
 
+      {articlePost ? (
+        <section className="relative mx-auto max-w-3xl border-l-2 border-quantum/30 px-5 pb-8 pl-6">
+          <div className="text-[15px] leading-[1.85] text-zinc-300">
+            <ArticleBody body={articlePost.deletedAt ? "[removed by moderator]" : articlePost.body} />
+          </div>
+          {!articlePost.deletedAt ? (
+            <div className="mt-4 flex justify-end">
+              <ReportButton threadId={thread.id} postId={articlePost.id} canReport={Boolean(viewer)} />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="relative mx-auto max-w-3xl px-5 pb-6">
+        {isArticle && comments.length ? (
+          <p className="mb-3 font-mono text-[10.5px] uppercase tracking-wider text-zinc-600">
+            {comments.length} {comments.length === 1 ? "comment" : "comments"}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-3">
-          {posts.map((p) => (
+          {comments.map((p) => (
             <article key={p.id} className="dk-panel rounded-lg p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[12.5px] font-semibold text-zinc-200">{p.authorName}</span>
@@ -103,9 +140,9 @@ export default async function DiscussThreadPage({
                   {p.editedAt ? " · edited" : ""}
                 </span>
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-zinc-300">
-                {p.deletedAt ? "[removed by moderator]" : p.body}
-              </p>
+              <div className="mt-2 text-[13.5px] leading-relaxed text-zinc-300">
+                {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
+              </div>
               {!p.deletedAt ? (
                 <div className="mt-2 flex justify-end">
                   <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
