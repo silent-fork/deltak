@@ -27,6 +27,8 @@ export class FirestoreError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    /** Google's own status string (e.g. "PERMISSION_DENIED", "UNAUTHENTICATED") — distinguishes a real rule denial from an unrecognized/invalid token, which the HTTP status and message alone don't. */
+    public readonly googleStatus?: string,
   ) {
     super(message);
     this.name = "FirestoreError";
@@ -107,7 +109,11 @@ async function request(
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new FirestoreError(body?.error?.message ?? `Firestore request failed (${res.status})`, res.status);
+    throw new FirestoreError(
+      body?.error?.message ?? `Firestore request failed (${res.status})`,
+      res.status,
+      body?.error?.status,
+    );
   }
   return body;
 }
