@@ -69,24 +69,27 @@ export function CorporateCalendarDashboard() {
             <PanelBootOverlay label="event calendar" />
           </CardContent>
         </Card>
-        <Card className="min-h-0 shrink-0">
-          <CardHeader>
-            <CardTitle>Block Deals</CardTitle>
-          </CardHeader>
-          {/* One row of chips is genuinely this short — matching it (rather than
-              the old 80px) avoids a visible shrink on load. */}
-          <CardContent className="relative min-h-[48px]">
-            <PanelBootOverlay label="block deals" compact />
-          </CardContent>
-        </Card>
-        <Card className="min-h-0 shrink-0">
-          <CardHeader>
-            <CardTitle>Recent IPOs</CardTitle>
-          </CardHeader>
-          <CardContent className="relative min-h-[180px]">
-            <PanelBootOverlay label="recent IPOs" />
-          </CardContent>
-        </Card>
+        {/* Block Deals is a narrow column beside Recent IPOs on desktop, not a
+            third full-width band — the grid stretches both cards to the same
+            row height, so the skeleton matches that shape too. */}
+        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
+          <Card className="min-h-0 shrink-0">
+            <CardHeader>
+              <CardTitle>Block Deals</CardTitle>
+            </CardHeader>
+            <CardContent className="relative min-h-[80px]">
+              <PanelBootOverlay label="block deals" compact />
+            </CardContent>
+          </Card>
+          <Card className="min-h-0 shrink-0">
+            <CardHeader>
+              <CardTitle>Recent IPOs</CardTitle>
+            </CardHeader>
+            <CardContent className="relative min-h-[180px]">
+              <PanelBootOverlay label="recent IPOs" />
+            </CardContent>
+          </Card>
+        </div>
 
         <ToolFooterMark sourceNote={SOURCE_NOTE} />
       </div>
@@ -128,8 +131,10 @@ export function CorporateCalendarDashboard() {
       </div>
 
       <EventTimeline events={data.events} />
-      <BlockDealsTicker deals={data.blockDeals} />
-      <IpoCards ipos={data.recentIpos} />
+      <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
+        <BlockDealsTicker deals={data.blockDeals} />
+        <IpoCards ipos={data.recentIpos} />
+      </div>
 
       <ToolFooterMark sourceNote={SOURCE_NOTE} />
     </div>
