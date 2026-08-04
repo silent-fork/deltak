@@ -8,7 +8,7 @@ import {
   rateLimitedSignIn,
   type ForumSession,
 } from "@/lib/server/firebaseAuth";
-import { getForumProfile } from "@/lib/server/forum";
+import { getOrRepairForumProfile } from "@/lib/server/forum";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,11 +49,14 @@ export async function POST(request: Request) {
   }
 
   // The credentials above already checked out — a Firestore hiccup reading
-  // the display name is not a reason to tell the caller sign-in failed.
-  const profile = await getForumProfile(auth.localId).catch((err) => {
-    console.error("[discuss] forumProfiles read failed after a successful signIn", err);
-    return null;
-  });
+  // (or repairing) the display name is not a reason to tell the caller
+  // sign-in failed.
+  const profile = await getOrRepairForumProfile(auth.localId, auth.email, auth.idToken).catch(
+    (err) => {
+      console.error("[discuss] forumProfiles read failed after a successful signIn", err);
+      return null;
+    },
+  );
 
   const session: ForumSession = {
     uid: auth.localId,

@@ -146,6 +146,16 @@ export async function createDocument(
   return fromDocument(body as Parameters<typeof fromDocument>[0]);
 }
 
+/** DELETE a document outright — used for the likes subcollection's toggle-off, not for anything user content ever hard-deletes (see forum.ts's own header comment on that). Idempotent: a 404 is not an error here. */
+export async function deleteDocument(path: string, idToken?: string): Promise<void> {
+  try {
+    await request(`/${path}`, { method: "DELETE", idToken });
+  } catch (err) {
+    if (err instanceof FirestoreError && err.status === 404) return;
+    throw err;
+  }
+}
+
 /** PATCH an existing document — only the named fields change; anything else on the document is left alone. */
 export async function patchDocument(
   path: string,

@@ -195,6 +195,7 @@ export async function freshIdToken(
 
 export interface ActiveForumSession {
   uid: string;
+  email: string;
   idToken: string;
   /** Re-encoded cookie value to set on the response — only present when the ID token needed refreshing. */
   refreshedCookie: string | null;
@@ -214,6 +215,7 @@ export async function getActiveForumSession(): Promise<ActiveForumSession | null
     const { idToken, refreshed } = await freshIdToken(session);
     return {
       uid: session.uid,
+      email: session.email,
       idToken,
       refreshedCookie: refreshed ? encodeForumSession(refreshed) : null,
     };

@@ -8,10 +8,10 @@ import { renderForumMarkdown } from "@/lib/discuss/markdown";
 /**
  * A long-article body renders in full in the HTML regardless of viewport —
  * the complete piece is always in the DOM, so a crawler or a reader with JS
- * off sees it all. On a narrow screen only, this visually clamps the initial
- * view to a preview height with a fade and a "Read more" toggle; at the `sm`
- * breakpoint and up there is no clamp at all, since a desktop reading column
- * has no need to hide the piece behind an extra tap.
+ * off sees it all. Every viewport clamps the initial view to a preview
+ * height with a fade and a "Read more" toggle — taller on wider screens,
+ * where a reading column comfortably shows more before it's worth asking
+ * for the tap.
  */
 export function ArticleBody({ body }: { body: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -22,14 +22,14 @@ export function ArticleBody({ body }: { body: string }) {
         className={
           expanded
             ? undefined
-            : "relative max-h-[420px] overflow-hidden sm:max-h-none sm:overflow-visible"
+            : "relative max-h-[420px] overflow-hidden sm:max-h-[640px]"
         }
       >
         {renderForumMarkdown(body)}
         {!expanded ? (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-zinc-950 to-transparent sm:hidden"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-zinc-950 to-transparent"
           />
         ) : null}
       </div>
@@ -37,7 +37,7 @@ export function ArticleBody({ body }: { body: string }) {
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="mt-3 flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-quantum sm:hidden"
+          className="mt-3 flex items-center gap-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-quantum hover:text-quantum/80"
         >
           Read more
           <ChevronDown className="h-3.5 w-3.5" />

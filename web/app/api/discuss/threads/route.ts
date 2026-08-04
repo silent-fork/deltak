@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getForumCategory } from "@/lib/content/forumCategories";
 import { applyRefreshedCookie, getActiveForumSession } from "@/lib/server/firebaseAuth";
-import { createThread, ForumValidationError, getForumProfile, listThreads } from "@/lib/server/forum";
+import { createThread, ForumValidationError, getOrRepairForumProfile, listThreads } from "@/lib/server/forum";
 import { FirestoreError } from "@/lib/server/firestore";
 import { RateLimiter } from "@/lib/server/rateLimiter";
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   await createLimiter.acquire();
 
   try {
-    const profile = await getForumProfile(session.uid);
+    const profile = await getOrRepairForumProfile(session.uid, session.email, session.idToken);
     const { thread, post } = await createThread(
       category,
       title,

@@ -60,8 +60,26 @@ service cloud.firestore {
       match /posts/{postId} {
         allow read: if true;
         allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-        allow update: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isModerator());
+        // Same two-caller split as the thread doc above: the post's own
+        // author (or a moderator) editing/removing it, and *any* signed-in
+        // member liking it, which only ever touches likeCount.
+        allow update: if isSignedIn() && (
+          resource.data.authorUid == request.auth.uid ||
+          isModerator() ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+        );
         allow delete: if false;
+
+        // One doc per liker, keyed on their own uid — its mere existence
+        // is the like; there is nothing in it worth reading, but public
+        // read keeps a like count's provenance auditable the same way
+        // everything else here is.
+        match /likes/{uid} {
+          allow read: if true;
+          allow create: if isOwner(uid);
+          allow delete: if isOwner(uid);
+          allow update: if false;
+        }
       }
     }
 

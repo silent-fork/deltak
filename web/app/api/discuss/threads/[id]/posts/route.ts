@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { applyRefreshedCookie, getActiveForumSession } from "@/lib/server/firebaseAuth";
-import { createPost, ForumValidationError, getForumProfile, listPosts } from "@/lib/server/forum";
+import { createPost, ForumValidationError, getOrRepairForumProfile, listPosts } from "@/lib/server/forum";
 import { FirestoreError } from "@/lib/server/firestore";
 import { RateLimiter } from "@/lib/server/rateLimiter";
 
@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await replyLimiter.acquire();
 
   try {
-    const profile = await getForumProfile(session.uid);
+    const profile = await getOrRepairForumProfile(session.uid, session.email, session.idToken);
     const post = await createPost(
       id,
       body,
