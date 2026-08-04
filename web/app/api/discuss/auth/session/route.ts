@@ -29,7 +29,9 @@ export async function GET() {
   try {
     const { refreshed } = await freshIdToken(session);
     const active = refreshed ?? session;
-    const profile = await getForumProfile(active.uid);
+    // A Firestore hiccup reading the profile is not proof the session itself
+    // is dead — only `freshIdToken` throwing (below) means that.
+    const profile = await getForumProfile(active.uid).catch(() => null);
 
     const res = NextResponse.json({
       authenticated: true,
