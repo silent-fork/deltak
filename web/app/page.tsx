@@ -451,32 +451,48 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="relative mx-auto max-w-3xl px-5 py-14 text-center">
-        <div className="dk-panel rounded-xl px-6 py-10">
-          <h2 className="text-xl font-bold text-zinc-50 sm:text-2xl">
-            Sign in and watch the walls move
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-zinc-500">
-            Paper mode runs the whole engine — COA, RRG, Autopilot, risk
-            guards — against simulated fills, no live order ever placed,
-            for as long as you want to watch it work.
-          </p>
-          <div className="mt-6 flex flex-row items-stretch justify-center gap-3">
+      {/*
+        Final CTA — was a full-width, centered, ~230px box, the same
+        oversized-relative-to-its-content shape the /learn section's closing
+        panel had before that redesign. Same fix here: compact and
+        asymmetric, a bordered glyph earning its keep as the one non-text
+        element, copy left-aligned, both buttons on the same row on desktop.
+      */}
+      <section className="relative mx-auto max-w-4xl px-5 pb-14">
+        <div className="dk-panel relative flex flex-col items-center gap-4 overflow-hidden rounded-xl px-5 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-quantum/[0.09] blur-[70px]"
+          />
+          <div className="relative flex flex-col items-center gap-3.5 sm:flex-row">
+            <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-quantum/30 bg-quantum/10 sm:flex">
+              <Zap className="h-5 w-5 text-quantum" />
+            </span>
+            <div>
+              <h2 className="text-[14px] font-bold text-zinc-50">
+                Sign in and watch the walls move
+              </h2>
+              <p className="mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
+                Paper mode runs the whole engine — COA, RRG, Autopilot, risk guards — against
+                simulated fills, no live order ever placed.
+              </p>
+            </div>
+          </div>
+          <div className="relative flex shrink-0 items-stretch gap-2">
             <CtaLink
               href="/terminal"
               location="closing"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[13px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25 sm:flex-none sm:px-6"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
             >
               Terminal
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </CtaLink>
             <CtaLink
               href="/tools"
               location="closing-tools"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-4 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:flex-none sm:px-6"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/60 px-4 text-[11px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
             >
-              Tools
+              Toolkit
             </CtaLink>
           </div>
         </div>
