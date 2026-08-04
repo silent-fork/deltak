@@ -20,6 +20,25 @@ const SITE_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
+/**
+ * A stable, deterministic pick from the terminal's own three semantic
+ * accents (quantum/aegis/zenith — the same trio the option chain already
+ * uses for wall/rotation color-coding) — not per-role or per-status,
+ * purely so the avatar rail reads as more than one undifferentiated teal
+ * dot per commenter.
+ */
+const AVATAR_ACCENTS = [
+  { border: "border-quantum/30", bg: "bg-quantum/10", text: "text-quantum" },
+  { border: "border-aegis/30", bg: "bg-aegis/10", text: "text-aegis" },
+  { border: "border-zenith/30", bg: "bg-zenith/10", text: "text-zenith" },
+] as const;
+
+function avatarAccent(name: string) {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_ACCENTS[sum % AVATAR_ACCENTS.length];
+}
+
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
@@ -147,32 +166,50 @@ export default async function DiscussThreadPage({
             {comments.length} {comments.length === 1 ? (isArticle ? "comment" : "reply") : isArticle ? "comments" : "replies"}
           </p>
         ) : null}
-        <div className="flex flex-col gap-3">
-          {comments.map((p) => (
-            <article key={p.id} className="dk-panel rounded-lg p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] font-semibold text-zinc-200">{p.authorName}</span>
-                <span className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">
-                  {timeAgo(p.createdAt)}
-                  {p.editedAt ? " · edited" : ""}
-                </span>
-              </div>
-              <div className="mt-2 text-[13.5px] leading-relaxed text-zinc-300">
-                {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
-              </div>
-              {!p.deletedAt ? (
-                <div className="mt-2 flex items-center justify-between">
-                  <LikeButton
-                    threadId={thread.id}
-                    postId={p.id}
-                    initialCount={p.likeCount}
-                    canLike={Boolean(viewer)}
-                  />
-                  <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
-                </div>
-              ) : null}
-            </article>
-          ))}
+        <div className="relative">
+          {comments.length > 1 ? (
+            <div
+              aria-hidden
+              className="absolute bottom-[34px] left-[17px] top-[34px] w-px bg-gradient-to-b from-quantum/30 via-zinc-700/50 to-transparent"
+            />
+          ) : null}
+          <div className="flex flex-col">
+            {comments.map((p) => {
+              const accent = avatarAccent(p.authorName);
+              return (
+                <article key={p.id} className="relative flex gap-3.5 py-3.5">
+                  <span
+                    className={`relative z-10 flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border font-mono text-[12px] font-semibold ${accent.border} ${accent.bg} ${accent.text}`}
+                  >
+                    {p.authorName.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-zinc-200">{p.authorName}</span>
+                      <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">
+                        {timeAgo(p.createdAt)}
+                        {p.editedAt ? " · edited" : ""}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[13.5px] leading-relaxed text-zinc-300">
+                      {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
+                    </div>
+                    {!p.deletedAt ? (
+                      <div className="mt-2 flex items-center justify-between">
+                        <LikeButton
+                          threadId={thread.id}
+                          postId={p.id}
+                          initialCount={p.likeCount}
+                          canLike={Boolean(viewer)}
+                        />
+                        <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 
