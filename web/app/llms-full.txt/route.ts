@@ -69,7 +69,7 @@ An OI-buildup compass: every F&O stock's near-month future, plotted by price-cha
 
 A 7-day forward-looking event strip: results, corporate actions (dividends, splits, bonuses), and IPO open/close dates — F&O-eligible names flagged throughout. Below it, today's block deals and a recent-IPO listing scoreboard (issue price band and listing date).
 
-## Learn — the options trading wiki
+## Learn — the Quantum Horizon Wiki
 
 [/learn](${SITE_URL}/learn): static reference content, no live data.
 

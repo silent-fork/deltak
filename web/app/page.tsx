@@ -284,7 +284,7 @@ export default function HomePage() {
               keeps it one line everywhere instead.
             */}
             <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
-              <span className="font-semibold uppercase tracking-wider text-quantum">Quantum Horizon</span>{" "}
+              <span className="font-semibold uppercase tracking-wider text-quantum">QntmHrzn</span>{" "}
               — real traders, real threads
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
@@ -429,7 +429,7 @@ export default function HomePage() {
               Free · No login · Reference
             </span>
             <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
-              The DeltaK options trading wiki
+              The Quantum Horizon Wiki
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
               Strategy payoff diagrams, an options and Indian F&amp;O glossary,

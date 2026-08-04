@@ -37,7 +37,7 @@ Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (l
   - [Market Scanner](${SITE_URL}/tools/market-scanner): A sector heatmap sized by turnover and coloured by the day's move, plus a range radar for F&O stocks nearest their ~20-session high or low.
   - [Volatility Desk](${SITE_URL}/tools/volatility-desk): An OI-buildup compass across every F&O stock's near-month future (Long/Short Buildup, Long Unwinding, Short Covering), max pain and PCR for NIFTY/BANKNIFTY/FINNIFTY, and an India VIX regime tracker.
   - [Corporate Calendar](${SITE_URL}/tools/corporate-calendar): Results, corporate actions and IPO milestones for the week ahead — F&O names flagged — plus today's block deals and recent IPO listings.
-- [Learn](${SITE_URL}/learn): DeltaK's options trading wiki — static, no live data.
+- [Learn](${SITE_URL}/learn): The Quantum Horizon Wiki, DeltaK's options trading reference — static, no live data.
   - [Strategies](${SITE_URL}/learn/strategies): Twelve options strategies, each with a payoff diagram, construction, ideal scenario and common mistakes.
   - [Glossary](${SITE_URL}/learn/glossary): Options and Indian F&O terminology, including DeltaK's own Aegis, Zenith, Quantum Horizon, COA Matrix and DKMS protocol terms.
   - [Trading styles](${SITE_URL}/learn/trading-styles): Intraday, swing and positional options trading compared, plus options buying vs. selling.

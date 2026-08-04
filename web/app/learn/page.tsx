@@ -9,10 +9,10 @@ import { STRATEGIES } from "@/lib/content/strategies";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
 export const metadata: Metadata = {
-  title: "Learn — Options Strategies, Glossary & F&O Reference",
+  title: "Quantum Horizon Wiki — Options Strategies, Glossary & F&O Reference",
   description:
-    "DeltaK's free options trading wiki — strategy payoff diagrams, a full F&O " +
-    "glossary, trading styles and Indian index reference.",
+    "The Quantum Horizon Wiki — DeltaK's free options trading reference: strategy payoff diagrams, " +
+    "a full F&O glossary, trading styles and Indian index reference.",
   keywords: [
     "options trading wiki india",
     "learn options trading nifty banknifty",
@@ -112,7 +112,7 @@ export default function LearnHubPage() {
           Free · No login · Reference
         </span>
         <h1 className="mt-4 text-balance text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl">
-          The DeltaK options trading wiki
+          The Quantum Horizon Wiki
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-balance text-[14px] leading-relaxed text-zinc-400">
           Strategy setups, a full glossary, trading styles and Indian F&amp;O index reference — including
