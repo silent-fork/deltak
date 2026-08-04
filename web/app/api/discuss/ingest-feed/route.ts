@@ -21,12 +21,16 @@ export const dynamic = "force-dynamic";
 /**
  * `GET /api/discuss/ingest-feed` — pulls every configured source in
  * `lib/server/rssFeed.ts`, creates a "feed" thread in Discuss → News for
- * anything not already ingested, and skips the rest. Not on a schedule
- * yet — there is no `vercel.json` `crons` entry for it (Vercel Hobby only
- * allows once-a-day schedules, so that's a deliberate follow-up decision,
- * not an oversight). For now this is triggered manually: `curl` it with
- * `Authorization: Bearer $CRON_SECRET`, the same header Vercel Cron itself
- * would send once a schedule is added later.
+ * anything not already ingested, and skips the rest.
+ *
+ * Invoked every 30 minutes by **Supabase's `pg_cron` + `pg_net`**, not
+ * Vercel Cron — same reasoning as `/api/watchdog/tick` (see the README's
+ * Watchdog section): Vercel's Hobby plan only allows once-a-day schedules,
+ * while `pg_cron`/`pg_net` have no such floor on any Supabase plan. See
+ * `supabase/migrations/0013` for the schedule itself, which calls this
+ * route via `net.http_get`, sending `Authorization: Bearer $CRON_SECRET`
+ * read from Supabase Vault (`discuss_ingest_feed_cron_secret`) at execution
+ * time. Can still be triggered by hand with the same header for testing.
  *
  * Posts as a dedicated bot account (`DISCUSS_FEED_BOT_EMAIL`/
  * `DISCUSS_FEED_BOT_PASSWORD`) rather than this app's own privileged
