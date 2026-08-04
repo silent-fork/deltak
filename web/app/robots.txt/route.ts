@@ -7,10 +7,12 @@ const SITE_URL =
 /**
  * A route handler rather than the `app/robots.ts` special file it replaces:
  * Next.js's typed `MetadataRoute.Robots` return shape only knows
- * `rules`/`sitemap`/`host` — there's no field for `Content-Signal`, the
- * newer (Cloudflare-championed) directive that states usage intent for the
- * content a crawler fetches, separately from whether it may fetch it at
- * all. Plain text here gets the exact line the typed generator can't emit.
+ * `rules`/`sitemap`/`host`, and its actual serializer (checked in
+ * `resolve-route-data.js`, not just the `.d.ts`) only ever emits
+ * User-Agent/Allow/Disallow/Crawl-delay/Host/Sitemap lines from that —
+ * there is no field that reaches a `Content-Signal:` line. Plain text here
+ * gets the exact line the typed generator can't emit, same pattern already
+ * used for llms.txt/llms-full.txt.
  *
  * Pure plumbing, not content, for any crawler: the Angel One app
  * registration's redirect URL and the API routes the terminal calls under
