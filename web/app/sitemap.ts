@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { FORUM_CATEGORIES } from "@/lib/content/forumCategories";
 import { GLOSSARY } from "@/lib/content/glossary";
 import { INDICES } from "@/lib/content/indices";
 import { STRATEGIES } from "@/lib/content/strategies";
@@ -12,13 +13,20 @@ const SITE_URL =
     : "http://localhost:3000");
 
 /**
- * "/", everything under "/learn", and everything under "/tools" are what's
- * meant to rank — real content with no login gate. "/terminal" is the app
- * itself, marked `noindex` on its own page (see app/terminal/page.tsx):
- * Google's own guidance is to leave noindex pages out of the sitemap rather
- * than submit a URL you're simultaneously telling it not to index.
- * Everything else is an API route or the OAuth callback, neither of which
- * is content.
+ * "/", everything under "/learn", "/tools", and "/discuss" is what's meant
+ * to rank — real content with no login gate to *read* (only to post).
+ * "/terminal" is the app itself, marked `noindex` on its own page (see
+ * app/terminal/page.tsx): Google's own guidance is to leave noindex pages
+ * out of the sitemap rather than submit a URL you're simultaneously telling
+ * it not to index. Everything else is an API route or the OAuth callback,
+ * neither of which is content.
+ *
+ * Individual /discuss threads are deliberately absent — user-generated and
+ * unbounded, unlike every other entry here which comes from a fixed content
+ * array. They still get crawled and indexed via their own meta tags and the
+ * links every category page already has to them; only the sitemap's own
+ * enumeration is skipped; a Firestore read at every sitemap request would be
+ * a real cost for what a plain crawl already covers.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticEntries: MetadataRoute.Sitemap = [
@@ -39,7 +47,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/learn/glossary`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/trading-styles`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/learn/indices`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/discuss`, changeFrequency: "daily", priority: 0.6 },
   ];
+
+  const discussEntries: MetadataRoute.Sitemap = FORUM_CATEGORIES.map((c) => ({
+    url: `${SITE_URL}/discuss/${c.slug}`,
+    changeFrequency: "hourly",
+    priority: 0.5,
+  }));
 
   // Every /learn/* leaf page is static content with no live data behind it —
   // "monthly" is the honest cadence for the whole wiki, hub pages included.
@@ -67,5 +82,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.5,
   }));
 
-  return [...staticEntries, ...strategyEntries, ...glossaryEntries, ...styleEntries, ...indexEntries];
+  return [
+    ...staticEntries,
+    ...strategyEntries,
+    ...glossaryEntries,
+    ...styleEntries,
+    ...indexEntries,
+    ...discussEntries,
+  ];
 }

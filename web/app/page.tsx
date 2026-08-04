@@ -499,6 +499,20 @@ export default function HomePage() {
       </section>
 
       <footer className="relative mx-auto max-w-6xl px-5 pb-8 pt-4 text-center text-[10px] leading-relaxed text-zinc-600">
+        <p className="mb-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-wider">
+          <CtaLink href="/terminal" location="footer-terminal" className="transition-colors hover:text-quantum">
+            Terminal
+          </CtaLink>
+          <CtaLink href="/tools" location="footer-tools" className="transition-colors hover:text-quantum">
+            Tools
+          </CtaLink>
+          <CtaLink href="/learn" location="footer-learn" className="transition-colors hover:text-quantum">
+            Learn
+          </CtaLink>
+          <CtaLink href="/discuss" location="footer-discuss" className="transition-colors hover:text-quantum">
+            Discuss
+          </CtaLink>
+        </p>
         <p>
           DeltaK Matrix Strategy (DKMS) · COA 1.0 / 2.0 wall tracking · RRG
           multi-strike momentum · Angel One SmartAPI

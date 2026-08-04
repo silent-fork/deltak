@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// /discuss's actual access control — not this repo's code, this file,
+// deployed straight to Firestore (`firebase deploy --only firestore:rules`,
+// or pasted into the console under Firestore → Rules). Nothing in
+// lib/server/forum.ts or firestore.ts can see past what this grants: there
+// is no service-role bypass the way lib/supabase.ts has one for the trading
+// tables (see firestore.ts's own header comment for why). A fresh Firestore
+// database denies every request until this is deployed — "it works in dev"
+// against an emulator or a test-mode project proves nothing about whether
+// this file is actually live in production.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Reads a *different* document mid-rule-evaluation to answer "is the
+    // caller a moderator" — the one place these rules look outside the
+    // document being evaluated. Costs a read against the caller's own quota
+    // on every moderator-gated check, which is the standard, accepted cost
+    // of role-based Firestore rules; there's no cheaper way to ask "what
+    // role does this token's owner have" from inside a rule.
+    function isModerator() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/forumProfiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/forumProfiles/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    // Profiles: public read (a byline needs a display name without forcing
+    // a login just to view a thread), self-create, self-or-moderator update.
+    // Never client-deletable — a departing member's post history staying
+    // attributable is the intended behavior, same as the app's own trading
+    // tables never hard-delete a position.
+    match /forumProfiles/{uid} {
+      allow read: if true;
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isModerator();
+      allow delete: if false;
+    }
+
+    match /forumThreads/{threadId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      // Two different callers legitimately patch a thread: its own author
+      // (or a moderator) editing/locking it, and *any* signed-in member
+      // replying — which only ever touches replyCount/lastActivityAt, never
+      // the title or lock state. `affectedKeys()` is what tells those apart.
+      allow update: if isSignedIn() && (
+        resource.data.authorUid == request.auth.uid ||
+        isModerator() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyCount', 'lastActivityAt'])
+      );
+      allow delete: if false;
+
+      match /posts/{postId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+        allow update: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isModerator());
+        allow delete: if false;
+      }
+    }
+
+    // Reports: anyone signed in can file one (write-only from their side —
+    // they can't read the queue back, which would leak who reported what to
+    // the reporter and to anyone else). Only moderators can read/resolve.
+    match /forumReports/{reportId} {
+      allow read: if isModerator();
+      allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
+      allow update: if isModerator();
+      allow delete: if false;
+    }
+  }
+}
