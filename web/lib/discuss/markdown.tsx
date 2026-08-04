@@ -166,3 +166,28 @@ export function renderForumMarkdown(body: string): ReactNode {
   const blocks = body.split(/\n{2,}/).filter((b) => b.trim() !== "");
   return <div className="flex flex-col gap-3">{blocks.map(renderBlock)}</div>;
 }
+
+/**
+ * Plain-text preview for a card/list row — strips this file's own markdown
+ * forms down to their readable text (headings, emphasis, links, list
+ * markers) rather than showing raw `##`/`**`/`[text](url)` syntax in a
+ * one-line teaser, then truncates on a word boundary.
+ */
+export function excerptFromMarkdown(body: string, maxLen = 160): string {
+  const plain = body
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/!\[([^\]]*)\]\(\S+?\)/g, "$1")
+    .replace(/\[([^\]]*)\]\(\S+?\)/g, "$1")
+    .replace(/(\*\*|~~|`)/g, "")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (plain.length <= maxLen) return plain;
+  const cut = plain.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 40 ? lastSpace : maxLen)}…`;
+}

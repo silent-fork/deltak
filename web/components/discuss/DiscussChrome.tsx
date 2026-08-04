@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, Zap } from "lucide-react";
 import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
@@ -83,6 +83,41 @@ export async function DiscussChrome({
       </nav>
 
       {children}
+
+      {/* Same closing-beat role LearnChrome's own panel plays on every /learn
+          page — compact, asymmetric, one non-text element earning its keep —
+          pointed the other direction here: a thread mentions gamma or a
+          collar, the mechanics behind it are a click away on Learn. */}
+      <section className="relative mx-auto max-w-5xl px-5 pb-12">
+        <div className="dk-panel relative flex flex-col items-center gap-4 overflow-hidden rounded-xl px-5 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-quantum/[0.09] blur-[70px]"
+          />
+          <div className="relative flex flex-col items-center gap-3.5 sm:flex-row">
+            <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-quantum/30 bg-quantum/10 sm:flex">
+              <BookOpen className="h-5 w-5 text-quantum" />
+            </span>
+            <div>
+              <h2 className="text-[14px] font-bold text-zinc-50">
+                Curious about the mechanics behind a thread?
+              </h2>
+              <p className="mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
+                DeltaK&apos;s glossary and strategy guides cover the mechanics behind what people
+                here are actually discussing — gamma, collars, expiry settlement, and more.
+              </p>
+            </div>
+          </div>
+          <CtaLink
+            href="/learn"
+            location="discuss-closing"
+            className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+          >
+            Learn
+            <ArrowRight className="h-3.5 w-3.5" />
+          </CtaLink>
+        </div>
+      </section>
 
       <footer className="relative mx-auto max-w-5xl px-5 pb-8 pt-6 text-center text-[10px] leading-relaxed text-zinc-600">
         <p>

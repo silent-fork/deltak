@@ -78,7 +78,7 @@ export function NewThreadForm({ category }: { category: string }) {
         placeholder={isArticle ? "Article headline" : "Thread title"}
         maxLength={140}
         required
-        className="h-9 rounded-md border border-zinc-800 bg-zinc-950/60 px-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+        className="h-9 rounded-md border border-zinc-700 bg-zinc-900/90 px-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
       />
       <RichTextEditor
         value={body}

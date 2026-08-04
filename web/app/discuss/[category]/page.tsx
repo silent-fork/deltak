@@ -6,8 +6,9 @@ import { notFound } from "next/navigation";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
 import { NewThreadForm } from "@/components/discuss/NewThreadForm";
 import { getForumCategory } from "@/lib/content/forumCategories";
+import { excerptFromMarkdown } from "@/lib/discuss/markdown";
 import { getViewerIdentity } from "@/lib/server/firebaseAuth";
-import { listThreads } from "@/lib/server/forum";
+import { listPosts, listThreads } from "@/lib/server/forum";
 import { timeAgo } from "@/lib/utils";
 
 // Threads change on every post — server-rendered fresh on each request
@@ -54,6 +55,19 @@ export default async function DiscussCategoryPage({
   const threads = threadsResult.threads;
   const pinned = threads.filter((t) => t.pinned);
   const rest = threads.filter((t) => !t.pinned);
+  const ordered = [...pinned, ...rest];
+
+  // Only articles get a preview excerpt — a fetch per article thread, not
+  // per thread overall, since a category page rarely holds more than a
+  // handful of long-form pieces at once.
+  const articleIds = ordered.filter((t) => t.postType === "article").map((t) => t.id);
+  const excerptEntries = await Promise.all(
+    articleIds.map(async (id) => {
+      const opener = await listPosts(id, 1).catch(() => []);
+      return [id, opener[0] ? excerptFromMarkdown(opener[0].body, 170) : ""] as const;
+    }),
+  );
+  const excerpts = new Map(excerptEntries);
 
   return (
     <DiscussChrome
@@ -90,45 +104,69 @@ export default async function DiscussCategoryPage({
             </p>
           </div>
         ) : (
-          <div className="dk-panel divide-y divide-zinc-800/70 overflow-hidden rounded-lg">
-            {[...pinned, ...rest].map((t) => (
-              <Link
-                key={t.id}
-                href={`/discuss/${category}/${t.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
-              >
-                {t.postType === "article" ? (
-                  <FileText className="h-4 w-4 shrink-0 text-quantum/70" />
-                ) : t.postType === "feed" ? (
-                  <Rss className="h-4 w-4 shrink-0 text-amber-400/70" />
-                ) : (
-                  <MessageCircle className="h-4 w-4 shrink-0 text-zinc-600" />
-                )}
-                <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-2.5">
+            {ordered.map((t) =>
+              t.postType === "article" ? (
+                <Link
+                  key={t.id}
+                  href={`/discuss/${category}/${t.id}`}
+                  className="dk-panel group rounded-lg p-5 transition-colors hover:border-quantum/30 hover:bg-white/[0.02]"
+                >
                   <div className="flex items-center gap-1.5">
                     {t.pinned ? <Pin className="h-3 w-3 shrink-0 text-quantum" /> : null}
-                    {t.postType === "article" ? (
-                      <span className="shrink-0 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-quantum">
-                        Article
-                      </span>
-                    ) : t.postType === "feed" ? (
-                      <span className="shrink-0 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-amber-400">
-                        News
-                      </span>
-                    ) : null}
-                    <span className="truncate text-[13.5px] font-medium text-zinc-100">
-                      {t.title}
+                    <span className="flex items-center gap-1 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-quantum">
+                      <FileText className="h-2.5 w-2.5" />
+                      Article
+                    </span>
+                    <span className="font-mono text-[10px] text-zinc-600">
+                      {t.authorName} · {timeAgo(t.createdAt)}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate font-mono text-[10px] text-zinc-600">
-                    {t.postType === "feed" ? `via ${t.authorName}` : t.authorName} · {timeAgo(t.createdAt)}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
-                  {t.replyCount} {t.replyCount === 1 ? "reply" : "replies"}
-                </span>
-              </Link>
-            ))}
+                  <h2 className="mt-2 text-balance text-lg font-semibold leading-snug text-zinc-50 group-hover:text-quantum">
+                    {t.title}
+                  </h2>
+                  {excerpts.get(t.id) ? (
+                    <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-zinc-400">
+                      {excerpts.get(t.id)}
+                    </p>
+                  ) : null}
+                  <span className="mt-3 inline-block rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
+                    {t.replyCount} {t.replyCount === 1 ? "reply" : "replies"}
+                  </span>
+                </Link>
+              ) : (
+                <Link
+                  key={t.id}
+                  href={`/discuss/${category}/${t.id}`}
+                  className="dk-panel flex items-center gap-3 rounded-lg px-4 py-3.5 transition-colors hover:border-quantum/30 hover:bg-white/[0.02]"
+                >
+                  {t.postType === "feed" ? (
+                    <Rss className="h-4 w-4 shrink-0 text-amber-400/70" />
+                  ) : (
+                    <MessageCircle className="h-4 w-4 shrink-0 text-zinc-600" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {t.pinned ? <Pin className="h-3 w-3 shrink-0 text-quantum" /> : null}
+                      {t.postType === "feed" ? (
+                        <span className="shrink-0 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-amber-400">
+                          News
+                        </span>
+                      ) : null}
+                      <span className="truncate text-[13.5px] font-medium text-zinc-100">
+                        {t.title}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate font-mono text-[10px] text-zinc-600">
+                      {t.postType === "feed" ? `via ${t.authorName}` : t.authorName} · {timeAgo(t.createdAt)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
+                    {t.replyCount} {t.replyCount === 1 ? "reply" : "replies"}
+                  </span>
+                </Link>
+              ),
+            )}
           </div>
         )}
       </section>

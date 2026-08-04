@@ -226,7 +226,7 @@ export function RichTextEditor({
         maxLength={maxLength}
         required
         rows={rows}
-        className="resize-y rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+        className="resize-y rounded-md border border-zinc-700 bg-zinc-900/90 px-3 py-2 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
       />
 
       {/* Updates on every keystroke — `## `, `**bold**`, etc. show as the

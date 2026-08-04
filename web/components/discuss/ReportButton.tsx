@@ -46,7 +46,7 @@ export function ReportButton({
           placeholder="Why?"
           autoFocus
           maxLength={500}
-          className="h-6 w-32 rounded border border-zinc-800 bg-zinc-950/60 px-1.5 font-mono text-[9.5px] text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-quantum/50"
+          className="h-6 w-32 rounded border border-zinc-700 bg-zinc-900/90 px-1.5 font-mono text-[9.5px] text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-quantum/50"
         />
         <button type="submit" className="font-mono text-[9.5px] text-quantum hover:underline">
           Send

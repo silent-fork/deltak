@@ -151,7 +151,7 @@ function AuthForms({ onDone }: { onDone: () => void }) {
               autoComplete="nickname"
               maxLength={40}
               required
-              className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-950/60 pl-8 pr-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/90 pl-8 pr-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
             />
           </div>
         ) : null}
@@ -165,7 +165,7 @@ function AuthForms({ onDone }: { onDone: () => void }) {
             placeholder="Email"
             autoComplete="email"
             required
-            className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-950/60 pl-8 pr-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+            className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/90 pl-8 pr-3 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
           />
         </div>
 
@@ -181,7 +181,7 @@ function AuthForms({ onDone }: { onDone: () => void }) {
               autoComplete={isSignup ? "new-password" : "current-password"}
               minLength={isSignup ? PASSWORD_MIN : undefined}
               required
-              className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-950/60 pl-8 pr-9 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/90 pl-8 pr-9 text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
             />
             <button
               type="button"
