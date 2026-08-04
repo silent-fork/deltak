@@ -32,7 +32,6 @@ import {
   weakeningCorroborated,
 } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
-import { applyNseSnapshot, buildMarketSnapshotPayload } from "../lib/engine/nseSnapshot";
 import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
@@ -1048,85 +1047,7 @@ test("withRetry recovers once a later attempt succeeds", async () => {
   assert.equal(calls, 2);
 });
 
-/* ------------------------------------------------- NSE snapshot & the open/close switch */
-
-test("applyNseSnapshot fills a token that has no data yet", () => {
-  const master = makeMaster();
-  const ticks = new TickStore();
-  const strike = 24_500;
-  const token = master.find("NIFTY", strike, "CE")!.token;
-
-  applyNseSnapshot(ticks, master, "NIFTY", {
-    underlying: "NIFTY",
-    spot: 24_774.3,
-    timestamp: "03-Aug-2026 15:40:00",
-    legs: [{ strike, side: "CE", oi: 12_345, changeInOi: 100, volume: 500, ltp: 42.5 }],
-  });
-
-  const tick = ticks.get(token)!;
-  assert.equal(tick.oi, 12_345);
-  assert.equal(tick.volume, 500);
-  assert.equal(tick.ltp, 42.5);
-});
-
-test("applyNseSnapshot never overwrites a token that already has real OI", () => {
-  const master = makeMaster();
-  // Angel One's own replay (or a live print before the tab was left open
-  // overnight) already seeded every contract's OI to 10,000 by default.
-  const ticks = fillTicks(master, new TickStore());
-  const strike = 24_500;
-  const token = master.find("NIFTY", strike, "CE")!.token;
-  const before = ticks.get(token)!.oi;
-
-  applyNseSnapshot(ticks, master, "NIFTY", {
-    underlying: "NIFTY",
-    spot: 24_774.3,
-    timestamp: "03-Aug-2026 15:40:00",
-    legs: [{ strike, side: "CE", oi: 999_999, changeInOi: 0, volume: 0, ltp: 0 }],
-  });
-
-  // NSE's number is a different source of the same fact; whichever source
-  // got there first is authoritative, so it must be left untouched.
-  assert.equal(ticks.get(token)!.oi, before);
-});
-
-test("applyNseSnapshot seeds the spot only while it is still missing", () => {
-  const master = makeMaster();
-  const ticks = new TickStore();
-  const spotToken = master.spotToken("NIFTY");
-
-  applyNseSnapshot(ticks, master, "NIFTY", {
-    underlying: "NIFTY",
-    spot: 24_774.3,
-    timestamp: "03-Aug-2026 15:40:00",
-    legs: [],
-  });
-  assert.equal(ticks.get(spotToken)!.ltp, 24_774.3);
-
-  applyNseSnapshot(ticks, master, "NIFTY", {
-    underlying: "NIFTY",
-    spot: 25_000,
-    timestamp: "03-Aug-2026 15:45:00",
-    legs: [],
-  });
-  // A second, different reading must not clobber the first.
-  assert.equal(ticks.get(spotToken)!.ltp, 24_774.3);
-});
-
-test("applyNseSnapshot silently skips a leg with no matching contract", () => {
-  const master = makeMaster();
-  const ticks = new TickStore();
-
-  assert.doesNotThrow(() =>
-    applyNseSnapshot(ticks, master, "NIFTY", {
-      underlying: "NIFTY",
-      spot: 24_774.3,
-      timestamp: "03-Aug-2026 15:40:00",
-      // Far outside makeMaster()'s ±20-strike ladder — no contract to resolve to.
-      legs: [{ strike: 999_999, side: "CE", oi: 1, changeInOi: 0, volume: 0, ltp: 0 }],
-    }),
-  );
-});
+/* ------------------------------------------------------------- the open/close switch */
 
 test("a live tick always supersedes a seeded one once the market reopens", () => {
   const ticks = new TickStore();
@@ -1155,90 +1076,3 @@ test("a live frame that omits a field carries the seeded value forward instead o
   assert.equal(ticks.ltp("1001"), 45);
 });
 
-test("buildMarketSnapshotPayload keeps every leg that has a real OI or a real print", () => {
-  const master = makeMaster();
-  const ticks = fillTicks(master, new TickStore());
-  const chain = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG).build(
-    master,
-    ticks,
-    24_500,
-  );
-
-  const payload = buildMarketSnapshotPayload(chain, {
-    candles: [],
-    stats: null,
-    pcr: 0.87,
-    buildup: null,
-  });
-
-  // fillTicks() gives every contract in the ladder a real OI, so every
-  // leg the chain carries should survive into the payload.
-  const expectedLegs = chain.rows.reduce(
-    (n, r) => n + (r.call ? 1 : 0) + (r.put ? 1 : 0),
-    0,
-  );
-  assert.equal(payload.legs.length, expectedLegs);
-  assert.equal(payload.spot, chain.spot);
-  assert.equal(payload.pcr, 0.87);
-});
-
-test("buildMarketSnapshotPayload drops a leg with neither OI nor a print", () => {
-  const master = makeMaster();
-  const ticks = new TickStore();
-  // Only the spot and one strike's calls ever quoted; everything else in
-  // the ladder is a strike nothing traded — legitimately nothing available.
-  const spot = emptyTick(master.spotToken("NIFTY"));
-  spot.ltp = 24_500;
-  ticks.apply(spot);
-  const quoted = master.find("NIFTY", 24_500, "CE")!;
-  const t = emptyTick(quoted.token);
-  t.oi = 12_000;
-  t.ltp = 113.85;
-  ticks.apply(t);
-
-  const chain = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG).build(
-    master,
-    ticks,
-    24_500,
-  );
-  const payload = buildMarketSnapshotPayload(chain, {
-    candles: [],
-    stats: null,
-    pcr: null,
-    buildup: null,
-  });
-
-  assert.equal(payload.legs.length, 1);
-  assert.equal(payload.legs[0].strike, 24_500);
-  assert.equal(payload.legs[0].side, "CE");
-  assert.equal(payload.legs[0].oi, 12_000);
-});
-
-test("a saved snapshot round-trips through applyNseSnapshot into a fresh tick store", () => {
-  const master = makeMaster();
-  const sourceTicks = fillTicks(master, new TickStore(), 24_500, { "24500CE": 55_000 });
-  const chain = new ChainBuilder("NIFTY", new RrgEngine(), DEFAULT_CONFIG).build(
-    master,
-    sourceTicks,
-    24_500,
-  );
-  const payload = buildMarketSnapshotPayload(chain, {
-    candles: [],
-    stats: null,
-    pcr: null,
-    buildup: null,
-  });
-
-  // A different tab, later — nothing seeded yet.
-  const freshTicks = new TickStore();
-  applyNseSnapshot(freshTicks, master, "NIFTY", {
-    underlying: "NIFTY",
-    spot: payload.spot,
-    timestamp: "2026-08-03T10:00:00Z",
-    legs: payload.legs,
-  });
-
-  const token = master.find("NIFTY", 24_500, "CE")!.token;
-  assert.equal(freshTicks.get(token)!.oi, 55_000);
-  assert.equal(freshTicks.ltp(master.spotToken("NIFTY")), 24_500);
-});

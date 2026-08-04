@@ -415,7 +415,11 @@ export interface HolidayResponse {
   fetched_at: string;
 }
 
-/** One strike's CE or PE leg, from NSE's own option-chain snapshot. */
+/**
+ * One strike's CE or PE leg, from NSE's own option-chain snapshot.
+ * Consumed by `/tools/volatility-desk` only — the Terminal's own
+ * closed-market option-chain fallback was removed.
+ */
 export interface NseOptionLeg {
   strike: number;
   side: "CE" | "PE";
@@ -437,31 +441,3 @@ export interface NseOptionChainResponse {
   legs: NseOptionLeg[];
 }
 
-/**
- * Whatever the board had available for one underlying, captured while the
- * market was closed — reuses `NseOptionLeg`'s shape for `legs` since the
- * fold-into-the-tick-store logic (`applyNseSnapshot`) is source-agnostic:
- * a leg here can equally have come from Angel One's own closed-market
- * replay or from the NSE supplement, whichever the tab actually had at
- * save time.
- */
-export interface MarketSnapshotPayload {
-  spot: number;
-  stats: SessionStats | null;
-  candles: Candle[];
-  legs: NseOptionLeg[];
-  pcr: number | null;
-  buildup: OiBuildupType | null;
-}
-
-export interface MarketSnapshotRecord {
-  underlying: string;
-  /** ISO, `YYYY-MM-DD` — the trading session this snapshot describes. */
-  sessionDate: string;
-  updatedAt: string;
-  payload: MarketSnapshotPayload;
-}
-
-export type MarketSnapshotReadResponse =
-  | ({ found: true } & MarketSnapshotRecord)
-  | { found: false };

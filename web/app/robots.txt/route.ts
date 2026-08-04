@@ -60,9 +60,9 @@ const LLM_AGENTS = [
 function block(userAgent: string): string {
   return [
     `User-agent: ${userAgent}`,
+    CONTENT_SIGNAL,
     "Allow: /",
     ...DISALLOW.map((d) => `Disallow: ${d}`),
-    CONTENT_SIGNAL,
   ].join("\n");
 }
 

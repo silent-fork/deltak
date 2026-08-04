@@ -95,6 +95,10 @@ interface RawOptionRow {
  * own symbol convention for its index option chains). BSE has no equivalent
  * endpoint in this package, so BANKEX/SENSEX are the caller's responsibility
  * to exclude before calling this.
+ *
+ * The Terminal no longer calls this (its own closed-market gap-filling was
+ * removed in favour of Angel One alone) — the one remaining caller is
+ * `/tools/volatility-desk`'s PCR/max-pain read, a wholly separate feature.
  */
 export async function fetchOptionChainSnapshot(
   underlying: string,

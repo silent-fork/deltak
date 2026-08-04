@@ -5,19 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { INDEX_UNIVERSE, isMarketOpen, optionExchange } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
-import {
-  fetchBatch,
-  fetchBuildup,
-  fetchCandles,
-  fetchMarketSnapshot,
-  fetchNseOptionChain,
-  fetchOi,
-  fetchPcr,
-} from "@/lib/market/client";
+import { fetchBatch, fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
 import { OI_BUILDUP_TYPES, type OiBuildupType } from "@/lib/market/constants";
 import { buildupIncludesUnderlying, pcrForUnderlying } from "@/lib/market/parse";
-import type { Candle, NseOptionChainResponse, OiPoint, SessionStats } from "@/lib/types";
+import type { Candle, OiPoint, SessionStats } from "@/lib/types";
 
 /**
  * Historical and market-data context for the terminal.
@@ -129,12 +121,6 @@ export interface MarketDataInput {
     token: string,
     replay: { pairs: [number, number][]; lastClose: number; volume: number },
   ) => void;
-  /**
-   * Called out of hours with NSE's own option-chain snapshot for the
-   * focused underlying (NSE-listed only) — a second, independent
-   * closed-market source, additive on top of everything above.
-   */
-  onNseOptionChain?: (underlying: string, snapshot: NseOptionChainResponse) => void;
 }
 
 const EMPTY: MarketData = {
@@ -241,29 +227,9 @@ export function useMarketData(input: MarketDataInput): MarketData {
     wallTokens,
     onOiBaseline,
     onContractSession,
-    onNseOptionChain,
   } = input;
 
   const [state, setState] = useState<MarketData>(EMPTY);
-
-  /**
-   * The closed-market DB-hydration check, per focus. `"checking"` holds every
-   * live closed-market fetch below (candles, the batch seed, the NSE
-   * snapshot) off until it resolves — reading the stored snapshot and
-   * re-fetching from Angel One at the same time would race, and the whole
-   * point is to skip the fetch when the store already has it. `"live"` means
-   * either the market is open (this mechanism never applies then), the store
-   * had nothing fresh, or what it had wasn't from *today's* own close — a
-   * snapshot only ever gets written by a browser tab that was actually open
-   * at the bell (see `useEngine.ts`'s save-on-close effect), so a stale row
-   * just means no tab happened to be open then, not that nothing fresher
-   * exists; the normal pipeline still runs and supersedes it. `"hydrated"`
-   * means the store answered with *today's* own close and nothing below
-   * should fetch at all — there is genuinely nothing fresher to find.
-   */
-  const [ready, setReady] = useState<"checking" | "hydrated" | "live">("checking");
-  /** Open, or closed with nothing left to wait on — every gated effect below reads this one flag. */
-  const liveFetchGate = isMarketOpen() || ready === "live";
 
   // `date:token` for every contract already baselined, so a drifting ATM band
   // only ever costs a request for the strikes that are genuinely new.
@@ -283,8 +249,6 @@ export function useMarketData(input: MarketDataInput): MarketData {
   baselineRef.current = onOiBaseline;
   const replayRef = useRef(onContractSession);
   replayRef.current = onContractSession;
-  const nseSnapshotRef = useRef(onNseOptionChain);
-  nseSnapshotRef.current = onNseOptionChain;
   // The spot session doubles as the RRG benchmark, read at call time so the
   // replay does not restart every time a candle poll lands.
   const spotCandlesRef = useRef(state.candles);
@@ -365,76 +329,8 @@ export function useMarketData(input: MarketDataInput): MarketData {
     replayedRef.current.clear();
   }, [focus]);
 
-  /* ---------------------------------------- closed-market DB hydration */
-
-  // A newly-focused underlying gets its own hydration check — skipped
-  // outright while the market is open, since this mechanism only exists to
-  // stand in for a fetch that would otherwise happen while closed.
-  useEffect(() => {
-    setReady(isMarketOpen() ? "live" : "checking");
-  }, [focus]);
-
-  /**
-   * Read `market_snapshots` before any of the closed-market fetches below
-   * get to run. A hit populates the same state a live fetch would (candles,
-   * stats, this underlying's PCR/buildup reading) and folds its legs into
-   * the tick store through the same callback the NSE snapshot uses — the
-   * fold logic doesn't care which source a leg came from. A miss (or any
-   * failure) just opens the gate for the normal pipeline below, unchanged.
-   */
-  useEffect(() => {
-    if (!enabled || isMarketOpen()) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetchMarketSnapshot(focus);
-        if (cancelled) return;
-        if (!res.found) {
-          setReady("live");
-          return;
-        }
-        setState((s) => ({
-          ...s,
-          candles: res.payload.candles,
-          stats: res.payload.stats,
-          spotStats: res.payload.stats
-            ? { ...s.spotStats, [focus]: res.payload.stats }
-            : s.spotStats,
-          pcr:
-            res.payload.pcr !== null
-              ? { ...s.pcr, [focus]: res.payload.pcr }
-              : s.pcr,
-          buildup:
-            res.payload.buildup !== null
-              ? { ...s.buildup, [focus]: res.payload.buildup }
-              : s.buildup,
-        }));
-        nseSnapshotRef.current?.(focus, {
-          underlying: focus,
-          spot: res.payload.spot,
-          timestamp: res.updatedAt,
-          legs: res.payload.legs,
-        });
-        // Paints immediately either way — the difference is only whether the
-        // pipeline below is trusted to stop there. A same-day row is; an
-        // older one (a weekend/holiday gap, or just no tab open at the last
-        // close) gets this as a fast first paint, then still lets candles,
-        // the seed pass and the NSE chain snapshot below run and bring the
-        // board current instead of freezing it on an old session.
-        setReady(res.sessionDate === istDate() ? "hydrated" : "live");
-      } catch {
-        // No stored snapshot to fall back on either — the live pipeline
-        // below is exactly what would have run without this effect.
-        if (!cancelled) setReady("live");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, focus]);
-
   usePoll(
-    enabled && !!spotToken && liveFetchGate,
+    enabled && !!spotToken,
     `candles:${focus}:${spotToken}:${isMarketOpen()}`,
     POLL_OPEN.candles,
     useCallback(async () => {
@@ -563,9 +459,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
    * the better source and stale bars would drag every rotation node backwards.
    */
   useEffect(() => {
-    // While closed, this waits for the DB-hydration check above to resolve
-    // rather than racing it — a hit means there is nothing left to seed.
-    if (!enabled || !seedKey || !liveFetchGate) return;
+    if (!enabled || !seedKey) return;
     let cancelled = false;
     const date = sessionDate;
     const closed = !isMarketOpen();
@@ -662,7 +556,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     return () => {
       cancelled = true;
     };
-  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, liveFetchGate, flush, fail, ok]);
+  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, flush, fail, ok]);
 
   /* ---------------------------------------------------------- wall curves */
 
@@ -733,47 +627,6 @@ export function useMarketData(input: MarketDataInput): MarketData {
       ok();
     }, [wallKey, sessionDate, focus, fail, ok]),
   );
-
-  /* ------------------------------------- NSE option-chain snapshot (closed only) */
-
-  /**
-   * A second, wholly independent closed-market source: NSE's own
-   * option-chain snapshot for the focused underlying, NSE-listed only.
-   * Everything above this block — the Angel One seeding pass, the wall
-   * curves, the closed-market replay it folds into — is untouched; this
-   * effect only ever fires when the market is shut, and only calls a
-   * callback the caller opted into. It fetches once per focus (the
-   * snapshot will not change again until NSE's next session), not on a
-   * poll, since there is nothing to keep re-reading. Waits on the same
-   * DB-hydration gate as the Angel One seeding pass above — a hit there
-   * means this has nothing to add either.
-   */
-  useEffect(() => {
-    if (
-      !enabled ||
-      isMarketOpen() ||
-      !liveFetchGate ||
-      INDEX_UNIVERSE[focus]?.exchange !== "NSE"
-    )
-      return;
-    const callback = nseSnapshotRef.current;
-    if (!callback) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const snapshot = await fetchNseOptionChain(focus);
-        if (!cancelled) callback(focus, snapshot);
-      } catch {
-        // Best-effort only — Angel One's own closed-market replay above is
-        // the primary source and needs nothing from this to keep working.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, focus, liveFetchGate]);
 
   /* -------------------------------------------------------------- pcr */
 

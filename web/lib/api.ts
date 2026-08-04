@@ -5,9 +5,6 @@ import type {
   ExecutionMode,
   HolidayResponse,
   MarginResponse,
-  MarketSnapshotPayload,
-  MarketSnapshotReadResponse,
-  NseOptionChainResponse,
   OiResponse,
   PcrResponse,
   Position,
@@ -201,21 +198,6 @@ export const api = {
       }),
     /** NSE's own F&O holiday calendar — not Angel One, no JWT involved. */
     holidays: () => request<HolidayResponse>("/api/market/holidays"),
-    /** NSE's own option-chain snapshot — not Angel One, NSE-listed underlyings only. */
-    nseOptionChain: (underlying: string) =>
-      request<NseOptionChainResponse>(
-        `/api/market/nse-option-chain?underlying=${encodeURIComponent(underlying)}`,
-      ),
-    /** The closed-market board-hydration store — global, not per account. */
-    snapshotRead: (underlying: string) =>
-      request<MarketSnapshotReadResponse>(
-        `/api/market/snapshot?underlying=${encodeURIComponent(underlying)}`,
-      ),
-    snapshotWrite: (underlying: string, sessionDate: string, payload: MarketSnapshotPayload) =>
-      request<{ ok: true }>("/api/market/snapshot", {
-        method: "POST",
-        body: JSON.stringify({ underlying, sessionDate, payload }),
-      }),
   },
 
   history: (resource: string, params: Record<string, string> = {}) =>
