@@ -147,40 +147,33 @@ export default async function DiscussThreadPage({
             {comments.length} {comments.length === 1 ? (isArticle ? "comment" : "reply") : isArticle ? "comments" : "replies"}
           </p>
         ) : null}
-        {comments.length ? (
-          <div className="dk-panel divide-y divide-zinc-800/70 overflow-hidden rounded-lg">
-            {comments.map((p) => (
-              <article key={p.id} className="flex gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.02]">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-quantum/10 font-mono text-[11px] font-semibold text-quantum">
-                  {p.authorName.charAt(0).toUpperCase()}
+        <div className="flex flex-col gap-3">
+          {comments.map((p) => (
+            <article key={p.id} className="dk-panel rounded-lg p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12.5px] font-semibold text-zinc-200">{p.authorName}</span>
+                <span className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">
+                  {timeAgo(p.createdAt)}
+                  {p.editedAt ? " · edited" : ""}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12.5px] font-semibold text-zinc-200">{p.authorName}</span>
-                    <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">
-                      {timeAgo(p.createdAt)}
-                      {p.editedAt ? " · edited" : ""}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[13.5px] leading-relaxed text-zinc-300">
-                    {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
-                  </div>
-                  {!p.deletedAt ? (
-                    <div className="mt-2 flex items-center justify-between">
-                      <LikeButton
-                        threadId={thread.id}
-                        postId={p.id}
-                        initialCount={p.likeCount}
-                        canLike={Boolean(viewer)}
-                      />
-                      <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
-                    </div>
-                  ) : null}
+              </div>
+              <div className="mt-2 text-[13.5px] leading-relaxed text-zinc-300">
+                {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
+              </div>
+              {!p.deletedAt ? (
+                <div className="mt-2 flex items-center justify-between">
+                  <LikeButton
+                    threadId={thread.id}
+                    postId={p.id}
+                    initialCount={p.likeCount}
+                    canLike={Boolean(viewer)}
+                  />
+                  <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
                 </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+              ) : null}
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="relative mx-auto max-w-3xl px-5 pb-16">
