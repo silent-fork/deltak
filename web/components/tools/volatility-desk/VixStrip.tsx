@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, TriangleAlert } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, fmt } from "@/lib/utils";
@@ -230,6 +230,40 @@ export function VixStrip({
             </div>
 
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-zinc-500">{breadth.text}</p>
+
+            {/* Max Pain Skyline already plots this per index below — restated
+                here as a distance rather than a direction on purpose: the
+                glossary's own Max Pain entry is explicit that the theory's
+                predictive record is mixed at best, so this reads as "how far,"
+                not "which way it's being pulled." */}
+            <div className="mt-3 border-t border-zinc-800/70 pt-3">
+              <span className="px-1 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+                Spot vs Max Pain
+              </span>
+              <div className="mt-2 flex flex-col gap-1.5 px-1">
+                {indices.map((ix) => {
+                  if (ix.maxPainStrike == null) return null;
+                  const diffPct = ((ix.spot - ix.maxPainStrike) / ix.maxPainStrike) * 100;
+                  const above = diffPct >= 0;
+                  return (
+                    <div
+                      key={ix.underlying}
+                      className="flex items-center justify-between font-mono text-[10px] text-zinc-500"
+                    >
+                      <span>{ix.label}</span>
+                      <span className="flex items-center gap-1 tabular-nums text-zinc-400">
+                        {above ? (
+                          <ArrowUp className="h-2.5 w-2.5 text-zinc-600" />
+                        ) : (
+                          <ArrowDown className="h-2.5 w-2.5 text-zinc-600" />
+                        )}
+                        {fmt(Math.abs(diffPct))}% {above ? "above" : "below"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         ) : null}
       </CardContent>
