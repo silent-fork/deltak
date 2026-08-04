@@ -253,11 +253,13 @@ export default function HomePage() {
             standalone banner earns that distinction: the live-pulse dot
             reads as "this is a running dashboard, not a page," and the
             orbiting-dot mark previews the RRG scatter itself rather than
-            just naming it.
+            just naming it. Points at the /tools hub rather than any single
+            dashboard now that there are four of them — Sector Rotation was
+            the first, not the whole story anymore.
           */}
           <CtaLink
-            href="/tools/fno-sector-rotation"
-            location="hero-fno"
+            href="/tools"
+            location="hero-tools"
             className="group mt-2 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/10"
           >
             <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
@@ -272,11 +274,11 @@ export default function HomePage() {
             */}
             <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
               <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — F&amp;O Sector Rotation, live RRG
+              — 4 free NSE F&amp;O tools
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
               <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — NSE F&amp;O Sector Rotation dashboard, live RRG
+              — 4 free NSE F&amp;O tools: sector RRG, scanner, volatility desk &amp; more
             </span>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-400 transition-transform group-hover:translate-x-0.5" />
           </CtaLink>
@@ -470,11 +472,11 @@ export default function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </CtaLink>
             <CtaLink
-              href="/learn"
-              location="closing-learn"
+              href="/tools"
+              location="closing-tools"
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-4 text-[13px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 sm:flex-none sm:px-6"
             >
-              Learn
+              Tools
             </CtaLink>
           </div>
         </div>
