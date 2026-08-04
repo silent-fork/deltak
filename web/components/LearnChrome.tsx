@@ -5,6 +5,27 @@ import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
+/** A miniature of the terminal's own RRG quadrant plot — not a stock icon. */
+function RotationGlyph() {
+  const dots: [number, number, string][] = [
+    [64, 20, "#10b981"],
+    [74, 30, "#10b981"],
+    [26, 68, "#f43f5e"],
+    [18, 58, "#f43f5e"],
+    [50, 38, "#00f0ff"],
+    [58, 52, "#f59e0b"],
+  ];
+  return (
+    <svg viewBox="0 0 92 92" className="h-6 w-6">
+      <line x1="6" y1="46" x2="86" y2="46" stroke="#3f3f46" strokeWidth="1" />
+      <line x1="46" y1="6" x2="46" y2="86" stroke="#3f3f46" strokeWidth="1" />
+      {dots.map(([x, y, c], i) => (
+        <circle key={i} cx={x} cy={y} r="4" fill={c} opacity="0.9" />
+      ))}
+    </svg>
+  );
+}
+
 /**
  * Shared shell for every /learn page — the wiki's own header, breadcrumb
  * rail and closing CTA/disclaimer, so the dozens of dynamic strategy,
@@ -74,21 +95,45 @@ export function LearnChrome({
 
       {children}
 
-      <section className="relative mx-auto max-w-3xl px-5 pb-16 text-center">
-        <div className="dk-panel rounded-xl px-6 py-8">
-          <h2 className="text-lg font-bold text-zinc-50">See it read live, not just diagrammed</h2>
-          <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-zinc-500">
-            DeltaK reads Aegis and Zenith wall migration and RRG rotation live across
-            NIFTY, BANKNIFTY and FINNIFTY — sign in with your own Angel One account
-            and watch it work in Paper mode.
-          </p>
+      {/*
+        Was a full-width, centered, ~230px-tall box with the same copy on
+        every single /learn page — strategies, glossary, trading styles,
+        indices, and every leaf beneath them. Repeated that often, its size
+        read as filler rather than a real closing beat, especially on the
+        thinner pages (trading styles' four cards, in particular) where it
+        dwarfed the actual content above it. Compact and asymmetric instead:
+        a live-rotation glyph earns its keep as the one thing on this panel
+        that isn't text, the copy sits left instead of centered, and the
+        whole thing is short enough to read as a footer beat, not a second
+        hero.
+      */}
+      <section className="relative mx-auto max-w-4xl px-5 pb-12">
+        <div className="dk-panel relative flex flex-col items-center gap-4 overflow-hidden rounded-xl px-5 py-5 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-quantum/[0.09] blur-[70px]"
+          />
+          <div className="relative flex flex-col items-center gap-3.5 sm:flex-row">
+            <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-quantum/30 bg-quantum/10 sm:flex">
+              <RotationGlyph />
+            </span>
+            <div>
+              <h2 className="text-[14px] font-bold text-zinc-50">
+                See it read live, not just diagrammed
+              </h2>
+              <p className="mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
+                DeltaK reads Aegis/Zenith wall migration and RRG rotation live across
+                NIFTY, BANKNIFTY and FINNIFTY — sign in and watch it work in Paper mode.
+              </p>
+            </div>
+          </div>
           <CtaLink
             href="/terminal"
             location={`${ctaLocation}-closing`}
-            className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-md border border-quantum/60 bg-quantum/15 px-6 text-[12.5px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
+            className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-quantum/60 bg-quantum/15 px-4 text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/25"
           >
             Terminal
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </CtaLink>
         </div>
       </section>
