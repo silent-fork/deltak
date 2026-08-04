@@ -61,18 +61,16 @@ export function CorporateCalendarDashboard() {
           <CardHeader>
             <CardTitle>This Week</CardTitle>
           </CardHeader>
-          {/* A real week's worth of results/actions/IPO rows runs well past 200px
-              once it's actually on screen (measured ~700px+ on a dense week) —
-              sized closer to that so the panel doesn't visibly grow the moment
-              data lands. */}
-          <CardContent className="relative min-h-[260px] lg:min-h-[480px]">
+          {/* Tab strip + one day's list, capped at 340px — same shape on every
+              breakpoint now, so one skeleton height covers both. */}
+          <CardContent className="relative min-h-[320px]">
             <PanelBootOverlay label="event calendar" />
           </CardContent>
         </Card>
         {/* Block Deals is a narrow column beside Recent IPOs on desktop, not a
             third full-width band — the grid stretches both cards to the same
             row height, so the skeleton matches that shape too. */}
-        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
+        <div className="grid min-h-0 shrink-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
           <Card className="min-h-0 shrink-0">
             <CardHeader>
               <CardTitle>Block Deals</CardTitle>
@@ -131,7 +129,7 @@ export function CorporateCalendarDashboard() {
       </div>
 
       <EventTimeline events={data.events} />
-      <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
+      <div className="grid min-h-0 shrink-0 grid-cols-1 gap-3 lg:grid-cols-[260px_1fr]">
         <BlockDealsTicker deals={data.blockDeals} />
         <IpoCards ipos={data.recentIpos} />
       </div>

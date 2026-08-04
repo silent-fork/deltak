@@ -15,15 +15,21 @@ import type { BlockDeal } from "@/lib/tools/corporateCalendarTypes";
  * with its own capped-height scroll — the panel's footprint stays put no
  * matter how many deals land, and it sits beside Recent IPOs instead of
  * stacking a third full-width band under the week view.
+ *
+ * The cap holds on every breakpoint, not just mobile: letting it grow
+ * unbounded on desktop is what let a heavy day's content quietly outgrow
+ * this card's flex-shrunk allocation and spill past the border — a fixed
+ * cap on both sides of the grid row means each column caps out on its own
+ * terms instead of leaning on the other to know when to stop.
  */
 export function BlockDealsTicker({ deals }: { deals: BlockDeal[] }) {
   return (
-    <Card className="min-h-0 shrink-0 lg:h-full">
+    <Card className="min-h-0 shrink-0">
       <CardHeader>
         <CardTitle>Block Deals</CardTitle>
         <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Today</span>
       </CardHeader>
-      <CardContent className="dk-scroll max-h-[280px] overflow-y-auto p-2 lg:max-h-none lg:flex-1">
+      <CardContent className="dk-scroll max-h-[280px] overflow-y-auto p-2">
         {deals.length === 0 ? (
           <p className="px-1 py-2 font-mono text-[10px] text-zinc-600">No block deals reported yet today.</p>
         ) : (

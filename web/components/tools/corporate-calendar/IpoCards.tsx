@@ -3,7 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RecentIpo } from "@/lib/tools/corporateCalendarTypes";
 
-/** Recent IPOs — issue price band and listing date, from NSE's own past-IPO list. */
+/**
+ * Recent IPOs — issue price band and listing date, from NSE's own past-IPO
+ * list. Height-capped with its own scroll, same reasoning as Block Deals
+ * next to it: an active listing month otherwise grew this card past what
+ * the grid row it shares had room for.
+ */
 export function IpoCards({ ipos }: { ipos: RecentIpo[] }) {
   return (
     <Card className="min-h-0 shrink-0">
@@ -11,7 +16,7 @@ export function IpoCards({ ipos }: { ipos: RecentIpo[] }) {
         <CardTitle>Recent IPOs</CardTitle>
         <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">Last 60 days</span>
       </CardHeader>
-      <CardContent className="p-2">
+      <CardContent className="dk-scroll max-h-[280px] overflow-y-auto p-2">
         {ipos.length === 0 ? (
           <p className="px-1 py-2 font-mono text-[10px] text-zinc-600">No recent listings in this window.</p>
         ) : (
