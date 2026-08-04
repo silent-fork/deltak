@@ -274,11 +274,11 @@ export default function HomePage() {
             */}
             <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
               <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — 4 free NSE F&amp;O tools
+              — a free NSE F&amp;O toolkit
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
               <span className="font-semibold uppercase tracking-wider text-emerald-300">New</span>{" "}
-              — 4 free NSE F&amp;O tools: sector RRG, scanner, volatility desk &amp; more
+              — a free NSE F&amp;O toolkit: sector RRG, scanner, volatility desk &amp; more
             </span>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-400 transition-transform group-hover:translate-x-0.5" />
           </CtaLink>

@@ -89,7 +89,14 @@ export function CorporateCalendarDashboard() {
           </Card>
         </div>
 
-        <ToolFooterMark sourceNote={SOURCE_NOTE} />
+        {/* This card and the deals/IPO row below are now both height-capped
+            rather than growing to fill the page (that's what let a heavy
+            week outgrow its row before), so nothing here naturally pushes
+            the footer to the bottom of a tall viewport the way the other
+            tool pages' flex-1 charts do — `mt-auto` does that job instead. */}
+        <div className="mt-auto">
+          <ToolFooterMark sourceNote={SOURCE_NOTE} />
+        </div>
       </div>
     );
   }
@@ -134,7 +141,9 @@ export function CorporateCalendarDashboard() {
         <IpoCards ipos={data.recentIpos} />
       </div>
 
-      <ToolFooterMark sourceNote={SOURCE_NOTE} />
+      <div className="mt-auto">
+        <ToolFooterMark sourceNote={SOURCE_NOTE} />
+      </div>
     </div>
   );
 }
