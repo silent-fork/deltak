@@ -280,6 +280,59 @@ export async function createPost(
   return postFromDoc(postDoc, threadId);
 }
 
+export async function getPost(threadId: string, postId: string): Promise<ForumPost | null> {
+  const doc = await getDocument(`forumThreads/${threadId}/posts/${postId}`);
+  return doc ? postFromDoc(doc, threadId) : null;
+}
+
+/**
+ * Author-only, enforced here as well as by `firestore.rules` — the rule is
+ * the real gate (this file has no privileged bypass, see its own header
+ * comment), but a wrong-author call should read as a clean 403 from the
+ * route rather than whatever Firestore's own error text says.
+ */
+export async function updatePost(
+  threadId: string,
+  postId: string,
+  body: string,
+  uid: string,
+  idToken: string,
+): Promise<ForumPost> {
+  const post = await getPost(threadId, postId);
+  if (!post) throw new ForumValidationError("Post not found.");
+  if (post.authorUid !== uid) throw new ForumValidationError("Not the author of this post.");
+  if (post.deletedAt) throw new ForumValidationError("This post has been deleted.");
+  // The upper bound here is the article ceiling regardless of which kind of
+  // post this is — permissive enough to never block a legitimate edit to
+  // either a comment or an article body, and BODY_MIN still catches an
+  // edit that empties the post out.
+  const cleanBody = assertLen(body, BODY_MIN, ARTICLE_BODY_MAX, "Post");
+  const doc = await patchDocument(
+    `forumThreads/${threadId}/posts/${postId}`,
+    { body: cleanBody, editedAt: new Date() },
+    idToken,
+  );
+  return postFromDoc(doc, threadId);
+}
+
+/**
+ * Soft delete only — the same "never truly gone" posture the rest of this
+ * file already takes (see the header comment on `forumProfiles`'s own
+ * delete rule). Sets `deletedAt`; nothing in Firestore's rules or this
+ * function ever issues a real DELETE against a post document.
+ */
+export async function deletePost(
+  threadId: string,
+  postId: string,
+  uid: string,
+  idToken: string,
+): Promise<void> {
+  const post = await getPost(threadId, postId);
+  if (!post) throw new ForumValidationError("Post not found.");
+  if (post.authorUid !== uid) throw new ForumValidationError("Not the author of this post.");
+  await patchDocument(`forumThreads/${threadId}/posts/${postId}`, { deletedAt: new Date() }, idToken);
+}
+
 async function bumpPostCount(uid: string, idToken: string): Promise<void> {
   const profile = await getForumProfile(uid);
   if (!profile) return;

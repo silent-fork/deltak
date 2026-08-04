@@ -60,11 +60,14 @@ service cloud.firestore {
       match /posts/{postId} {
         allow read: if true;
         allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-        // Same two-caller split as the thread doc above: the post's own
-        // author (or a moderator) editing/removing it, and *any* signed-in
-        // member liking it, which only ever touches likeCount.
+        // Three legitimate callers on a post: its own author editing the
+        // body or soft-deleting it (never authorUid/authorName/createdAt —
+        // those stay fixed once written), a moderator with no such field
+        // restriction, and *any* signed-in member liking it, which only
+        // ever touches likeCount.
         allow update: if isSignedIn() && (
-          resource.data.authorUid == request.auth.uid ||
+          (resource.data.authorUid == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'editedAt', 'deletedAt'])) ||
           isModerator() ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
         );

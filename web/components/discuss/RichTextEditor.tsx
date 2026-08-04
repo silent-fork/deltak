@@ -97,7 +97,9 @@ export function RichTextEditor({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [preview, setPreview] = useState(false);
+  // Defaults on — the whole point is formatting reads as formatting while
+  // typing, not as raw `##`/`**` syntax the toggle used to hide behind.
+  const [preview, setPreview] = useState(true);
 
   function apply(op: (el: HTMLTextAreaElement) => Selection) {
     const el = ref.current;
@@ -208,7 +210,7 @@ export function RichTextEditor({
         <span className="mx-0.5 h-4 w-px bg-zinc-800" />
         <button
           type="button"
-          title={preview ? "Edit" : "Preview"}
+          title={preview ? "Hide live preview" : "Show live preview"}
           className={`${btn} ${preview ? "bg-quantum/15 text-quantum" : ""}`}
           onClick={() => setPreview((p) => !p)}
         >
@@ -216,24 +218,33 @@ export function RichTextEditor({
         </button>
       </div>
 
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        required
+        rows={rows}
+        className="resize-y rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
+      />
+
+      {/* Updates on every keystroke — `## `, `**bold**`, etc. show as the
+          actual heading/bold rather than staying literal syntax the way a
+          native textarea alone would leave them, without needing a
+          contenteditable rewrite of the input itself. */}
       {preview ? (
-        <div className="min-h-[80px] rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[13px] leading-relaxed text-zinc-300">
-          {value.trim() ? renderForumMarkdown(value) : (
-            <p className="text-zinc-600">Nothing to preview yet.</p>
-          )}
+        <div className="rounded-md border border-zinc-800 bg-zinc-950/40 px-3 py-2">
+          <p className="mb-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-600">Live preview</p>
+          <div className="text-[13px] leading-relaxed text-zinc-300">
+            {value.trim() ? (
+              renderForumMarkdown(value)
+            ) : (
+              <p className="text-zinc-600">Nothing to preview yet.</p>
+            )}
+          </div>
         </div>
-      ) : (
-        <textarea
-          ref={ref}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          maxLength={maxLength}
-          required
-          rows={rows}
-          className="resize-y rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[13px] leading-relaxed text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-quantum/50"
-        />
-      )}
+      ) : null}
     </div>
   );
 }

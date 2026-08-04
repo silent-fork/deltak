@@ -2,14 +2,11 @@ import { AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ArticleBody } from "@/components/discuss/ArticleBody";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
-import { LikeButton } from "@/components/discuss/LikeButton";
+import { PostView } from "@/components/discuss/PostView";
 import { ReplyForm } from "@/components/discuss/ReplyForm";
-import { ReportButton } from "@/components/discuss/ReportButton";
 import { ShareButtons } from "@/components/discuss/ShareButtons";
 import { getForumCategory } from "@/lib/content/forumCategories";
-import { renderForumMarkdown } from "@/lib/discuss/markdown";
 import { getViewerIdentity } from "@/lib/server/firebaseAuth";
 import { getThread, listPosts } from "@/lib/server/forum";
 import { timeAgo } from "@/lib/utils";
@@ -143,20 +140,18 @@ export default async function DiscussThreadPage({
 
       {articlePost ? (
         <section className="relative mx-auto max-w-3xl border-l-2 border-quantum/30 px-5 pb-8 pl-6">
-          <div className="text-[15px] leading-[1.85] text-zinc-300">
-            <ArticleBody body={articlePost.deletedAt ? "[removed by moderator]" : articlePost.body} />
-          </div>
-          {!articlePost.deletedAt ? (
-            <div className="mt-4 flex items-center justify-between">
-              <LikeButton
-                threadId={thread.id}
-                postId={articlePost.id}
-                initialCount={articlePost.likeCount}
-                canLike={Boolean(viewer)}
-              />
-              <ReportButton threadId={thread.id} postId={articlePost.id} canReport={Boolean(viewer)} />
-            </div>
-          ) : null}
+          <PostView
+            threadId={thread.id}
+            postId={articlePost.id}
+            body={articlePost.body}
+            deletedAt={articlePost.deletedAt}
+            authorUid={articlePost.authorUid}
+            viewerUid={viewer?.uid ?? null}
+            likeCount={articlePost.likeCount}
+            canLike={Boolean(viewer)}
+            canReport={Boolean(viewer)}
+            variant="article"
+          />
         </section>
       ) : null}
 
@@ -191,20 +186,20 @@ export default async function DiscussThreadPage({
                         {p.editedAt ? " · edited" : ""}
                       </span>
                     </div>
-                    <div className="mt-1 text-[13.5px] leading-relaxed text-zinc-300">
-                      {renderForumMarkdown(p.deletedAt ? "[removed by moderator]" : p.body)}
+                    <div className="mt-1">
+                      <PostView
+                        threadId={thread.id}
+                        postId={p.id}
+                        body={p.body}
+                        deletedAt={p.deletedAt}
+                        authorUid={p.authorUid}
+                        viewerUid={viewer?.uid ?? null}
+                        likeCount={p.likeCount}
+                        canLike={Boolean(viewer)}
+                        canReport={Boolean(viewer)}
+                        variant="comment"
+                      />
                     </div>
-                    {!p.deletedAt ? (
-                      <div className="mt-2 flex items-center justify-between">
-                        <LikeButton
-                          threadId={thread.id}
-                          postId={p.id}
-                          initialCount={p.likeCount}
-                          canLike={Boolean(viewer)}
-                        />
-                        <ReportButton threadId={thread.id} postId={p.id} canReport={Boolean(viewer)} />
-                      </div>
-                    ) : null}
                   </div>
                 </article>
               );
