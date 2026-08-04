@@ -27,7 +27,11 @@ export async function DiscussChrome({
   viewEvent: string;
 }) {
   const viewer = await getViewerIdentity();
-  const profile = viewer ? await getForumProfile(viewer.uid) : null;
+  // Every /discuss page renders through this chrome, so an unguarded
+  // Firestore call here — unlike the category/thread pages' own reads —
+  // would take the whole page down on a transient failure instead of just
+  // falling back to "signed in, display name unknown yet" for the header.
+  const profile = viewer ? await getForumProfile(viewer.uid).catch(() => null) : null;
 
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
