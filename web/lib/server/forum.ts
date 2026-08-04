@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import {
   createDocument,
   deleteDocument,
@@ -113,7 +115,7 @@ export async function createForumProfile(
 
 /* -------------------------------------------------------------- threads */
 
-export type ForumPostType = "discussion" | "article";
+export type ForumPostType = "discussion" | "article" | "feed";
 
 export interface ForumThread {
   id: string;
@@ -126,8 +128,11 @@ export interface ForumThread {
   lastActivityAt: string;
   pinned: boolean;
   locked: boolean;
-  /** "article" threads render their opening post as a long-form piece, not a chat bubble. */
+  /** "article" renders its opening post as a long-form piece; "feed" as an ingested headline. Neither is a chat bubble. */
   postType: ForumPostType;
+  /** Only set on postType "feed" — the original story's URL and the feed's display name. */
+  sourceLink: string | null;
+  sourceName: string | null;
 }
 
 function threadFromDoc(doc: FirestoreDoc): ForumThread {
@@ -144,7 +149,10 @@ function threadFromDoc(doc: FirestoreDoc): ForumThread {
     lastActivityAt: iso(f.lastActivityAt ?? f.createdAt),
     pinned: Boolean(f.pinned ?? false),
     locked: Boolean(f.locked ?? false),
-    postType: f.postType === "article" ? "article" : "discussion",
+    postType:
+      f.postType === "article" ? "article" : f.postType === "feed" ? "feed" : "discussion",
+    sourceLink: f.sourceLink ? String(f.sourceLink) : null,
+    sourceName: f.sourceName ? String(f.sourceName) : null,
   };
 }
 
@@ -171,12 +179,13 @@ export async function createThread(
   author: { uid: string; name: string },
   idToken: string,
   postType: ForumPostType = "discussion",
+  source: { link: string; name: string } | null = null,
 ): Promise<{ thread: ForumThread; post: ForumPost }> {
   const cleanTitle = assertLen(title, TITLE_MIN, TITLE_MAX, "Title");
   const cleanBody =
-    postType === "article"
-      ? assertLen(body, BODY_MIN, ARTICLE_BODY_MAX, "Article")
-      : assertLen(body, BODY_MIN, BODY_MAX, "Post");
+    postType === "discussion"
+      ? assertLen(body, BODY_MIN, BODY_MAX, "Post")
+      : assertLen(body, BODY_MIN, ARTICLE_BODY_MAX, "Article");
   const now = new Date();
 
   const threadDoc = await createDocument(
@@ -192,6 +201,8 @@ export async function createThread(
       pinned: false,
       locked: false,
       postType,
+      sourceLink: source?.link ?? null,
+      sourceName: source?.name ?? null,
     },
     idToken,
   );
@@ -397,6 +408,31 @@ export async function reportPost(
       resolved: false,
     },
     idToken,
+  );
+}
+
+/* --------------------------------------------------------- feed ingestion */
+
+/** A stable, filesystem-safe Firestore doc ID from a feed item's own URL — the dedup key. */
+function feedItemId(link: string): string {
+  return createHash("sha1").update(link).digest("hex");
+}
+
+export async function wasFeedItemIngested(link: string, idToken: string): Promise<boolean> {
+  const doc = await getDocument(`forumFeedItems/${feedItemId(link)}`, idToken);
+  return doc !== null;
+}
+
+export async function markFeedItemIngested(
+  link: string,
+  threadId: string,
+  idToken: string,
+): Promise<void> {
+  await createDocument(
+    "forumFeedItems",
+    { link, threadId, ingestedAt: new Date() },
+    idToken,
+    feedItemId(link),
   );
 }
 

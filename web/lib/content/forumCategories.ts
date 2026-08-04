@@ -15,6 +15,13 @@ export interface ForumCategory {
 
 export const FORUM_CATEGORIES: ForumCategory[] = [
   {
+    slug: "news",
+    name: "News",
+    tagline: "Live market headlines, auto-updated — comment on any story",
+    description:
+      "Market headlines pulled in automatically from verified live sources, refreshed through the day. Every story is open underneath for discussion.",
+  },
+  {
     slug: "strategy",
     name: "Strategy",
     tagline: "Setups, adjustments and the trade-offs between them",

@@ -32,14 +32,29 @@ service cloud.firestore {
     }
 
     // Profiles: public read (a byline needs a display name without forcing
-    // a login just to view a thread), self-create, self-or-moderator update.
-    // Never client-deletable — a departing member's post history staying
-    // attributable is the intended behavior, same as the app's own trading
-    // tables never hard-delete a position.
+    // a login just to view a thread), self-create. Never client-deletable —
+    // a departing member's post history staying attributable is the
+    // intended behavior, same as the app's own trading tables never
+    // hard-delete a position.
+    //
+    // Update is deliberately split by field: the owner can rename
+    // themselves, but never touch their own `role` — the account that
+    // wrote this comment originally left that unrestricted, which let any
+    // signed-in user grant themselves `moderator` with a single PATCH.
+    // Only an existing moderator can change *anyone's* role now, including
+    // granting the first one — which makes the very first moderator (and
+    // this app's feed-ingestion bot, see forumFeedItems below) a manual
+    // grant via the Firebase console, not something the app can bootstrap
+    // through its own rules. Console writes go through Firebase's own
+    // admin path, not these rules, so that bootstrap step is unaffected by
+    // anything written here.
     match /forumProfiles/{uid} {
       allow read: if true;
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isModerator();
+      allow update: if isSignedIn() && (
+        (isOwner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])) ||
+        isModerator()
+      );
       allow delete: if false;
     }
 
@@ -94,6 +109,17 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
       allow update: if isModerator();
       allow delete: if false;
+    }
+
+    // Dedup bookkeeping for RSS-ingested threads — doc ID is a hash of the
+    // source item's link, value is which thread it became. Nothing in the
+    // UI ever reads this; it exists purely so a cron run doesn't create a
+    // second thread for a story it already posted. Moderator-gated because
+    // the ingestion route authenticates as the feed bot's own account,
+    // which is granted that role manually (see forumProfiles above) —
+    // there is no separate "service account" concept in these rules.
+    match /forumFeedItems/{itemId} {
+      allow read, write: if isModerator();
     }
   }
 }

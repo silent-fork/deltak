@@ -101,8 +101,10 @@ export default async function DiscussThreadPage({
   if (!thread || thread.category !== category) notFound();
 
   const isArticle = thread.postType === "article";
-  const articlePost = isArticle ? posts[0] : null;
-  const comments = isArticle ? posts.slice(1) : posts;
+  const isFeed = thread.postType === "feed";
+  const hasOpener = isArticle || isFeed;
+  const articlePost = hasOpener ? posts[0] : null;
+  const comments = hasOpener ? posts.slice(1) : posts;
   const wordCount = articlePost ? articlePost.body.trim().split(/\s+/).filter(Boolean).length : 0;
   const readMins = Math.max(1, Math.round(wordCount / 200));
 
@@ -120,10 +122,14 @@ export default async function DiscussThreadPage({
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-quantum">
             Article · {readMins} min read
           </p>
+        ) : isFeed ? (
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-amber-400">
+            News · via {thread.sourceName ?? thread.authorName}
+          </p>
         ) : null}
         <h1
           className={
-            isArticle
+            hasOpener
               ? "text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-4xl"
               : "text-balance text-2xl font-bold tracking-tight text-zinc-50"
           }
@@ -132,14 +138,18 @@ export default async function DiscussThreadPage({
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-[10.5px] uppercase tracking-wider text-zinc-600">
-            {isArticle ? "By" : "Started by"} {thread.authorName} · {timeAgo(thread.createdAt)}
+            {isArticle ? "By" : isFeed ? "Via" : "Started by"} {thread.authorName} · {timeAgo(thread.createdAt)}
           </p>
           <ShareButtons url={`${SITE_URL}/discuss/${category}/${thread.id}`} title={thread.title} />
         </div>
       </section>
 
       {articlePost ? (
-        <section className="relative mx-auto max-w-3xl border-l-2 border-quantum/30 px-5 pb-8 pl-6">
+        <section
+          className={`relative mx-auto max-w-3xl border-l-2 px-5 pb-8 pl-6 ${
+            isFeed ? "border-amber-400/30" : "border-quantum/30"
+          }`}
+        >
           <PostView
             threadId={thread.id}
             postId={articlePost.id}
@@ -150,7 +160,7 @@ export default async function DiscussThreadPage({
             likeCount={articlePost.likeCount}
             canLike={Boolean(viewer)}
             canReport={Boolean(viewer)}
-            variant="article"
+            variant={isArticle ? "article" : "comment"}
           />
         </section>
       ) : null}
@@ -158,7 +168,7 @@ export default async function DiscussThreadPage({
       <section className="relative mx-auto max-w-3xl px-5 pb-6">
         {comments.length ? (
           <p className="mb-3 font-mono text-[10.5px] uppercase tracking-wider text-zinc-600">
-            {comments.length} {comments.length === 1 ? (isArticle ? "comment" : "reply") : isArticle ? "comments" : "replies"}
+            {comments.length} {comments.length === 1 ? (hasOpener ? "comment" : "reply") : hasOpener ? "comments" : "replies"}
           </p>
         ) : null}
         <div className="relative">

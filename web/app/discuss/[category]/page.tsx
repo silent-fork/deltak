@@ -1,4 +1,4 @@
-import { AlertTriangle, FileText, MessageCircle, Pin } from "lucide-react";
+import { AlertTriangle, FileText, MessageCircle, Pin, Rss } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -99,6 +99,8 @@ export default async function DiscussCategoryPage({
               >
                 {t.postType === "article" ? (
                   <FileText className="h-4 w-4 shrink-0 text-quantum/70" />
+                ) : t.postType === "feed" ? (
+                  <Rss className="h-4 w-4 shrink-0 text-amber-400/70" />
                 ) : (
                   <MessageCircle className="h-4 w-4 shrink-0 text-zinc-600" />
                 )}
@@ -109,13 +111,17 @@ export default async function DiscussCategoryPage({
                       <span className="shrink-0 rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-quantum">
                         Article
                       </span>
+                    ) : t.postType === "feed" ? (
+                      <span className="shrink-0 rounded border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-amber-400">
+                        News
+                      </span>
                     ) : null}
                     <span className="truncate text-[13.5px] font-medium text-zinc-100">
                       {t.title}
                     </span>
                   </div>
                   <p className="mt-0.5 truncate font-mono text-[10px] text-zinc-600">
-                    {t.authorName} · {timeAgo(t.createdAt)}
+                    {t.postType === "feed" ? `via ${t.authorName}` : t.authorName} · {timeAgo(t.createdAt)}
                   </p>
                 </div>
                 <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
