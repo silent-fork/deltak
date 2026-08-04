@@ -21,11 +21,12 @@ export const dynamic = "force-dynamic";
 /**
  * `GET /api/discuss/ingest-feed` — pulls every configured source in
  * `lib/server/rssFeed.ts`, creates a "feed" thread in Discuss → News for
- * anything not already ingested, and skips the rest. Meant to be called
- * only by Vercel Cron (`vercel.json`'s `crons` entry), never a browser:
- * gated on `CRON_SECRET` the same way Vercel's own docs describe, since
- * this is a content-creation endpoint and the only auth it can check
- * without a signed-in human is a shared secret in the request header.
+ * anything not already ingested, and skips the rest. Not on a schedule
+ * yet — there is no `vercel.json` `crons` entry for it (Vercel Hobby only
+ * allows once-a-day schedules, so that's a deliberate follow-up decision,
+ * not an oversight). For now this is triggered manually: `curl` it with
+ * `Authorization: Bearer $CRON_SECRET`, the same header Vercel Cron itself
+ * would send once a schedule is added later.
  *
  * Posts as a dedicated bot account (`DISCUSS_FEED_BOT_EMAIL`/
  * `DISCUSS_FEED_BOT_PASSWORD`) rather than this app's own privileged
