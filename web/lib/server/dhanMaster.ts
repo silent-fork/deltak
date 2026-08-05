@@ -70,6 +70,13 @@ async function parseDhanMaster(): Promise<DhanMasterIndex> {
   const iInstrument = col("INSTRUMENT");
   const iUnderlying = col("UNDERLYING_SYMBOL");
   const iSymbolName = col("SYMBOL_NAME");
+  // `SYMBOL_NAME` is a generic per-segment code ("BSXOPT" for every single
+  // SENSEX option, "NIFTYOPT" for every NIFTY one) — useless as a trading
+  // symbol since it doesn't even tell two contracts apart. `DISPLAY_NAME`
+  // ("SENSEX 24 SEP 68000 CALL") is the actual descriptive one, confirmed
+  // against a live master fetch; still falls back to SYMBOL_NAME if a row's
+  // DISPLAY_NAME is ever blank.
+  const iDisplayName = col("DISPLAY_NAME");
   const iLotSize = col("LOT_SIZE");
   const iExpiry = col("SM_EXPIRY_DATE");
   const iStrike = col("STRIKE_PRICE");
@@ -137,7 +144,7 @@ async function parseDhanMaster(): Promise<DhanMasterIndex> {
 
     (options[underlying] ??= []).push({
       token: securityId,
-      symbol: row[iSymbolName] ?? "",
+      symbol: row[iDisplayName] || row[iSymbolName] || "",
       name: underlying,
       exchSeg: exchSeg === "BSE" || exchSeg === "BFO" ? "BFO" : "NFO",
       strike: Number(row[iStrike] ?? 0) || 0,
