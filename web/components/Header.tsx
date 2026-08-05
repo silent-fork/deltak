@@ -178,8 +178,11 @@ export function Header({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
         <div className="flex shrink-0 items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10 shadow-quantum">
-              <Zap className="h-4 w-4 text-quantum" />
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10"
+              style={{ boxShadow: "0 0 0 1px rgba(0,240,255,0.16), 0 0 12px rgba(0,240,255,0.06)" }}
+            >
+              <Zap className="h-4 w-4 text-quantum/80" />
             </div>
             <div className="leading-none">
               <Wordmark className="text-[13px] tracking-[0.16em]" />
@@ -299,7 +302,8 @@ export function Header({
             <Button
               variant="quantum"
               size="sm"
-              className="h-7"
+              className="h-7 border-quantum/35 bg-quantum/[0.08] text-quantum/80 hover:bg-quantum/15"
+              style={{ boxShadow: "0 0 0 1px rgba(0,240,255,0.16), 0 0 10px rgba(0,240,255,0.06)" }}
               onClick={() => setLoginOpen(true)}
             >
               <Plug className="h-3 w-3" />

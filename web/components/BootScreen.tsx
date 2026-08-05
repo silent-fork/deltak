@@ -125,15 +125,19 @@ export function BootScreen({
 
         {/* Core emblem — the same square mark the homepage header and the
             sign-in screen use, just larger for a screen with nothing else on
-            it. `shadow-quantum` gives it the same glow ring the terminal's
-            own focused/armed surfaces carry, instead of a plain border.
-            Static, not pulsing: the progress bar and status copy below
-            already say something is moving. */}
+            it. A dim glow ring instead of a plain border, toned down well
+            below the terminal's own focused/armed surfaces — full brightness
+            here read as gaudy on a screen this quiet. Static, not pulsing:
+            the progress bar and status copy below already say something is
+            moving. */}
         <div
-          className="relative flex h-11 w-11 animate-fade-up items-center justify-center rounded-md border border-quantum/40 bg-quantum/10 shadow-quantum"
-          style={{ animationDelay: "160ms" }}
+          className="relative flex h-11 w-11 animate-fade-up items-center justify-center rounded-md border border-quantum/40 bg-quantum/10"
+          style={{
+            animationDelay: "160ms",
+            boxShadow: "0 0 0 1px rgba(0,240,255,0.16), 0 0 12px rgba(0,240,255,0.06)",
+          }}
         >
-          <Zap className="relative h-5 w-5 text-quantum" />
+          <Zap className="relative h-5 w-5 text-quantum/80" />
         </div>
 
         <div
@@ -151,20 +155,33 @@ export function BootScreen({
 
         {/* Fluid progress — a filling arc, and rotating status copy that
             crossfades on every line change, not a checklist accumulating
-            underneath it. Housed in the same bordered, blurred surface every
-            panel on this product sits in, rather than floating bare. */}
+            underneath it. Floating bare rather than boxed in a bordered
+            panel: the bar is the only moving thing on the screen and reads
+            better as a line of light than as a widget in a card. */}
         <div
-          className="dk-panel flex w-80 animate-fade-up flex-col items-center gap-4 rounded-xl px-5 py-4"
+          className="flex w-80 animate-fade-up flex-col items-center gap-4"
           style={{ animationDelay: "300ms" }}
         >
-          <div className="h-[3px] w-full overflow-hidden rounded-full bg-zinc-800/70">
+          <div className="relative h-[4px] w-full overflow-hidden rounded-full bg-zinc-800/50">
             <div
               className={cn(
-                "h-full rounded-full bg-gradient-to-r from-quantum/30 via-quantum to-quantum/60 transition-[width] duration-700 ease-out",
+                "relative h-full overflow-hidden rounded-full bg-gradient-to-r from-quantum/30 via-quantum to-quantum/60 transition-[width] duration-700 ease-out",
                 complete && "from-quantum via-quantum to-quantum",
               )}
-              style={{ width: `${progress}%`, boxShadow: "0 0 10px rgba(0,240,255,0.5)" }}
-            />
+              style={{ width: `${progress}%`, boxShadow: "0 0 12px rgba(0,240,255,0.55)" }}
+            >
+              {/* A sweeping sheen, not a static fill — the same shimmer
+                  every skeleton on this product uses (`dk-shimmer`), just
+                  faster: this bar is the one thing on screen actively
+                  saying "working", so it earns a livelier cadence than a
+                  placeholder waiting on data. */}
+              {!complete ? (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 -translate-x-full animate-[dk-shimmer_1.1s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent"
+                />
+              ) : null}
+            </div>
           </div>
 
           <div
