@@ -138,6 +138,16 @@ export function useEngine(simulate: boolean) {
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [masterReady, setMasterReady] = useState(false);
   /**
+   * Bumped every time `masterRef.current` is *replaced*, not just whenever it
+   * becomes ready. The bootstrap effect below can call `loadMaster` twice —
+   * once assuming Angel One before the session is known, again with Dhan's
+   * once a Dhan session resolves — and both loads report `ready: true`, so a
+   * memo keyed on the `masterReady` boolean alone would never re-run for the
+   * second swap: `true → true` is not a change React re-renders for. This
+   * counter is what `spotTokens`/`spotToken` below actually key off.
+   */
+  const [masterVersion, setMasterVersion] = useState(0);
+  /**
    * Whether the initial session restore has *settled* — not whether it
    * succeeded. Before this, "not authenticated" and "haven't checked yet"
    * were the same `false`, which is what put the sign-in screen on a fully
@@ -801,6 +811,7 @@ export function useEngine(simulate: boolean) {
       const payload = await withRetry(() => api.master(b) as Promise<MasterPayload>);
       masterRef.current = new ScripMaster(payload);
       setMasterReady(masterRef.current.ready);
+      setMasterVersion((v) => v + 1);
       setError(null);
       log(
         "INFO",
@@ -933,16 +944,20 @@ export function useEngine(simulate: boolean) {
       Object.fromEntries(
         UNDERLYINGS.map((u) => [u, masterRef.current.spotToken(u)]),
       ) as Record<string, string>,
-    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // The master is a ref; `masterVersion` is the state edge that says it
+    // was (re)loaded — see its declaration for why `masterReady` alone
+    // isn't enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [masterReady],
+    [masterVersion],
   );
 
   const spotToken = useMemo(
     () => masterRef.current.spotToken(focus),
-    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // The master is a ref; `masterVersion` is the state edge that says it
+    // was (re)loaded — see its declaration for why `masterReady` alone
+    // isn't enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [focus, masterReady],
+    [focus, masterVersion],
   );
 
   /**
