@@ -9,7 +9,7 @@
  * rotating the key later is one env var away from correct rather than a
  * source-file hunt.
  */
-const INDEXNOW_KEY = process.env.DK_INDEXNOW_KEY ?? "0f0f40144f7f4db5baeb4391733e69de";
+const INDEXNOW_KEY = process.env.DK_INDEXNOW_KEY ?? "2a2a8adbdc0e4ab891cc6268f5578ea9";
 
 export function GET() {
   return new Response(INDEXNOW_KEY, {
