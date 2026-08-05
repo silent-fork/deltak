@@ -30,17 +30,22 @@ const SITE_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
-const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal for Angel One";
+const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal";
 /**
  * Google truncates a meta description around 155–160 characters — the old
  * 330-character version wasn't wrong, just invisible past the cut, so every
  * search result rendered a mid-sentence ellipsis instead of a full pitch.
  * Kept under 160 everywhere it's reused below (page <meta>, OG, Twitter,
  * JSON-LD) for the same reason.
+ *
+ * Broker-neutral by design: the terminal supports more than one broker
+ * (Angel One, Dhan, more to follow) — naming one here would just need
+ * editing again at the next addition, so the pitch is DKMS/Quantum Horizon
+ * itself, not whichever broker happens to be wired in today.
  */
 const DESCRIPTION =
-  "DeltaK: a live Angel One options terminal built on the Quantum Horizon — COA walls, " +
-  "RRG rotation, Autopilot across NIFTY, BANKNIFTY, FINNIFTY.";
+  "DeltaK: a live options terminal on the Quantum Horizon — COA walls, " +
+  "RRG rotation, Autopilot across NIFTY, BANKNIFTY, FINNIFTY, SENSEX & BANKEX.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -50,23 +55,25 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   keywords: [
-    "Angel One",
-    "Angel One SmartAPI",
+    "DeltaK",
+    "Quantum Horizon",
+    "QntmHrzn",
+    "DKMS",
     "options trading",
     "futures and options",
     "F&O trading",
     "algo trading India",
+    "multi-broker options trading",
     "NIFTY options",
     "BANKNIFTY options",
     "FINNIFTY options",
+    "SENSEX options",
+    "BANKEX options",
     "options trading terminal",
     "options trading signals",
     "intraday options strategy",
     "relative strength rotation",
     "RRG",
-    "Quantum Horizon",
-    "DeltaK",
-    "DKMS",
     "paper trading",
     "options chain analysis",
   ],

@@ -965,17 +965,29 @@ export function useEngine(simulate: boolean) {
    * pass stops on the first rate-limit, and if it only ever gets part of the
    * way through, the strikes it did reach should be the ones the walls and the
    * driver actually sit on.
+   *
+   * `oiSeedSpan` (5 strikes either side) was sized against Angel One's
+   * historical endpoints specifically — `getCandleData` and `getOIData` are
+   * two separate metered calls per contract, throttled hard enough that
+   * seeding the *whole* rendered chain (chainDepth, 12 either side) routinely
+   * wouldn't finish before the next poll cycle came around. Dhan's
+   * `/charts/intraday` covers both candles and OI in one call, and its
+   * published cap (5 req/sec general, no separate historical-endpoint
+   * throttle) is looser than what actually gated Angel One — so a Dhan
+   * session seeds the full rendered band instead of the narrower one.
    */
+  const seedSpan =
+    session.broker === "dhan" ? cfgRef.current.chainDepth : cfgRef.current.oiSeedSpan;
   const seedTokens = useMemo(() => {
     const atm = focusChain?.atm_strike ?? 0;
     if (!focusChain || !atm) return [];
-    const span = INDEX_UNIVERSE[focus].strikeStep * cfgRef.current.oiSeedSpan;
+    const span = INDEX_UNIVERSE[focus].strikeStep * seedSpan;
     return focusChain.rows
       .filter((r) => Math.abs(r.strike - atm) <= span)
       .sort((a, b) => Math.abs(a.strike - atm) - Math.abs(b.strike - atm))
       .flatMap((r) => [r.call?.token, r.put?.token])
       .filter((t): t is string => !!t);
-  }, [focusChain, focus]);
+  }, [focusChain, focus, seedSpan]);
 
   /** The put defending Aegis and the call capping Zenith. */
   const wallTokens = useMemo(() => {

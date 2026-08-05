@@ -14,8 +14,8 @@ const SITE_URL =
  * gets the exact line the typed generator can't emit, same pattern already
  * used for llms.txt/llms-full.txt.
  *
- * Pure plumbing, not content, for any crawler: the Angel One app
- * registration's redirect URL and the API routes the terminal calls under
+ * Pure plumbing, not content, for any crawler: the broker OAuth app
+ * registrations' redirect URL and the API routes the terminal calls under
  * the hood. /terminal is deliberately *not* listed here despite being
  * noindex — a crawler has to actually fetch a page to see its noindex meta
  * tag, so disallowing it here would hide that tag rather than enforce it.

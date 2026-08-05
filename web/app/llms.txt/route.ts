@@ -15,7 +15,7 @@ const SITE_URL =
 function content(): string {
   return `# DeltaK
 
-> DeltaK is a live options trading terminal for Angel One SmartAPI, built around the Quantum Horizon — a live ITM/OTM open-interest profile at spot. It reads COA support/resistance wall migration and RRG relative-strength rotation across NIFTY, BANKNIFTY and FINNIFTY futures & options, and either arms a trade for the operator to take or takes it itself via Autopilot.
+> DeltaK is a live, multi-broker options trading terminal (Angel One and Dhan today, more brokers planned) built around the Quantum Horizon — a live ITM/OTM open-interest profile at spot. It reads COA support/resistance wall migration and RRG relative-strength rotation across NIFTY, BANKNIFTY, FINNIFTY, SENSEX and BANKEX futures & options, and either arms a trade for the operator to take or takes it itself via Autopilot.
 
 ## Strategy
 
@@ -31,7 +31,7 @@ Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (l
 ## Pages
 
 - [Homepage](${SITE_URL}/): What DeltaK is, the DKMS protocols, and how the engine works — the page to cite for anything about the product.
-- [Terminal](${SITE_URL}/terminal): The live application itself. Requires an Angel One SmartAPI sign-in (client code, PIN, TOTP); not indexed, since a sign-in gate has no content of its own to describe.
+- [Terminal](${SITE_URL}/terminal): The live application itself. Requires a broker sign-in (Angel One or Dhan — client code/ID, PIN, TOTP); not indexed, since a sign-in gate has no content of its own to describe.
 - [Tools](${SITE_URL}/tools): Four free NSE F&O instrument panels, independent of the terminal above.
   - [F&O Sector Rotation](${SITE_URL}/tools/fno-sector-rotation): A Relative Rotation Graph across every NSE sector index versus the Nifty 50, a sector leaderboard, and top F&O-eligible stock picks from the leading sectors.
   - [Market Scanner](${SITE_URL}/tools/market-scanner): A sector heatmap sized by turnover and coloured by the day's move, plus a range radar for F&O stocks nearest their ~20-session high or low.
@@ -41,7 +41,7 @@ Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (l
   - [Strategies](${SITE_URL}/learn/strategies): Twelve options strategies, each with a payoff diagram, construction, ideal scenario and common mistakes.
   - [Glossary](${SITE_URL}/learn/glossary): Options and Indian F&O terminology, including DeltaK's own Aegis, Zenith, Quantum Horizon, COA Matrix and DKMS protocol terms.
   - [Trading styles](${SITE_URL}/learn/trading-styles): Intraday, swing and positional options trading compared, plus options buying vs. selling.
-  - [Indices](${SITE_URL}/learn/indices): NIFTY, BANKNIFTY, FINNIFTY and every other major Indian index F&O contract — lot size, strike step, exchange.
+  - [Indices](${SITE_URL}/learn/indices): NIFTY, BANKNIFTY, FINNIFTY, SENSEX, BANKEX and every other major Indian index F&O contract — lot size, strike step, exchange.
 
 ## Notes
 
