@@ -210,14 +210,17 @@ export default function HomePage() {
           </span>
         </h1>
 
-        {/* Was text-[15px]/text-base — the same size as the h1's own supporting
-            weight rather than a step below it, which read as two headlines
-            stacked rather than a headline and its subhead. */}
+        {/*
+          Was text-[15px]/text-base and a full mechanism-and-index rundown —
+          the same visual weight as the h1 itself, reading as two headlines
+          stacked rather than a headline and its subhead, and the five index
+          names it spelled out are the same five the chip row two beats below
+          already names individually. Cut to the two moves DKMS actually
+          watches for, "five Indian indices" standing in for the roll call.
+        */}
         <p className="mx-auto mt-5 max-w-2xl text-balance text-[13px] leading-relaxed text-zinc-400 sm:text-[14px]">
-          DeltaK reads COA support/resistance walls, RRG relative-strength rotation
-          and live open-interest across NIFTY, BANKNIFTY, FINNIFTY, SENSEX &amp;
-          BANKEX futures &amp; options — and either arms a trade for you to take,
-          or takes it itself.
+          Walls shift. Rotation turns. DeltaK watches both across five Indian
+          indices — then arms your trade, or fires it itself.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3">
