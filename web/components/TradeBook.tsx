@@ -277,6 +277,15 @@ export const TradeBook = memo(function TradeBook({
     try {
       await fn();
       onChanged();
+      // The engine's own persist call is fire-and-forget by design (see
+      // /api/persist's own comment — a write must never delay a trading
+      // decision), so there's no signal to await here for "the close has
+      // actually landed in Supabase." A short delay before refreshing beats
+      // never refreshing at all: without it, a just-closed position's own
+      // stale archive snapshot (still `OPEN`) re-passes mergeBook's dedup
+      // the instant the live ledger drops it, showing as a read-only ghost
+      // duplicate in the Open tab until the next manual refresh or reload.
+      setTimeout(onRefreshArchive, 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
       setTimeout(() => setError(null), 6000);

@@ -109,11 +109,23 @@ const pick = (row: Record<string, unknown>, allowed: readonly string[]) => {
  * stable: the entry, every mark-to-market checkpoint and the exit all upsert
  * onto one row rather than appending twenty.
  *
+ * `openedAt` is parsed and re-serialized rather than used as-is: the exact
+ * same instant can reach here as `...T05:29:25Z` on one call (the engine's
+ * own timestamp) and `...T05:29:25+00:00` on another (Postgres's own
+ * rendering of the same `timestamptz`, round-tripped back through a position
+ * refresh) — two different strings for one moment, which used to compute two
+ * different trade keys and upsert onto two different rows instead of one.
+ * The exit write landing on a key the open write never used is exactly why a
+ * manually closed position could come back from Supabase still `OPEN`.
+ *
  * Composed here rather than in the browser so it cannot be spoofed into
  * overwriting another account's trade.
  */
-export const tradeKey = (clientCode: string, ledgerId: string, openedAt: string) =>
-  `${clientCode || "ANON"}|${ledgerId}|${openedAt}`;
+export const tradeKey = (clientCode: string, ledgerId: string, openedAt: string) => {
+  const ms = Date.parse(openedAt);
+  const normalized = Number.isFinite(ms) ? new Date(ms).toISOString() : openedAt;
+  return `${clientCode || "ANON"}|${ledgerId}|${normalized}`;
+};
 
 /**
  * Append rows on behalf of one account.
