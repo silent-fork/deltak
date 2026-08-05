@@ -23,14 +23,8 @@ export function NavLink({
   const { pending, onClick } = useTransitionLink(href);
 
   return (
-    <Link href={href} className={`relative ${className ?? ""}`} aria-busy={pending} onClick={onClick}>
-      <span className={pending ? "contents opacity-25" : "contents"}>{children}</span>
-      {pending ? (
-        <Zap
-          aria-hidden
-          className="pointer-events-none absolute inset-0 m-auto h-3.5 w-3.5 animate-dk-charge fill-current"
-        />
-      ) : null}
+    <Link href={href} className={className} aria-busy={pending} onClick={onClick}>
+      {pending ? <Zap aria-hidden className="h-3.5 w-3.5 animate-dk-charge fill-current" /> : children}
     </Link>
   );
 }

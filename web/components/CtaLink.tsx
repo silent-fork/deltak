@@ -38,22 +38,12 @@ export function CtaLink({
   const { pending, onClick } = useTransitionLink(href, () => track(event, { location, ...data }));
 
   return (
-    <Link
-      href={href}
-      className={`relative ${className ?? ""}`}
-      aria-busy={pending}
-      onClick={onClick}
-    >
-      {/* `display: contents` so the wrapper never becomes a flex item of its
-          own — the icon/text children inside keep laying out exactly as the
-          caller's own `gap-x`/`items-center` classes expect, pending or not. */}
-      <span className={pending ? "contents opacity-25" : "contents"}>{children}</span>
-      {pending ? (
-        <Zap
-          aria-hidden
-          className="pointer-events-none absolute inset-0 m-auto h-4 w-4 animate-dk-charge fill-current"
-        />
-      ) : null}
+    <Link href={href} className={className} aria-busy={pending} onClick={onClick}>
+      {/* A clean swap, not an overlay — a dimmed label with an icon stacked
+          on top of it read as broken (letters bleeding through the glow)
+          rather than loading. Nothing else on the button while it's pending,
+          same as the label itself only ever shows one thing at a time. */}
+      {pending ? <Zap aria-hidden className="h-4 w-4 animate-dk-charge fill-current" /> : children}
     </Link>
   );
 }
