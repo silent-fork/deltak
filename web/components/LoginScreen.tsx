@@ -7,7 +7,13 @@ import { useEngineContext } from "@/components/EngineProvider";
 import { Wordmark } from "@/components/Wordmark";
 import { Input } from "@/components/ui/input";
 import { track } from "@/lib/analytics";
+import type { Broker } from "@/lib/types";
 import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
+
+const BROKERS: { id: Broker; label: string; sub: string }[] = [
+  { id: "angelone", label: "Angel One", sub: "SmartAPI" },
+  { id: "dhan", label: "Dhan", sub: "Data API" },
+];
 
 /**
  * Sign-in gate.
@@ -41,6 +47,7 @@ function Field({
 
 export function LoginScreen({ simulate }: { simulate: boolean }) {
   const engine = useEngineContext();
+  const [broker, setBroker] = useState<Broker>("angelone");
   const [clientCode, setClientCode] = useState("");
   const [pin, setPin] = useState("");
   const [totp, setTotp] = useState("");
@@ -63,7 +70,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
-    track("login_attempt");
+    track("login_attempt", { broker });
     try {
       // Nothing is asked of the operator here: the challenge runs behind the
       // button while it spins, and the token rides along with the credentials.
@@ -71,6 +78,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       const token = await turnstile.execute();
       setPhase("authenticating");
       await engine.login({
+        broker,
         client_code: clientCode.trim(),
         pin: pin.trim(),
         totp: totp.trim(),
@@ -83,13 +91,13 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       // in useEngine (keyed off `session.clientCode`) to catch up — this
       // fires the instant login resolves, so the very first event of the
       // session already carries the ID Amplitude identifies the user by.
-      track("login_success", { client_code: clientCode.trim() });
+      track("login_success", { broker, client_code: clientCode.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
       setTotp("");
       // No error detail here — a login failure reason is exactly the kind of
       // thing that shouldn't ride along into a third-party analytics event.
-      track("login_failed");
+      track("login_failed", { broker });
     } finally {
       setBusy(false);
       setPhase(null);
@@ -105,7 +113,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       />
       <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-60" />
 
-      <div className="relative w-full max-w-[360px]">
+      <div className="relative w-full max-w-[380px]">
         {/* Brand */}
         <div className="mb-7 flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
@@ -119,17 +127,53 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
           </div>
         </div>
 
-        <h1 className="text-lg font-medium tracking-tight text-zinc-100">
-          Sign in to Angel One
-        </h1>
-        <p className="mt-1.5 text-[12px] text-zinc-500">SmartAPI session</p>
+        {/*
+          The card itself — `dk-panel` is the same glass surface the home
+          page's own feature/strategy cards use (blurred, soft-shadowed, a
+          hairline border) rather than the sign-in form sitting bare on the
+          page background.
+        */}
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-quantum/[0.09] blur-[70px]"
+          />
 
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <Field label="Client Code">
+          <h1 className="relative text-lg font-medium tracking-tight text-zinc-100">
+            Sign in to {broker === "dhan" ? "Dhan" : "Angel One"}
+          </h1>
+          <p className="relative mt-1.5 text-[12px] text-zinc-500">
+            {broker === "dhan" ? "Dhan Data API session" : "SmartAPI session"}
+          </p>
+
+          {/* Broker toggle — same three-field TOTP form either way, so this is the only real fork in the sign-in flow. */}
+          <div className="relative mt-5 grid grid-cols-2 gap-1.5 rounded-lg border border-zinc-800/70 bg-zinc-950/50 p-1">
+            {BROKERS.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => {
+                  setBroker(b.id);
+                  setError(null);
+                }}
+                className={`rounded-md px-2.5 py-1.5 text-left transition-all duration-150 ${
+                  broker === b.id
+                    ? "bg-quantum/10 text-zinc-100 shadow-[0_0_14px_-6px_rgba(0,240,255,0.45)] ring-1 ring-inset ring-quantum/40"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                <div className="text-[12px] font-medium">{b.label}</div>
+                <div className="text-[9px] uppercase tracking-[0.12em] opacity-70">{b.sub}</div>
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={submit} className="relative mt-4 space-y-4">
+          <Field label={broker === "dhan" ? "Dhan Client ID" : "Client Code"}>
             <Input
               value={clientCode}
               onChange={(e) => setClientCode(e.target.value.toUpperCase())}
-              placeholder="A123456"
+              placeholder={broker === "dhan" ? "1100011234" : "A123456"}
               autoComplete="username"
               autoFocus
               spellCheck={false}
@@ -199,7 +243,8 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
               Protected by Cloudflare Turnstile
             </p>
           ) : null}
-        </form>
+          </form>
+        </div>
 
         {simulate ? (
           <button
@@ -213,7 +258,10 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
         {/* One line, because it is the only claim a sign-in page needs to make. */}
         <div className="mt-6 flex items-center gap-2 border-t border-zinc-900 pt-4 text-[10px] text-zinc-600">
           <LockKeyhole className="h-3 w-3 shrink-0" />
-          <span>Credentials are relayed to Angel One and never stored.</span>
+          <span>
+            Credentials are relayed to {broker === "dhan" ? "Dhan" : "Angel One"} and never
+            stored.
+          </span>
         </div>
       </div>
     </main>

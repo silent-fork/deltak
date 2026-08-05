@@ -7,7 +7,13 @@ import { useEngineContext } from "@/components/EngineProvider";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
+import type { Broker } from "@/lib/types";
 import { useTurnstile } from "@/lib/useTurnstile";
+
+const BROKERS: { id: Broker; label: string }[] = [
+  { id: "angelone", label: "Angel One" },
+  { id: "dhan", label: "Dhan" },
+];
 
 export function LoginModal({
   open,
@@ -18,6 +24,7 @@ export function LoginModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [broker, setBroker] = useState<Broker>("angelone");
   const [clientCode, setClientCode] = useState("");
   const [pin, setPin] = useState("");
   const [totp, setTotp] = useState("");
@@ -41,6 +48,7 @@ export function LoginModal({
     try {
       const token = await turnstile.execute();
       await engine.login({
+        broker,
         client_code: clientCode.trim(),
         pin: pin.trim(),
         totp: totp.trim(),
@@ -63,15 +71,34 @@ export function LoginModal({
     <Dialog
       open={open}
       onClose={onClose}
-      title="SmartAPI Session"
-      subtitle="Angel One · loginByPassword · session valid until midnight IST"
+      title={broker === "dhan" ? "Dhan Session" : "SmartAPI Session"}
+      subtitle={
+        broker === "dhan"
+          ? "Dhan · generateAccessToken · session valid 24h"
+          : "Angel One · loginByPassword · session valid until midnight IST"
+      }
     >
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Client Code">
+        <div className="flex gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-1">
+          {BROKERS.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setBroker(b.id)}
+              className={`flex-1 rounded-[5px] px-2 py-1 text-[11px] font-medium transition-colors ${
+                broker === b.id ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+
+        <Field label={broker === "dhan" ? "Dhan Client ID" : "Client Code"}>
           <Input
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value.toUpperCase())}
-            placeholder="A123456"
+            placeholder={broker === "dhan" ? "1100011234" : "A123456"}
             autoComplete="username"
             spellCheck={false}
           />
@@ -115,8 +142,8 @@ export function LoginModal({
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[10px] leading-tight text-zinc-600">
-            Relayed straight to Angel One. Nothing is written to disk. The API key
-            lives in the server&apos;s secrets, not here.
+            Relayed straight to {broker === "dhan" ? "Dhan" : "Angel One"}. Nothing is
+            written to disk.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
             {busy ? (

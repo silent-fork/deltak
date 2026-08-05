@@ -1,5 +1,6 @@
 import type {
   BatchResponse,
+  Broker,
   BuildupResponse,
   CandleResponse,
   ExecutionMode,
@@ -62,23 +63,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 /** `/api/auth/session` — the same shape as a login, plus how it was resolved. */
 export interface SessionResponse {
   authenticated: boolean;
+  broker?: Broker;
   client_code?: string;
   feed_token?: string;
   api_key?: string;
   login_time?: string;
-  /** Who is signed in — from `getProfile`, or the last one stored for them. */
+  /** Who is signed in — from `getProfile` (Angel One) or the token response (Dhan), or the last one stored for them. */
   profile?: UserProfile | null;
   /** The broker could not be reached; the cookie is being trusted for now. */
   stale?: boolean;
-  /** New tokens were minted from the refresh token. */
+  /** New tokens were minted from the refresh token. Angel One only — Dhan has no refresh path. */
   refreshed?: boolean;
   reason?: string | null;
 }
 
 export interface LoginResponse {
   authenticated: boolean;
+  broker: Broker;
   client_code: string;
-  /** Market-data credentials — the browser opens the SmartStream socket itself. */
+  /** Market-data credentials — the browser opens its own feed socket. Dhan's `api_key` is always empty; its `feed_token` doubles as the trading-capable access token. */
   feed_token: string;
   api_key: string;
   state: string | null;
@@ -89,13 +92,16 @@ export interface LoginResponse {
 
 export const api = {
   /** Index-option slice of the scrip master, projected server-side. */
-  master: () => request<unknown>("/api/master"),
+  master: (broker: Broker = "angelone") =>
+    request<unknown>(`/api/master?broker=${broker}`),
 
   /**
-   * No api_key in the payload: the SmartAPI key is a deployment secret read from
-   * the server environment, so it never crosses the wire on the way in.
+   * No api_key in the payload: the SmartAPI key (Angel One) is a deployment
+   * secret read from the server environment, so it never crosses the wire on
+   * the way in. Dhan takes the same client-code + PIN + TOTP shape.
    */
   login: (payload: {
+    broker?: Broker;
     client_code: string;
     pin: string;
     totp: string;

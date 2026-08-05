@@ -2,8 +2,10 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isExchange, isInterval, type HistoricalInterval } from "@/lib/market/constants";
+import { parseDhanCandles, parseDhanOiSeries } from "@/lib/market/dhanParse";
 import { candleDate, parseCandles, parseOiSeries } from "@/lib/market/parse";
 import { readJson } from "@/lib/market/request";
+import { DhanApiError, dhanIntraday } from "@/lib/server/dhan";
 import {
   CANDLE_URL,
   OI_DATA_URL,
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
     return NextResponse.json(
-      { detail: "Historical data requires a SmartAPI session." },
+      { detail: "Historical data requires an active broker session." },
       { status: 401 },
     );
   }
@@ -90,6 +92,9 @@ export async function POST(request: Request) {
   // covers the whole batch — NIFTY/BANKNIFTY/FINNIFTY's options are on NFO,
   // BANKEX/SENSEX's are on BFO. Default keeps existing callers unchanged.
   const exchange = isExchange(raw?.exchange) ? raw.exchange : "NFO";
+  // Dhan's own exchange-segment vocabulary — only read on the Dhan branch below.
+  const exchangeSegment = String(raw?.exchangeSegment ?? "NSE_FNO");
+  const instrument = String(raw?.instrument ?? "OPTIDX");
 
   if (!DATE_PATTERN.test(date)) {
     return NextResponse.json({ detail: "date must be YYYY-MM-DD." }, { status: 400 });
@@ -105,6 +110,54 @@ export async function POST(request: Request) {
       { detail: `At most ${MAX_TOKENS} tokens per request; got ${tokens.length}.` },
       { status: 400 },
     );
+  }
+
+  if (session.broker === "dhan") {
+    const dhanInterval = interval === "ONE_MINUTE" ? "1" : interval === "FIFTEEN_MINUTE" ? "15" : "5";
+    const fromDate = `${date} 09:15:00`;
+    const toDate = `${date} 15:40:00`;
+    let rateLimited = false;
+
+    const contracts = await pooled(tokens, async (securityId) => {
+      const entry: {
+        token: string;
+        bars?: unknown;
+        series?: unknown;
+        open_oi?: number | null;
+        last_oi?: number | null;
+        error?: string;
+      } = { token: securityId };
+
+      if ((wantBars || wantOi) && !rateLimited) {
+        try {
+          const data = await dhanIntraday(
+            { accessToken: session.accessToken, clientId: session.clientCode },
+            {
+              securityId,
+              exchangeSegment,
+              instrument,
+              interval: dhanInterval,
+              fromDate,
+              toDate,
+              oi: wantOi,
+            },
+          );
+          if (wantBars) entry.bars = parseDhanCandles(data).filter((c) => candleDate(c) === date);
+          if (wantOi) {
+            const series = parseDhanOiSeries(data).filter((p) => p.time.slice(0, 10) === date);
+            entry.series = series;
+            entry.open_oi = series.length ? series[0].oi : null;
+            entry.last_oi = series.length ? series[series.length - 1].oi : null;
+          }
+        } catch (err) {
+          if (err instanceof DhanApiError && err.status === 429) rateLimited = true;
+          entry.error = err instanceof Error ? err.message : "fetch failed";
+        }
+      }
+      return entry;
+    });
+
+    return NextResponse.json({ date, interval, rate_limited: rateLimited, contracts });
   }
 
   const from = `${date} 09:15`;

@@ -33,8 +33,16 @@ export async function POST(request: Request) {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
     return NextResponse.json(
-      { detail: "Live orders require an active SmartAPI session." },
+      { detail: "Live orders require an active broker session." },
       { status: 401 },
+    );
+  }
+  // Dhan is wired for market data only — this app is paper-trading, and no
+  // order-routing integration exists for Dhan.
+  if (session.broker !== "angelone") {
+    return NextResponse.json(
+      { detail: "Live order routing is only available for Angel One sessions." },
+      { status: 501 },
     );
   }
 

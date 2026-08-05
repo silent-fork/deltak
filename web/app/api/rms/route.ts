@@ -17,7 +17,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
-    return NextResponse.json({ detail: "No active SmartAPI session." }, { status: 401 });
+    return NextResponse.json({ detail: "No active broker session." }, { status: 401 });
+  }
+  // Dhan is wired for market data only — trading/margin reads stay Angel
+  // One-only until (if ever) order routing is built for it.
+  if (session.broker !== "angelone") {
+    return NextResponse.json({ detail: "RMS is only available for Angel One sessions." }, { status: 501 });
   }
 
   try {

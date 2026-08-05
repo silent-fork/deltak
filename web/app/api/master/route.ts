@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { INDEX_UNIVERSE, SCRIP_MASTER_URL } from "@/lib/engine/config";
 import { parseExpiry, type Instrument, type MasterPayload } from "@/lib/engine/scripMaster";
+import { loadDhanMaster, toMasterPayload } from "@/lib/server/dhanMaster";
 
 /**
  * `GET /api/master` — unauthenticated scrip-master cold bootstrap.
@@ -53,7 +54,22 @@ for (const [underlying, spec] of Object.entries(INDEX_UNIVERSE)) {
   for (const alias of spec.spotAliases) SPOT_LOOKUP[normalizeSpotAlias(alias)] = underlying;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const broker = new URL(request.url).searchParams.get("broker");
+  if (broker === "dhan") {
+    try {
+      const payload = toMasterPayload(await loadDhanMaster());
+      return NextResponse.json(payload, {
+        headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+      });
+    } catch (err) {
+      return NextResponse.json(
+        { detail: err instanceof Error ? err.message : "Dhan instrument master unreachable." },
+        { status: 502 },
+      );
+    }
+  }
+
   let rows: RawRow[];
   try {
     const res = await fetch(SCRIP_MASTER_URL, { cache: "no-store" });

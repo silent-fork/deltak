@@ -2,6 +2,19 @@ import "server-only";
 
 import { withRetry } from "@/lib/retry";
 import { RateLimiter } from "./rateLimiter";
+import {
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+  SESSION_MAX_AGE,
+  decodeSession,
+  encodeSession,
+  type ServerSession,
+} from "./session";
+
+// Re-exported so every existing `@/lib/server/smartapi` import keeps working
+// now that the cookie envelope lives in `./session`, shared with Dhan.
+export { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, SESSION_MAX_AGE, decodeSession, encodeSession };
+export type { ServerSession };
 
 /**
  * Angel One SmartAPI v2.0 client for route handlers.
@@ -172,65 +185,3 @@ export async function smartApiCall<T = Record<string, unknown>>(
   return (payload.data ?? {}) as T;
 }
 
-/* ----------------------------------------------------------- session cookie */
-
-export const SESSION_COOKIE = "dk_session";
-
-export interface ServerSession {
-  jwtToken: string;
-  refreshToken: string;
-  clientCode: string;
-  /**
-   * Market-data token for the browser's own SmartStream socket.
-   *
-   * It lives in the cookie beside the trading JWT so a page refresh can rebuild
-   * the whole session: without it the tab comes back "signed in" but unable to
-   * open a feed, which is a worse state than being signed out. It is handed to
-   * the page either way — it subscribes to quotes and cannot trade — the cookie
-   * is simply where it survives a reload.
-   */
-  feedToken?: string;
-  /** When the session was established, ISO to the second. */
-  loginAt?: string;
-  /**
-   * This window's claim on `client_sessions` — the single-active-session
-   * arbiter. Absent on a cookie written before that feature existed, which
-   * `isActiveSession` treats as unverifiable rather than superseded.
-   */
-  sessionId?: string;
-}
-
-/**
- * How long the cookie may live.
- *
- * SmartAPI sessions expire daily, so this is a ceiling rather than a promise:
- * the session route revalidates against the broker and refreshes or clears the
- * cookie, and that — not the age of a cookie — is what decides whether the
- * terminal is signed in.
- */
-export const SESSION_MAX_AGE = 60 * 60 * 16;
-
-export const SESSION_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/",
-  maxAge: SESSION_MAX_AGE,
-} as const;
-
-export function encodeSession(s: ServerSession): string {
-  return Buffer.from(JSON.stringify(s), "utf8").toString("base64url");
-}
-
-export function decodeSession(raw: string | undefined): ServerSession | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
-    if (typeof parsed?.jwtToken === "string" && typeof parsed?.clientCode === "string") {
-      return parsed as ServerSession;
-    }
-  } catch {
-    /* malformed cookie — treat as signed out */
-  }
-  return null;
-}

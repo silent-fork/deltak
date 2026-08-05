@@ -132,14 +132,24 @@ export interface CandleRequest {
   todate: string;
 }
 
+/** Dhan's own request shape for the same two routes — see `lib/market/dhanRequest.ts`. */
+export interface DhanCandleRequest {
+  securityId: string;
+  exchangeSegment: string;
+  instrument: string;
+  interval: "1" | "5" | "15" | "25" | "60";
+  fromDate: string;
+  toDate: string;
+}
+
 /** Intraday candles are only worth re-reading once a bar can have closed. */
-export function fetchCandles(req: CandleRequest, ttlMs = 45_000) {
+export function fetchCandles(req: CandleRequest | DhanCandleRequest, ttlMs = 45_000) {
   return cached<CandleResponse>(`candles:${JSON.stringify(req)}`, ttlMs, () =>
     api.market.candles(req),
   );
 }
 
-export function fetchOi(req: CandleRequest, ttlMs = 120_000) {
+export function fetchOi(req: CandleRequest | DhanCandleRequest, ttlMs = 120_000) {
   return cached<OiResponse>(`oi:${JSON.stringify(req)}`, ttlMs, () =>
     api.market.oi(req),
   );
@@ -159,6 +169,10 @@ export function fetchBatch(
     oi?: boolean;
     candles?: boolean;
     exchange?: HistoricalExchange;
+    /** Dhan's request shape needs these instead of `exchange` — see `lib/market/dhanRequest.ts`. */
+    exchangeSegment?: string;
+    instrument?: string;
+    interval?: HistoricalInterval;
   },
   ttlMs = 120_000,
 ) {

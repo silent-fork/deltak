@@ -42,8 +42,14 @@ export async function POST(request: Request) {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
     return NextResponse.json(
-      { detail: "Margin calculation requires a SmartAPI session." },
+      { detail: "Margin calculation requires an active broker session." },
       { status: 401 },
+    );
+  }
+  if (session.broker !== "angelone") {
+    return NextResponse.json(
+      { detail: "Margin calculation is only available for Angel One sessions." },
+      { status: 501 },
     );
   }
 

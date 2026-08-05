@@ -168,7 +168,11 @@ export function futuresExpiry(symbol: string): string | null {
  */
 export function buildupIncludesUnderlying(rows: OiBuildupRow[], underlying: string): boolean {
   const want = underlying.toUpperCase();
-  return rows.some((r) => FUT_PATTERN.exec(r.trading_symbol.toUpperCase())?.[1] === want);
+  return rows.some(
+    (r) =>
+      (r.underlying?.toUpperCase() ?? FUT_PATTERN.exec(r.trading_symbol.toUpperCase())?.[1]) ===
+      want,
+  );
 }
 
 export function pcrForUnderlying(
@@ -177,6 +181,12 @@ export function pcrForUnderlying(
   today = new Date().toISOString().slice(0, 10),
 ): PcrRow | null {
   const want = underlying.toUpperCase();
+
+  // Dhan's derived rows carry the underlying directly — one row per
+  // underlying, no futures-expiry disambiguation to do.
+  const tagged = rows.find((r) => r.underlying?.toUpperCase() === want);
+  if (tagged) return tagged;
+
   const matches = rows
     .map((row) => ({ row, expiry: futuresExpiry(row.trading_symbol) }))
     .filter(

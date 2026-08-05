@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { INDEX_UNIVERSE, isMarketOpen, optionExchange } from "@/lib/engine/config";
+import { INDEX_UNIVERSE, UNDERLYINGS, isMarketOpen, optionExchange } from "@/lib/engine/config";
 import { MIN_SAMPLES } from "@/lib/engine/rrg";
 import { ApiError } from "@/lib/api";
 import { fetchBatch, fetchBuildup, fetchCandles, fetchOi, fetchPcr } from "@/lib/market/client";
 import { MARKET_OPEN_STAMP, istDate, sessionWindow } from "@/lib/market/clock";
 import { OI_BUILDUP_TYPES, type OiBuildupType } from "@/lib/market/constants";
+import { DHAN_SPOT_SEGMENT, dhanOptionSegment, toDhanStamp } from "@/lib/market/dhanRequest";
 import { buildupIncludesUnderlying, pcrForUnderlying } from "@/lib/market/parse";
-import type { Candle, OiPoint, SessionStats } from "@/lib/types";
+import type { Broker, Candle, OiPoint, SessionStats } from "@/lib/types";
 
 /**
  * Historical and market-data context for the terminal.
@@ -93,6 +94,7 @@ export interface MarketData {
 
 export interface MarketDataInput {
   enabled: boolean;
+  broker: Broker;
   /** Underlying whose intraday detail the HUD is currently showing. */
   focus: string;
   /** NSE token of that underlying's index spot. */
@@ -220,6 +222,7 @@ function usePoll(
 export function useMarketData(input: MarketDataInput): MarketData {
   const {
     enabled,
+    broker,
     focus,
     spotToken,
     spotTokens,
@@ -228,6 +231,15 @@ export function useMarketData(input: MarketDataInput): MarketData {
     onOiBaseline,
     onContractSession,
   } = input;
+
+  /**
+   * Dhan's PCR/buildup derivation (see `dhanParse.ts`) works per-underlying
+   * off each one's own option chain or futures contract, so it covers BSE
+   * underlyings too — unlike Angel One's whole-NSE-board endpoints, which
+   * have no BSE equivalent. `NSE_UNDERLYING_NAMES` stays the Angel One list;
+   * this is only where the two diverge.
+   */
+  const pcrBuildupUnderlyings = broker === "dhan" ? UNDERLYINGS : NSE_UNDERLYING_NAMES;
 
   const [state, setState] = useState<MarketData>(EMPTY);
 
@@ -337,12 +349,24 @@ export function useMarketData(input: MarketDataInput): MarketData {
       if (!spotToken) return;
       setState((s) => ({ ...s, loading: true }));
       try {
-        const res = await fetchCandles({
-          exchange: INDEX_UNIVERSE[focus]?.exchange ?? "NSE",
-          symboltoken: spotToken,
-          interval: "ONE_MINUTE",
-          ...sessionWindow(CANDLE_LOOKBACK_DAYS),
-        });
+        const window = sessionWindow(CANDLE_LOOKBACK_DAYS);
+        const res = await fetchCandles(
+          broker === "dhan"
+            ? {
+                securityId: spotToken,
+                exchangeSegment: DHAN_SPOT_SEGMENT,
+                instrument: "INDEX",
+                interval: "1",
+                fromDate: toDhanStamp(window.fromdate),
+                toDate: toDhanStamp(window.todate),
+              }
+            : {
+                exchange: INDEX_UNIVERSE[focus]?.exchange ?? "NSE",
+                symboltoken: spotToken,
+                interval: "ONE_MINUTE",
+                ...window,
+              },
+        );
         setState((s) => ({
           ...s,
           candles: res.session,
@@ -364,7 +388,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         // with no further retry until focus happened to change.
         throw err;
       }
-    }, [spotToken, focus, fail, ok]),
+    }, [spotToken, focus, broker, fail, ok]),
   );
 
   /* ------------------------------------------------ the other two indices */
@@ -394,15 +418,25 @@ export function useMarketData(input: MarketDataInput): MarketData {
         .split(",")
         .filter(Boolean)
         .map((pair) => pair.split(":") as [string, string]);
+      const window = sessionWindow(CANDLE_LOOKBACK_DAYS);
       const results = await Promise.allSettled(
         pairs.map(([underlying, token]) =>
           fetchCandles(
-            {
-              exchange: INDEX_UNIVERSE[underlying]?.exchange ?? "NSE",
-              symboltoken: token,
-              interval: "ONE_MINUTE",
-              ...sessionWindow(CANDLE_LOOKBACK_DAYS),
-            },
+            broker === "dhan"
+              ? {
+                  securityId: token,
+                  exchangeSegment: DHAN_SPOT_SEGMENT,
+                  instrument: "INDEX",
+                  interval: "1",
+                  fromDate: toDhanStamp(window.fromdate),
+                  toDate: toDhanStamp(window.todate),
+                }
+              : {
+                  exchange: INDEX_UNIVERSE[underlying]?.exchange ?? "NSE",
+                  symboltoken: token,
+                  interval: "ONE_MINUTE",
+                  ...window,
+                },
             BACKGROUND_SPOT_TTL_MS,
           ),
         ),
@@ -432,7 +466,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
       // and gave it a fresh key. Throwing keeps the slow closed-market
       // retry alive instead — still silent, just not permanent.
       if (anyFailed) throw new Error("background spot fetch incomplete");
-    }, [backgroundKey]),
+    }, [backgroundKey, broker]),
   );
 
   /* ------------------------------ session seeding: open interest and replay */
@@ -491,13 +525,25 @@ export function useMarketData(input: MarketDataInput): MarketData {
         chunks.map(async (chunk) => {
           let res;
           try {
-            res = await fetchBatch({
-              date,
-              tokens: chunk,
-              oi: true,
-              candles: wantBars,
-              exchange: optionExchange(focus),
-            });
+            res = await fetchBatch(
+              broker === "dhan"
+                ? {
+                    date,
+                    tokens: chunk,
+                    oi: true,
+                    candles: wantBars,
+                    exchangeSegment: dhanOptionSegment(focus),
+                    instrument: "OPTIDX",
+                    interval: "FIVE_MINUTE",
+                  }
+                : {
+                    date,
+                    tokens: chunk,
+                    oi: true,
+                    candles: wantBars,
+                    exchange: optionExchange(focus),
+                  },
+            );
           } catch (err) {
             if (!cancelled) fail(err);
             return;
@@ -556,7 +602,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
     return () => {
       cancelled = true;
     };
-  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, flush, fail, ok]);
+  }, [enabled, seedKey, sessionDate, benchmarkReady, focus, broker, flush, fail, ok]);
 
   /* ---------------------------------------------------------- wall curves */
 
@@ -570,20 +616,33 @@ export function useMarketData(input: MarketDataInput): MarketData {
       const date = sessionDate;
       const window = sessionWindow(0);
       const tokens = wallKey.split(",").filter(Boolean);
+      const fromdate = `${date} ${MARKET_OPEN_STAMP}`;
+      // A closed session is finished, so its curve is asked for whole and
+      // then cached; a live one is asked for up to the minute.
+      const todate = date === istDate() ? window.todate : `${date} 15:40`;
       // Aegis and Zenith are independent contracts — a throttle or a miss on
       // one must not cost the other its refresh too, which the old
       // stop-on-first-error loop did.
       const results = await Promise.allSettled(
         tokens.map((token) =>
-          fetchOi({
-            exchange: optionExchange(focus),
-            symboltoken: token,
-            interval: "FIFTEEN_MINUTE",
-            fromdate: `${date} ${MARKET_OPEN_STAMP}`,
-            // A closed session is finished, so its curve is asked for whole and
-            // then cached; a live one is asked for up to the minute.
-            todate: date === istDate() ? window.todate : `${date} 15:40`,
-          }),
+          fetchOi(
+            broker === "dhan"
+              ? {
+                  securityId: token,
+                  exchangeSegment: dhanOptionSegment(focus),
+                  instrument: "OPTIDX",
+                  interval: "15",
+                  fromDate: toDhanStamp(fromdate),
+                  toDate: toDhanStamp(todate),
+                }
+              : {
+                  exchange: optionExchange(focus),
+                  symboltoken: token,
+                  interval: "FIFTEEN_MINUTE",
+                  fromdate,
+                  todate,
+                },
+          ),
         ),
       );
 
@@ -625,7 +684,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         throw sawError;
       }
       ok();
-    }, [wallKey, sessionDate, focus, fail, ok]),
+    }, [wallKey, sessionDate, focus, broker, fail, ok]),
   );
 
   /* -------------------------------------------------------------- pcr */
@@ -639,7 +698,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         const res = await fetchPcr();
         const today = istDate();
         const byUnderlying: Record<string, number> = {};
-        for (const underlying of NSE_UNDERLYING_NAMES) {
+        for (const underlying of pcrBuildupUnderlyings) {
           const row = pcrForUnderlying(res.rows, underlying, today);
           if (row) byUnderlying[underlying] = row.pcr;
         }
@@ -652,7 +711,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         fail(err);
         throw err;
       }
-    }, [fail, ok]),
+    }, [pcrBuildupUnderlyings, fail, ok]),
   );
 
   /* --------------------------------------------------------------- buildup */
@@ -667,7 +726,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
           OI_BUILDUP_TYPES.map((datatype) => fetchBuildup(datatype, "NEAR")),
         );
         const next: Partial<Record<string, OiBuildupType>> = {};
-        for (const underlying of NSE_UNDERLYING_NAMES) {
+        for (const underlying of pcrBuildupUnderlyings) {
           for (let i = 0; i < OI_BUILDUP_TYPES.length; i++) {
             if (buildupIncludesUnderlying(results[i].rows, underlying)) {
               next[underlying] = OI_BUILDUP_TYPES[i];
@@ -682,7 +741,7 @@ export function useMarketData(input: MarketDataInput): MarketData {
         fail(err);
         throw err;
       }
-    }, [fail, ok]),
+    }, [pcrBuildupUnderlyings, fail, ok]),
   );
 
   /* --------------------------------------------------------------- reset */

@@ -7,6 +7,8 @@ import type { INDEX_UNIVERSE } from "./engine/config";
 import type { OiBuildupType } from "./market/constants";
 
 export type ExecutionMode = "paper" | "live";
+/** Which broker's data (and, for Angel One, trading) API a session is authenticated against. */
+export type Broker = "angelone" | "dhan";
 /**
  * Who fires an actionable signal. `auto` is the browser's own tick loop —
  * the same "auto-driver" DKMS already names in its Delta-protocol rationale
@@ -313,6 +315,12 @@ export interface OiPoint {
 export interface PcrRow {
   pcr: number;
   trading_symbol: string;
+  /**
+   * Set only on Dhan's derived rows (`lib/market/dhanParse.ts`), which have
+   * no futures trading-symbol to parse an underlying out of the way Angel
+   * One's do — `pcrForUnderlying` matches this directly when present.
+   */
+  underlying?: string;
 }
 
 /** One row of the `OIBuildup` response, with the numerics parsed. */
@@ -324,6 +332,8 @@ export interface OiBuildupRow {
   percent_change: number;
   open_interest: number;
   oi_change: number;
+  /** Set only on Dhan's derived rows — see `PcrRow.underlying`. */
+  underlying?: string;
 }
 
 /** One leg of a margin-calculator basket. */

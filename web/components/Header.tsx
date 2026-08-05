@@ -70,10 +70,15 @@ function SpotTicker({
     <button
       onClick={onSelect}
       className={cn(
-        "flex h-9 w-[162px] shrink-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
+        // The home page's own card treatment (`dk-panel`): a soft glass
+        // surface with its own blur and shadow, rather than a flat filled
+        // rectangle — the active tab additionally picks up a quiet quantum
+        // glow, echoing the hero's own accent-lit cards instead of a plain
+        // colour swap.
+        "dk-panel flex h-9 w-[162px] shrink-0 items-center gap-2 border px-2 text-left transition-all duration-150",
         active
-          ? "border-quantum/60 bg-quantum/10"
-          : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
+          ? "border-quantum/60 bg-quantum/10 shadow-[0_0_18px_-6px_rgba(0,240,255,0.45)]"
+          : "border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900/70",
       )}
     >
       <span

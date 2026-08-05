@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { cachedDhanProfile } from "@/lib/server/dhanProfile";
 import {
   cachedProfile,
   fetchProfile,
@@ -33,7 +34,16 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
-    return NextResponse.json({ detail: "No active SmartAPI session." }, { status: 401 });
+    return NextResponse.json({ detail: "No active broker session." }, { status: 401 });
+  }
+
+  // Dhan's Data API has no live profile call to refresh against — the token
+  // response at login was the only identity read there is, so this just
+  // returns what login already stored.
+  if (session.broker === "dhan") {
+    const cached = await cachedDhanProfile(session.clientCode);
+    if (cached) return NextResponse.json({ profile: cached });
+    return NextResponse.json({ detail: "No stored profile for this session." }, { status: 404 });
   }
 
   try {
@@ -72,7 +82,7 @@ function normalise(
 export async function PATCH(request: Request) {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!session) {
-    return NextResponse.json({ detail: "No active SmartAPI session." }, { status: 401 });
+    return NextResponse.json({ detail: "No active broker session." }, { status: 401 });
   }
 
   let body: { email?: unknown; mobile_no?: unknown };
