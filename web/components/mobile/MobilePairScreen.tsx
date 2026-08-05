@@ -98,10 +98,8 @@ export function MobilePairScreen({
 
           <ol className="relative mt-4 space-y-2 text-left">
             {steps.map((step, i) => (
-              <li key={step} className="flex items-start gap-2.5">
-                <span className="mt-px flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-zinc-700 font-mono text-[10px] font-bold text-zinc-500">
-                  {i + 1}
-                </span>
+              <li key={step} className="flex items-baseline gap-2.5">
+                <span className="shrink-0 font-mono text-[11px] font-semibold text-quantum">{i + 1}.</span>
                 <span className="text-[12px] leading-relaxed text-zinc-400">{step}</span>
               </li>
             ))}
