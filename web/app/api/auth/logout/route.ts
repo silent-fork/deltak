@@ -27,14 +27,18 @@ export async function POST() {
   const session = decodeSession((await cookies()).get(SESSION_COOKIE)?.value);
 
   if (session) {
-    await smartApiCall(LOGOUT_URL, {
-      method: "POST",
-      jwt: session.jwtToken,
-      body: { clientcode: session.clientCode },
-    }).catch(() => undefined);
-    // A signed-out account should leave nothing behind for a background job
-    // to decrypt and use.
-    await forgetBrokerSession(session.clientCode);
+    // Dhan has no documented logout/invalidate endpoint in the Data API — the
+    // access token simply ages out on its own 24h clock.
+    if (session.broker === "angelone") {
+      await smartApiCall(LOGOUT_URL, {
+        method: "POST",
+        jwt: session.jwtToken,
+        body: { clientcode: session.clientCode },
+      }).catch(() => undefined);
+      // A signed-out account should leave nothing behind for a background job
+      // to decrypt and use.
+      await forgetBrokerSession(session.clientCode);
+    }
     // And nothing behind to compare a next login against — that row's only
     // job is telling a *different*, still-open window it's been superseded.
     await forgetActiveSession(session.clientCode);

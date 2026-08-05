@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   Automation,
+  Broker,
   EngineSnapshot,
   ExecutionMode,
   OptionChain,
@@ -41,6 +42,7 @@ import { runGuards } from "@/lib/engine/risk";
 import { legRiskAtStop, portfolioRiskAtStop } from "@/lib/engine/sizing";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
+import { DhanFeedClient } from "@/lib/stream/dhanfeed";
 import { SimulatedFeed } from "@/lib/stream/simFeed";
 import { useMarketData, type MarketData } from "@/lib/useMarketData";
 import { clearMarketCache } from "@/lib/market/client";
@@ -88,6 +90,7 @@ const SESSION_FOCUS_MIN_MS = 5 * 60_000;
 
 export interface EngineSession {
   authenticated: boolean;
+  broker: Broker | null;
   clientCode: string | null;
   feedToken: string | null;
   apiKey: string | null;
@@ -98,6 +101,7 @@ export interface EngineSession {
 
 const NO_SESSION: EngineSession = {
   authenticated: false,
+  broker: null,
   clientCode: null,
   feedToken: null,
   apiKey: null,
@@ -133,6 +137,16 @@ export function useEngine(simulate: boolean) {
   const [automation, setAutomationState] = useState<Automation>("manual");
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [masterReady, setMasterReady] = useState(false);
+  /**
+   * Bumped every time `masterRef.current` is *replaced*, not just whenever it
+   * becomes ready. The bootstrap effect below can call `loadMaster` twice —
+   * once assuming Angel One before the session is known, again with Dhan's
+   * once a Dhan session resolves — and both loads report `ready: true`, so a
+   * memo keyed on the `masterReady` boolean alone would never re-run for the
+   * second swap: `true → true` is not a change React re-renders for. This
+   * counter is what `spotTokens`/`spotToken` below actually key off.
+   */
+  const [masterVersion, setMasterVersion] = useState(0);
   /**
    * Whether the initial session restore has *settled* — not whether it
    * succeeded. Before this, "not authenticated" and "haven't checked yet"
@@ -247,6 +261,7 @@ export function useEngine(simulate: boolean) {
   const lastMobilePushRef = useRef(0);
 
   const streamRef = useRef<SmartStreamClient | null>(null);
+  const dhanStreamRef = useRef<DhanFeedClient | null>(null);
   const simRef = useRef<SimulatedFeed | null>(null);
   // The simulated feed is opt-in: an unauthenticated visitor sees the sign-in
   // screen, not a terminal quietly filled with synthetic prints.
@@ -283,8 +298,49 @@ export function useEngine(simulate: boolean) {
 
   const stopFeeds = useCallback(() => {
     streamRef.current?.stop();
+    dhanStreamRef.current?.stop();
     simRef.current?.stop();
     setSimulated(false);
+  }, []);
+
+  /**
+   * Both brokers group instruments into the same `{nse, bse}` shape
+   * (`ScripMaster.subscriptionTokens` is broker-agnostic — it just reads
+   * `Instrument.exchSeg`), so the split into segments/exchange-types is the
+   * only broker-specific piece, kept in these two small dispatchers rather
+   * than duplicated at every call site that needs to (re)subscribe.
+   */
+  const trackAngelOne = (
+    client: SmartStreamClient,
+    nse: { spotTokens: string[]; optionTokens: string[] },
+    bse: { spotTokens: string[]; optionTokens: string[] },
+    method: "track" | "subscribeNew",
+  ) => {
+    client[method](EXCHANGE_NSE_CM, nse.spotTokens);
+    client[method](EXCHANGE_NSE_FO, nse.optionTokens);
+    if (bse.spotTokens.length) client[method](EXCHANGE_BSE_CM, bse.spotTokens);
+    if (bse.optionTokens.length) client[method](EXCHANGE_BSE_FO, bse.optionTokens);
+  };
+
+  const trackDhan = (
+    client: DhanFeedClient,
+    nse: { spotTokens: string[]; optionTokens: string[] },
+    bse: { spotTokens: string[]; optionTokens: string[] },
+    method: "track" | "subscribeNew",
+  ) => {
+    const spots = [...nse.spotTokens, ...bse.spotTokens];
+    if (spots.length) client[method]("IDX_I", spots);
+    if (nse.optionTokens.length) client[method]("NSE_FNO", nse.optionTokens);
+    if (bse.optionTokens.length) client[method]("BSE_FNO", bse.optionTokens);
+  };
+
+  const subscribeOptionToken = useCallback((underlying: string, token: string) => {
+    const onBse = INDEX_UNIVERSE[underlying]?.exchange === "BSE";
+    if (sessionRef.current.broker === "dhan") {
+      dhanStreamRef.current?.subscribeNew(onBse ? "BSE_FNO" : "NSE_FNO", [token]);
+    } else {
+      streamRef.current?.subscribeNew(onBse ? EXCHANGE_BSE_FO : EXCHANGE_NSE_FO, [token]);
+    }
   }, []);
 
   const startFeed = useCallback(
@@ -292,17 +348,24 @@ export function useEngine(simulate: boolean) {
       stopFeeds();
       const onTick = (t: Tick) => ticksRef.current.apply(t);
 
-      if (sess.authenticated && sess.feedToken && sess.clientCode && sess.apiKey) {
+      if (sess.authenticated && sess.broker === "dhan" && sess.feedToken && sess.clientCode) {
+        const client = new DhanFeedClient(onTick, setStreamStatus);
+        dhanStreamRef.current = client;
+        const { nse, bse } = masterRef.current.subscriptionTokens(
+          spotMap(),
+          cfgRef.current.chainDepth,
+        );
+        trackDhan(client, nse, bse, "track");
+        client.start({ clientId: sess.clientCode, accessToken: sess.feedToken });
+        log("INFO", "Dhan live market feed engaged (full packet mode).");
+      } else if (sess.authenticated && sess.feedToken && sess.clientCode && sess.apiKey) {
         const client = new SmartStreamClient(onTick, setStreamStatus);
         streamRef.current = client;
         const { nse, bse } = masterRef.current.subscriptionTokens(
           spotMap(),
           cfgRef.current.chainDepth,
         );
-        client.track(EXCHANGE_NSE_CM, nse.spotTokens);
-        client.track(EXCHANGE_NSE_FO, nse.optionTokens);
-        if (bse.spotTokens.length) client.track(EXCHANGE_BSE_CM, bse.spotTokens);
-        if (bse.optionTokens.length) client.track(EXCHANGE_BSE_FO, bse.optionTokens);
+        trackAngelOne(client, nse, bse, "track");
         client.start({
           clientCode: sess.clientCode,
           feedToken: sess.feedToken,
@@ -472,7 +535,10 @@ export function useEngine(simulate: boolean) {
   /* ---------------------------------------------------------- snapshot */
 
   const feedLive = useCallback(
-    () => streamRef.current?.status === "live" || !!simRef.current?.running,
+    () =>
+      streamRef.current?.status === "live" ||
+      dhanStreamRef.current?.status === "live" ||
+      !!simRef.current?.running,
     [],
   );
 
@@ -666,16 +732,15 @@ export function useEngine(simulate: boolean) {
       resyncRef.current -= 1;
       if (resyncRef.current <= 0) {
         resyncRef.current = RESYNC_EVERY_TICKS;
-        const client = streamRef.current;
-        if (client && client.status === "live") {
+        const angelClient = streamRef.current;
+        const dhanClient = dhanStreamRef.current;
+        if (angelClient?.status === "live" || dhanClient?.status === "live") {
           const { nse, bse } = master.subscriptionTokens(
             spotMap(),
             cfgRef.current.chainDepth,
           );
-          client.subscribeNew(EXCHANGE_NSE_CM, nse.spotTokens);
-          client.subscribeNew(EXCHANGE_NSE_FO, nse.optionTokens);
-          if (bse.spotTokens.length) client.subscribeNew(EXCHANGE_BSE_CM, bse.spotTokens);
-          if (bse.optionTokens.length) client.subscribeNew(EXCHANGE_BSE_FO, bse.optionTokens);
+          if (angelClient?.status === "live") trackAngelOne(angelClient, nse, bse, "subscribeNew");
+          if (dhanClient?.status === "live") trackDhan(dhanClient, nse, bse, "subscribeNew");
         }
       }
 
@@ -740,11 +805,13 @@ export function useEngine(simulate: boolean) {
 
   /* --------------------------------------------------------- lifecycle */
 
-  const loadMaster = useCallback(async () => {
+  const loadMaster = useCallback(async (broker?: Broker) => {
     try {
-      const payload = await withRetry(() => api.master() as Promise<MasterPayload>);
+      const b = broker ?? sessionRef.current.broker ?? "angelone";
+      const payload = await withRetry(() => api.master(b) as Promise<MasterPayload>);
       masterRef.current = new ScripMaster(payload);
       setMasterReady(masterRef.current.ready);
+      setMasterVersion((v) => v + 1);
       setError(null);
       log(
         "INFO",
@@ -809,10 +876,17 @@ export function useEngine(simulate: boolean) {
       // exists.
       const [restored, , openFromDb] = await Promise.all([
         restoreSession(),
-        loadMaster(),
+        loadMaster(), // fires immediately assuming Angel One — the common case, and the only one known before restoreSession resolves
         loadOpenPositions(),
       ]);
       if (cancelled) return;
+      // A Dhan session needs Dhan's own master (different security-ID space,
+      // different projection) — re-fetched now that the broker is known,
+      // rather than guessed at before the session restore above resolved.
+      if (restored.authenticated && restored.broker === "dhan") {
+        await loadMaster("dhan");
+        if (cancelled) return;
+      }
       startFeed(restored.authenticated ? restored : sessionRef.current);
 
       /**
@@ -834,11 +908,7 @@ export function useEngine(simulate: boolean) {
           // restored position carries for "already scaled once", since the
           // in-memory `scaled` set itself does not survive a reload.
           if (pos.realised_pnl !== 0) scaledRef.current.add(pos.id);
-          const optionExchange =
-            INDEX_UNIVERSE[pos.underlying]?.exchange === "BSE"
-              ? EXCHANGE_BSE_FO
-              : EXCHANGE_NSE_FO;
-          streamRef.current?.subscribeNew(optionExchange, [pos.token]);
+          subscribeOptionToken(pos.underlying, pos.token);
         }
         log(
           "INFO",
@@ -874,16 +944,20 @@ export function useEngine(simulate: boolean) {
       Object.fromEntries(
         UNDERLYINGS.map((u) => [u, masterRef.current.spotToken(u)]),
       ) as Record<string, string>,
-    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // The master is a ref; `masterVersion` is the state edge that says it
+    // was (re)loaded — see its declaration for why `masterReady` alone
+    // isn't enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [masterReady],
+    [masterVersion],
   );
 
   const spotToken = useMemo(
     () => masterRef.current.spotToken(focus),
-    // The master is a ref; `masterReady` is the state edge that says it landed.
+    // The master is a ref; `masterVersion` is the state edge that says it
+    // was (re)loaded — see its declaration for why `masterReady` alone
+    // isn't enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [focus, masterReady],
+    [focus, masterVersion],
   );
 
   /**
@@ -949,6 +1023,7 @@ export function useEngine(simulate: boolean) {
 
   const market = useMarketData({
     enabled: session.authenticated,
+    broker: session.broker ?? "angelone",
     focus,
     spotToken,
     spotTokens,
@@ -996,6 +1071,7 @@ export function useEngine(simulate: boolean) {
 
   const login = useCallback(
     async (payload: {
+      broker?: Broker;
       client_code: string;
       pin: string;
       totp: string;
@@ -1004,6 +1080,7 @@ export function useEngine(simulate: boolean) {
       const res = await api.login(payload);
       const next: EngineSession = {
         authenticated: true,
+        broker: res.broker ?? "angelone",
         clientCode: res.client_code,
         feedToken: res.feed_token,
         apiKey: res.api_key,
@@ -1016,12 +1093,16 @@ export function useEngine(simulate: boolean) {
       clearMarketCache();
       log(
         "INFO",
-        `SmartAPI session established for ${res.profile?.name ?? res.client_code}.`,
+        `${next.broker === "dhan" ? "Dhan" : "SmartAPI"} session established for ${res.profile?.name ?? res.client_code}.`,
       );
+      // The bootstrap effect may have already loaded the *other* broker's
+      // master (or none, before any session existed) — always reload for the
+      // broker that just signed in, rather than trust whatever is cached.
+      await loadMaster(next.broker ?? "angelone");
       startFeed(next);
       return res;
     },
-    [log, startFeed],
+    [log, startFeed, loadMaster],
   );
 
   /**
@@ -1039,6 +1120,7 @@ export function useEngine(simulate: boolean) {
       if (!res.authenticated || !res.client_code) return NO_SESSION;
       const next: EngineSession = {
         authenticated: true,
+        broker: res.broker ?? "angelone",
         clientCode: res.client_code,
         feedToken: res.feed_token ?? null,
         apiKey: res.api_key ?? null,
@@ -1048,11 +1130,12 @@ export function useEngine(simulate: boolean) {
       setSession(next);
       sessionRef.current = next;
       const who = res.profile?.name ?? res.client_code;
+      const brokerLabel = next.broker === "dhan" ? "Dhan" : "SmartAPI";
       log(
         "INFO",
         res.refreshed
-          ? `SmartAPI session refreshed for ${who} — tokens renewed past expiry.`
-          : `SmartAPI session restored for ${who}.`,
+          ? `${brokerLabel} session refreshed for ${who} — tokens renewed past expiry.`
+          : `${brokerLabel} session restored for ${who}.`,
       );
       return next;
     } catch {
@@ -1144,16 +1227,21 @@ export function useEngine(simulate: boolean) {
           "INFO",
           res.reason === "superseded"
             ? "Signed out — this account was signed in from another window."
-            : "SmartAPI session expired — sign in again to resume the feed.",
+            : sessionRef.current.broker === "dhan"
+              ? "Dhan session expired — sign in again to resume the feed."
+              : "SmartAPI session expired — sign in again to resume the feed.",
         );
         return;
       }
 
       // A refresh mints a new feed token, and the old socket is authenticated
-      // with the old one: reconnect rather than let it die quietly.
+      // with the old one: reconnect rather than let it die quietly. Angel One
+      // only — Dhan's branch of `/api/auth/session` never sets `refreshed`,
+      // since there is no refresh path for a Dhan access token.
       if (res.refreshed && res.client_code) {
         const next: EngineSession = {
           authenticated: true,
+          broker: res.broker ?? "angelone",
           clientCode: res.client_code,
           feedToken: res.feed_token ?? null,
           apiKey: res.api_key ?? null,
@@ -1228,6 +1316,11 @@ export function useEngine(simulate: boolean) {
       if (next === "live") {
         if (!sessionRef.current.authenticated) {
           throw new Error("Live mode requires a SmartAPI session.");
+        }
+        if (sessionRef.current.broker !== "angelone") {
+          throw new Error(
+            "Live order routing is only available for Angel One sessions — Dhan is wired for data only.",
+          );
         }
         if (!ticksRef.current.updates) {
           throw new Error("Refusing Live mode without a live market feed.");
@@ -1501,7 +1594,7 @@ export function useEngine(simulate: boolean) {
     simulated,
     demo,
     error,
-    trackedTokens: streamRef.current?.trackedCount ?? 0,
+    trackedTokens: streamRef.current?.trackedCount ?? dhanStreamRef.current?.trackedCount ?? 0,
     tickUpdates: ticksRef.current.updates,
     riskPct: cfgRef.current.riskPct,
     /** Contracts whose COA 2.0 ΔOI is measured from a real session open. */

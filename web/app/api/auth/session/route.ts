@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { isActiveSession } from "@/lib/server/activeSession";
 import { rememberBrokerSession } from "@/lib/server/brokerSession";
+import { cachedDhanProfile } from "@/lib/server/dhanProfile";
 import {
   cachedProfile,
   fetchProfile,
@@ -31,12 +32,13 @@ import {
  * sign-in screen while a perfectly good session sat in the cookie jar. This is
  * the route that closes that gap.
  *
- * It does not take the cookie's word for it. SmartAPI sessions expire daily, so
- * an unexpired cookie is not evidence of an unexpired session: the JWT is put
- * to the broker, and only a real profile read counts as signed in. When the JWT
- * has aged out but the refresh token has not, new tokens are minted here and
- * the cookie is rewritten — the operator sees a terminal that simply stayed
- * logged in across the rollover.
+ * For Angel One it does not take the cookie's word for it: SmartAPI sessions
+ * expire daily, so the JWT is put to the broker via `getProfile`, and only a
+ * real read counts as signed in — with a `generateTokens` refresh when the
+ * JWT has aged out but the refresh token has not. Dhan has no equivalent
+ * liveness call in the Data API, so its branch instead checks the access
+ * token's own stored `expiryTime` locally — a 24h ceiling with no refresh
+ * path, so an expired Dhan session simply asks for a fresh TOTP login.
  *
  * Always 200: "not signed in" is an answer, not a failure, and the page renders
  * a sign-in screen from it rather than an error.
@@ -45,7 +47,7 @@ import {
  * *active* session. A login elsewhere overwrites `client_sessions` with a new
  * id, and a cookie carrying the old one now fails `isActiveSession` — cheaper
  * than a broker round trip, and it is what actually enforces single-active-
- * session rather than merely relying on Angel One's own token lifetime.
+ * session rather than merely relying on the broker's own token lifetime.
  *
  * The profile read that proves the JWT is alive is also the profile the HUD
  * shows, so it is kept rather than thrown away: one call, both jobs.
@@ -72,19 +74,26 @@ export async function GET() {
     // Best-effort: invalidate this window's own JWT at the broker too, so a
     // cached copy of it can't keep trading past the point this cookie was
     // told it's done. The window that superseded it already wrote its own
-    // token to `broker_sessions` on login — nothing here touches that.
-    await smartApiCall(LOGOUT_URL, {
-      method: "POST",
-      jwt: session.jwtToken,
-      body: { clientcode: session.clientCode },
-    }).catch(() => undefined);
+    // token to `broker_sessions` on login — nothing here touches that. Dhan
+    // has no documented logout/invalidate endpoint, so its superseded branch
+    // just clears the cookie.
+    if (session.broker === "angelone") {
+      await smartApiCall(LOGOUT_URL, {
+        method: "POST",
+        jwt: session.jwtToken,
+        body: { clientcode: session.clientCode },
+      }).catch(() => undefined);
+    }
     const res = signedOut("superseded");
     res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
     return res;
   }
 
+  if (session.broker === "dhan") return sessionDhan(session);
+
   const body = (feedToken: string, loginAt: string | null) => ({
     authenticated: true,
+    broker: "angelone",
     client_code: session.clientCode,
     feed_token: feedToken,
     api_key: API_KEY,
@@ -176,6 +185,7 @@ export async function GET() {
     res.cookies.set(
       SESSION_COOKIE,
       encodeSession({
+        broker: "angelone",
         jwtToken: data.jwtToken,
         refreshToken: data.refreshToken ?? session.refreshToken,
         clientCode: session.clientCode,
@@ -191,4 +201,30 @@ export async function GET() {
     res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
     return res;
   }
+}
+
+/**
+ * Dhan's branch: no liveness call exists in the Data API, so the access
+ * token's own `expiryTime` (stored at login) is the only signal available.
+ * There is no refresh path either — an expired token means a fresh TOTP
+ * login, not a silent renewal.
+ */
+async function sessionDhan(session: Extract<import("@/lib/server/session").ServerSession, { broker: "dhan" }>) {
+  if (new Date(session.tokenExpiresAt).getTime() <= Date.now()) {
+    const res = signedOut("expired");
+    res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+    return res;
+  }
+
+  const profile = await cachedDhanProfile(session.clientCode);
+  return NextResponse.json({
+    authenticated: true,
+    broker: "dhan",
+    client_code: session.clientCode,
+    feed_token: session.accessToken,
+    api_key: "",
+    state: null,
+    login_time: session.loginAt ?? new Date().toISOString().slice(0, 19),
+    profile,
+  });
 }
