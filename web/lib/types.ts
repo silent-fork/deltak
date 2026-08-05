@@ -358,6 +358,10 @@ export interface MarginEstimate {
   delivery: number;
   non_fo: number;
   options_premium: number;
+  /** Dhan-only: its calculator returns real per-order brokerage directly, summed across the basket's legs — Angel One's batch endpoint has no equivalent. */
+  brokerage?: number;
+  /** Dhan-only: exposure margin, summed across legs. */
+  exposure?: number;
 }
 
 /* ------------------------------------------- market-data route envelopes */

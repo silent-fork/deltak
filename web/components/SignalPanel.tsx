@@ -11,6 +11,7 @@ import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
 import { roundTripCharges } from "@/lib/engine/charges";
 import { fetchMargin } from "@/lib/market/client";
+import { INDEX_UNIVERSE } from "@/lib/engine/config";
 import type {
   ExecutionMode,
   LedgerSnapshot,
@@ -152,10 +153,13 @@ export function SignalPanel({
       return;
     }
     let cancelled = false;
+    // SENSEX/BANKEX list on BSE, not NSE — the same split `dhanOptionSegment`
+    // already makes for Dhan's own request shape.
+    const exchange = INDEX_UNIVERSE[signal?.underlying ?? ""]?.exchange === "BSE" ? "BFO" : "NFO";
     const id = setTimeout(() => {
       void fetchMargin([
         {
-          exchange: "NFO",
+          exchange,
           qty: quantity,
           price: entryPrice,
           productType: "INTRADAY",
@@ -175,7 +179,7 @@ export function SignalPanel({
       cancelled = true;
       clearTimeout(id);
     };
-  }, [authenticated, token, quantity, entryPrice]);
+  }, [authenticated, token, quantity, entryPrice, signal?.underlying]);
 
   /**
    * The trade's arithmetic, after costs.
@@ -424,7 +428,11 @@ export function SignalPanel({
               <span className="dk-label text-[9px]">Margin</span>
               {margin ? (
                 <span
-                  title={`Angel One batch margin calculator: span ${money(margin.span, 0)}, net premium ${money(margin.net_premium, 0)}, options premium ${money(margin.options_premium, 0)}, benefit ${money(margin.benefit, 0)}.`}
+                  title={
+                    engine.session.broker === "dhan"
+                      ? `Dhan margin calculator: span ${money(margin.span, 0)}, exposure ${money(margin.exposure ?? 0, 0)}, brokerage ${money(margin.brokerage ?? 0, 0)}, premium ${money(margin.net_premium, 0)}.`
+                      : `Angel One batch margin calculator: span ${money(margin.span, 0)}, net premium ${money(margin.net_premium, 0)}, options premium ${money(margin.options_premium, 0)}, benefit ${money(margin.benefit, 0)}.`
+                  }
                   className="truncate text-zinc-300"
                 >
                   {money(margin.total, 0)}

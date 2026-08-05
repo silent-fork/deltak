@@ -34,6 +34,7 @@ export const ROLLING_OPTION_URL = `${DATA_API_ROOT}/charts/rollingoption`;
 export const OPTION_CHAIN_URL = `${DATA_API_ROOT}/optionchain`;
 export const EXPIRY_LIST_URL = `${DATA_API_ROOT}/optionchain/expirylist`;
 export const INSTRUMENT_MASTER_URL = "https://images.dhan.co/api-data/api-scrip-master-detailed.csv";
+export const MARGIN_CALCULATOR_URL = `${DATA_API_ROOT}/margincalculator`;
 
 /**
  * Dhan's own published throttling (Annexure + the Live Market Feed/Option
@@ -52,6 +53,10 @@ const limiters: Record<string, RateLimiter> = {
   [ROLLING_OPTION_URL]: new RateLimiter([{ ms: 1_000, max: 3 }]),
   [OPTION_CHAIN_URL]: new RateLimiter([{ ms: 3_000, max: 1 }]),
   [EXPIRY_LIST_URL]: new RateLimiter([{ ms: 3_000, max: 1 }]),
+  // Not in Dhan's published per-endpoint table (unlike the Data APIs above) —
+  // 5/sec matches their general Data-API default, a conservative guess rather
+  // than a documented number.
+  [MARGIN_CALCULATOR_URL]: new RateLimiter([{ ms: 1_000, max: 5 }]),
 };
 
 export class DhanApiError extends Error {
@@ -360,5 +365,53 @@ export async function dhanQuote(
     accessToken: creds.accessToken,
     clientId: creds.clientId,
     body: bySegment,
+  });
+}
+
+export interface DhanMarginResult {
+  totalMargin: number;
+  spanMargin: number;
+  exposureMargin: number;
+  availableBalance: number;
+  variableMargin: number;
+  insufficientBalance: number;
+  /** What Dhan would actually charge for this one order — the real number, not a rate-card estimate. */
+  brokerage: number;
+  leverage: string;
+}
+
+/**
+ * `POST /margincalculator` — one order's margin and brokerage, not a basket.
+ *
+ * Unlike Angel One's batch endpoint this is priced per leg, so a multi-leg
+ * basket costs one call per leg (see `/api/margin`'s Dhan branch, which fans
+ * these out and sums them) rather than a single request.
+ */
+export async function dhanMarginCalculator(
+  creds: { accessToken: string; clientId: string },
+  params: {
+    exchangeSegment: string;
+    transactionType: "BUY" | "SELL";
+    quantity: number;
+    productType: string;
+    securityId: string;
+    price: number;
+    triggerPrice?: number;
+  },
+): Promise<DhanMarginResult> {
+  return dhanApiCall<DhanMarginResult>(MARGIN_CALCULATOR_URL, {
+    method: "POST",
+    accessToken: creds.accessToken,
+    clientId: creds.clientId,
+    body: {
+      dhanClientId: creds.clientId,
+      exchangeSegment: params.exchangeSegment,
+      transactionType: params.transactionType,
+      quantity: params.quantity,
+      productType: params.productType,
+      securityId: params.securityId,
+      price: params.price,
+      triggerPrice: params.triggerPrice ?? 0,
+    },
   });
 }
