@@ -10,9 +10,9 @@ import { ImageResponse } from "next/og";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
-  "DeltaK — Quantum Horizon options trading terminal for Angel One, across NIFTY, BANKNIFTY and FINNIFTY futures & options";
+  "DeltaK — Quantum Horizon options trading terminal, across NIFTY, BANKNIFTY, FINNIFTY, SENSEX & BANKEX futures & options";
 
-const CHIPS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode"];
+const CHIPS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX"];
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -114,7 +114,7 @@ export default function OpengraphImage() {
             textAlign: "center",
           }}
         >
-          An Angel One options terminal built around the&nbsp;
+          The DeltaK options terminal built around the&nbsp;
           <span style={{ display: "flex", color: "#00f0ff" }}>Quantum Horizon</span>
         </div>
 

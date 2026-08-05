@@ -28,11 +28,11 @@ function content(): string {
 
   return `# DeltaK — full reference
 
-> The expanded companion to [/llms.txt](${SITE_URL}/llms.txt). DeltaK is two independent things under one brand: a live Angel One options-trading terminal (DKMS strategy, sign-in required), and a family of free NSE F&O reference tools.
+> The expanded companion to [/llms.txt](${SITE_URL}/llms.txt). DeltaK is two independent things under one brand: a live, multi-broker options-trading terminal (Angel One and Dhan today, more brokers planned; DKMS strategy, sign-in required), and a family of free NSE F&O reference tools.
 
 ## The terminal — DeltaK Matrix Strategy (DKMS)
 
-The terminal reads two structures live, tick by tick, across NIFTY, BANKNIFTY and FINNIFTY options:
+The terminal reads two structures live, tick by tick, across NIFTY, BANKNIFTY, FINNIFTY, SENSEX and BANKEX options:
 
 - **COA Matrix** — Aegis (the live support wall) and Zenith (the live resistance wall), tracked as two generations each: the cumulative open-interest wall built up over the session, and the one today's writers are actively building right now. A wall "migrating" — its strike shifting session over session — versus "solid" — holding its strike — is what actually selects the protocol below, not a setting anyone chooses.
 - **Quantum Horizon** — a live ITM/OTM open-interest profile drawn through the option chain at spot: everything left of it is in-the-money for calls, everything right in-the-money for puts, updated tick by tick.
@@ -47,7 +47,7 @@ One of four protocols is armed each session, decided by how Aegis and Zenith are
 
 Every candidate, in any protocol, still has to clear the Zero-OTM rule (longs restricted to the 2nd/3rd deepest ITM strike — never at-the-money or out-of-the-money) before it's actionable. Execution is either manual (operator clicks Execute) or Autopilot (the engine fires it itself); everything runs in Paper mode against live market data, no live order is ever placed.
 
-[Terminal](${SITE_URL}/terminal) — requires an Angel One SmartAPI sign-in (client code, PIN, TOTP); intentionally not indexed, since a sign-in gate has no content of its own to describe.
+[Terminal](${SITE_URL}/terminal) — requires a broker sign-in, Angel One or Dhan (client code/ID, PIN, TOTP); intentionally not indexed, since a sign-in gate has no content of its own to describe.
 
 ## Tools — the /tools family
 

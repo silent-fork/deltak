@@ -112,14 +112,14 @@ const STEPS = [
   {
     n: "01",
     icon: KeyRound,
-    title: "Sign in with SmartAPI",
-    body: "Client code, PIN and a six-digit TOTP — the same loginByPassword flow you'd use on Angel One directly. Nothing is stored beyond the session.",
+    title: "Connect your broker",
+    body: "Angel One or Dhan, more to follow — client code/ID, PIN and a six-digit TOTP either way. Nothing is stored beyond the session.",
   },
   {
     n: "02",
     icon: ScanLine,
     title: "The engine reads the tape",
-    body: "COA wall migration, RRG rotation and OI buildup recompute every second the market's open, across NIFTY, BANKNIFTY and FINNIFTY.",
+    body: "COA wall migration, RRG rotation and OI buildup recompute every second the market's open, across NIFTY, BANKNIFTY, FINNIFTY, SENSEX and BANKEX.",
   },
   {
     n: "03",
@@ -158,7 +158,7 @@ const LEARN_SECTIONS = [
     href: "/learn/indices",
     icon: Building2,
     title: "Indices",
-    body: "NIFTY, BANKNIFTY, FINNIFTY and every other major Indian index F&O contract — lot size, strike step, exchange.",
+    body: "NIFTY, BANKNIFTY, FINNIFTY, SENSEX, BANKEX and every other major Indian index F&O contract — lot size, strike step, exchange.",
   },
 ] as const;
 
@@ -204,16 +204,23 @@ export default function HomePage() {
         </span>
 
         <h1 className="mt-6 text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-5xl">
-          An Angel One options terminal built around the{" "}
+          The DeltaK options terminal built around the{" "}
           <span className="text-quantum [text-shadow:0_0_6px_rgba(0,240,255,0.3)]">
             Quantum Horizon
           </span>
         </h1>
 
-        <p className="mx-auto mt-5 max-w-2xl text-balance text-[15px] leading-relaxed text-zinc-400 sm:text-base">
-          DeltaK reads COA support/resistance walls, RRG relative-strength rotation
-          and live open-interest across NIFTY, BANKNIFTY and FINNIFTY futures &amp;
-          options — and either arms a trade for you to take, or takes it itself.
+        {/*
+          Was text-[15px]/text-base and a full mechanism-and-index rundown —
+          the same visual weight as the h1 itself, reading as two headlines
+          stacked rather than a headline and its subhead, and the five index
+          names it spelled out are the same five the chip row two beats below
+          already names individually. Cut to the two moves DKMS actually
+          watches for, "five Indian indices" standing in for the roll call.
+        */}
+        <p className="mx-auto mt-5 max-w-2xl text-balance text-[13px] leading-relaxed text-zinc-400 sm:text-[14px]">
+          Walls shift. Rotation turns. DeltaK watches both across five Indian
+          indices — then arms your trade, or fires it itself.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3">
@@ -242,7 +249,7 @@ export default function HomePage() {
           </div>
           <span className="flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-600">
             <LockKeyhole className="h-3 w-3" />
-            Free — sign in with your own Angel One account
+            Free — connect your own broker account
           </span>
 
           {/*
@@ -296,7 +303,7 @@ export default function HomePage() {
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
-          {["NIFTY", "BANKNIFTY", "FINNIFTY", "Paper mode"].map(
+          {["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "Paper mode"].map(
             (chip) => (
               <span
                 key={chip}
@@ -526,7 +533,7 @@ export default function HomePage() {
         </p>
         <p>
           DeltaK Matrix Strategy (DKMS) · COA 1.0 / 2.0 wall tracking · RRG
-          multi-strike momentum · Angel One SmartAPI
+          multi-strike momentum · Multi-broker market data
         </p>
         <p className="mt-1">
           Not investment advice. Options trading carries substantial risk of
