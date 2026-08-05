@@ -198,16 +198,16 @@ export function MobileCompanion({
               </div>
             ) : null}
 
-            <Card className="flex-1">
+            <Card>
               <CardHeader>
                 <CardTitle>Live Signal</CardTitle>
                 <span className="text-[9.5px] text-zinc-600">
                   {data?.signal ? `desktop · ${timeAgo(data.signal_updated_at)}` : "waiting for desktop"}
                 </span>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col p-0">
+              <CardContent className="flex flex-col p-0">
                 {data?.signal && !data.signal.market_open ? (
-                  <p className="flex flex-1 items-center justify-center px-3 py-3 text-center text-[11px] leading-snug text-zinc-500">
+                  <p className="px-3 py-4 text-center text-[11px] leading-snug text-zinc-500">
                     Market closed — waiting for the next session to open.
                     <br />
                     <span className="text-zinc-600">
@@ -222,34 +222,30 @@ export function MobileCompanion({
               </CardContent>
             </Card>
 
-            <Card className="flex-1">
+            <Card>
               <CardHeader>
                 <CardTitle>Open Positions</CardTitle>
                 <Badge className="h-4.5">{open.length}</Badge>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col p-0">
+              <CardContent className="flex flex-col p-0">
                 {open.length ? (
                   open.map((p) => <PositionRow key={p.id} position={p} />)
                 ) : (
-                  <p className="flex flex-1 items-center justify-center px-3 py-3 text-center text-[11px] text-zinc-600">
-                    Nothing open.
-                  </p>
+                  <p className="px-3 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="flex-1">
+            <Card>
               <CardHeader>
                 <CardTitle>Closed Trades</CardTitle>
                 <Badge className="h-4.5">{closed.length}</Badge>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col p-0">
+              <CardContent className="flex flex-col p-0">
                 {closed.length ? (
                   closed.map((p) => <PositionRow key={p.id} position={p} />)
                 ) : (
-                  <p className="flex flex-1 items-center justify-center px-3 py-3 text-center text-[11px] text-zinc-600">
-                    No trades yet.
-                  </p>
+                  <p className="px-3 py-4 text-center text-[11px] text-zinc-600">No trades yet.</p>
                 )}
               </CardContent>
             </Card>
