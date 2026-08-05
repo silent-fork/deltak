@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, LockKeyhole, ShieldAlert, Zap } from "lucide-react";
+import { KeyRound, LockKeyhole, ShieldAlert, ShieldCheck, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
@@ -230,7 +230,19 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             disabled={!valid || busy}
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 text-[13px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin text-zinc-400" /> : null}
+            {/*
+              A spinning icon rather than a static one keeps the familiar
+              "something is happening" read a plain Loader2 gave — but which
+              icon spins says what: a shield while Turnstile is being
+              satisfied, a key the instant that hands off to the broker
+              round trip, so the two waits (different systems, different
+              failure modes) look different, not just the label beside them.
+            */}
+            {phase === "verifying" ? (
+              <ShieldCheck className="h-4 w-4 animate-spin text-zinc-400" />
+            ) : phase === "authenticating" ? (
+              <KeyRound className="h-4 w-4 animate-spin text-zinc-400" />
+            ) : null}
             {phase === "verifying"
               ? "Verifying you're human"
               : phase === "authenticating"

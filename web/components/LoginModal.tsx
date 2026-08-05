@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
+import { KeyRound, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
@@ -146,11 +146,11 @@ export function LoginModal({
             written to disk.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <KeyRound className="h-3.5 w-3.5" />
-            )}
+            {/* The same key spins rather than swapping for a generic
+                spinner — one recognizable "in progress" glyph, doing the
+                same double duty (busy *and* what it's busy doing) as the
+                sign-in screen's own phase icons. */}
+            <KeyRound className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
             {busy ? "Authenticating" : "Connect"}
           </Button>
         </div>

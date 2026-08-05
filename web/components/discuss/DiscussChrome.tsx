@@ -1,8 +1,8 @@
 import { ArrowRight, BookOpen, ChevronRight, Zap } from "lucide-react";
-import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
+import { NavLink } from "@/components/NavLink";
 import { Wordmark } from "@/components/Wordmark";
 import { getViewerIdentity } from "@/lib/server/firebaseAuth";
 import { getForumProfile } from "@/lib/server/forum";
@@ -42,12 +42,12 @@ export async function DiscussChrome({
       />
 
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-        <Link href="/" className="flex items-center gap-2.5">
+        <NavLink href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
             <Zap className="h-4 w-4 text-quantum" />
           </div>
           <Wordmark className="text-[15px] tracking-[0.18em]" />
-        </Link>
+        </NavLink>
         <div className="flex items-center gap-2">
           <AuthMenu
             signedIn={Boolean(viewer)}
@@ -72,9 +72,9 @@ export async function DiscussChrome({
           <span key={i} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRight className="h-3 w-3 text-zinc-700" />}
             {c.href ? (
-              <Link href={c.href} className="transition-colors hover:text-quantum">
+              <NavLink href={c.href} className="transition-colors hover:text-quantum">
                 {c.label}
-              </Link>
+              </NavLink>
             ) : (
               <span className="text-zinc-400">{c.label}</span>
             )}

@@ -141,12 +141,34 @@
   }
 }
 
+/*
+ * A bolt striking, not spinning — a rotating Zap glyph reads as a broken
+ * clock hand, not a charge building. Used on nav links while a route
+ * transition is in flight (see `useTransitionLink`), so the wait reads as
+ * "the terminal is booting" rather than a generic spinner borrowed from
+ * anywhere else on the web.
+ */
+@keyframes dk-charge {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dk-scroll {
     scroll-behavior: auto;
   }
   /* The shapes carry the meaning; the sweep is decoration. */
   .dk-skeleton::after {
+    animation: none;
+  }
+  .animate-dk-charge {
     animation: none;
   }
 }
@@ -161,5 +183,8 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+  .animate-dk-charge {
+    animation: dk-charge 0.55s ease-in-out infinite;
   }
 }
