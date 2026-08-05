@@ -165,7 +165,7 @@ export function BootScreen({
             panel: the bar is the only moving thing on the screen and reads
             better as a line of light than as a widget in a card. */}
         <div
-          className="flex w-80 animate-fade-up flex-col items-center gap-4"
+          className="flex w-[34rem] max-w-[90vw] animate-fade-up flex-col items-center gap-4"
           style={{ animationDelay: "300ms" }}
         >
           <div className="relative h-[4px] w-full overflow-hidden rounded-full bg-zinc-800/50">
@@ -192,15 +192,22 @@ export function BootScreen({
 
           <div
             key={text}
-            className="flex animate-fade-up items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400"
+            className="flex animate-fade-up items-start gap-2 font-mono text-[10px] uppercase leading-relaxed tracking-[0.14em] text-zinc-400"
           >
+            {/* `mt-[3px]` rather than `items-center`: a status line short
+                enough to fit one line looked fine centered against itself,
+                but the longer, witty replacements (see STAGE_COPY) wrap on
+                anything narrower than a very wide screen, and a vertically
+                centered dot against two lines of text reads as misaligned —
+                this pins it to the first line's cap-height instead, the
+                usual hanging-bullet position, so it holds up wrapped or not. */}
             <span
               className={cn(
-                "h-1.5 w-1.5 shrink-0 rounded-full",
+                "mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full",
                 complete ? "bg-emerald-400" : "bg-quantum animate-pulse-ring",
               )}
             />
-            {text}
+            <span className="text-left">{text}</span>
           </div>
         </div>
 
