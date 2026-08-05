@@ -138,6 +138,19 @@ function PositionCard({
             >
               {p.automation === "auto" ? "AUTO" : "MANUAL"}
             </span>
+            {p.broker ? (
+              <span
+                title={p.broker === "dhan" ? "Dhan" : "Angel One"}
+                className={cn(
+                  "rounded border px-1",
+                  p.broker === "dhan"
+                    ? "border-amber-500/40 text-amber-400"
+                    : "border-sky-500/40 text-sky-400",
+                )}
+              >
+                {p.broker === "dhan" ? "DHAN" : "ANGEL"}
+              </span>
+            ) : null}
             {closed && p.exit_reason ? (
               <span className="rounded border border-zinc-800 px-1 text-zinc-400">
                 {EXIT_REASON[p.exit_reason] ?? p.exit_reason}
@@ -255,7 +268,7 @@ export const TradeBook = memo(function TradeBook({
   archive: Position[] | null;
   archiveLoading: boolean;
   archiveError: string | null;
-  onRefreshArchive: () => void;
+  onRefreshArchive: () => Promise<void>;
 }) {
   const [tab, setTab] = useState<Tab>("open");
   const [busy, setBusy] = useState<string | null>(null);
@@ -285,7 +298,15 @@ export const TradeBook = memo(function TradeBook({
       // stale archive snapshot (still `OPEN`) re-passes mergeBook's dedup
       // the instant the live ledger drops it, showing as a read-only ghost
       // duplicate in the Open tab until the next manual refresh or reload.
-      setTimeout(onRefreshArchive, 1200);
+      //
+      // Both awaited, not fired-and-forgotten, so `busy` — and the spinner
+      // and disabled buttons it drives — stays live for the whole visible
+      // transition. The refresh already had its own spinner (the header's
+      // RefreshCw), but nothing tied it to a just-closed position, so the
+      // ghost duplicate's correction a moment later looked like an
+      // unexplained jump instead of a load anyone could see coming.
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      await onRefreshArchive();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
       setTimeout(() => setError(null), 6000);
@@ -378,9 +399,15 @@ export const TradeBook = memo(function TradeBook({
         <div className="flex items-center justify-end gap-2">
           {archiveError ? (
             <span className="text-[9px] text-zinc-600">{archiveError}</span>
+          ) : archiveLoading ? (
+            // The word, not just the spin — a lone spinning icon this small
+            // reads as decoration; naming what's happening is what makes a
+            // just-closed position's own correction a moment later read as
+            // "still settling" instead of an unexplained jump.
+            <span className="text-[9px] uppercase tracking-wider text-zinc-600">Syncing…</span>
           ) : null}
           <button
-            onClick={onRefreshArchive}
+            onClick={() => void onRefreshArchive()}
             disabled={archiveLoading}
             title="Refresh from Supabase"
             className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"

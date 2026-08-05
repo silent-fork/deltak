@@ -1,5 +1,6 @@
 import type {
   Automation,
+  Broker,
   ExecutionMode,
   LedgerSnapshot,
   OptionType,
@@ -92,6 +93,8 @@ export class Ledger {
     entrySpot?: number | null;
     mode: ExecutionMode;
     automation?: Automation;
+    /** Which broker's session this fill came from — null for a paper trade taken signed out. */
+    broker?: Broker | null;
   }): Position {
     const pos: Position = {
       id: this.nextId(),
@@ -120,6 +123,7 @@ export class Ledger {
       status: "OPEN",
       mode: params.mode,
       automation: params.automation ?? "manual",
+      broker: params.broker ?? null,
     };
     this.positions.set(pos.id, pos);
     const cost = this.legCharges(pos.side, pos.avg_price, pos.quantity);

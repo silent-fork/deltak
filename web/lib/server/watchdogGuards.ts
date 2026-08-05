@@ -10,7 +10,7 @@ import {
 import { applySlippage } from "@/lib/engine/ledger";
 import { decideExit, type ExitReason } from "@/lib/engine/risk";
 import { insertRows, selectFrom, updatePositionByTradeKey } from "@/lib/supabase";
-import type { Side } from "@/lib/types";
+import type { Broker, Side } from "@/lib/types";
 import { NoBrokerSessionError, watchdogLtp } from "./watchdogMarket";
 
 /**
@@ -45,6 +45,7 @@ interface OpenPositionRow {
   trade_key: string;
   ledger_id: string;
   client_code: string;
+  broker: string | null;
   mode: string;
   underlying: string;
   token: string;
@@ -97,6 +98,8 @@ async function bookExit(row: OpenPositionRow, ltp: number, reason: ExitReason): 
   const realisedPnl = r2((fill - avg) * quantity * direction);
   const pnlPct = avg ? r2(((fill - avg) / avg) * 100 * direction) : 0;
   const closedAt = new Date().toISOString();
+  const broker: Broker | null =
+    row.broker === "dhan" || row.broker === "angelone" ? row.broker : null;
 
   await updatePositionByTradeKey(row.trade_key, {
     status: "CLOSED",
@@ -133,6 +136,7 @@ async function bookExit(row: OpenPositionRow, ltp: number, reason: ExitReason): 
       },
     ],
     row.client_code,
+    broker,
   );
 
   await insertRows(

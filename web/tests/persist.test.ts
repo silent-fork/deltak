@@ -45,6 +45,7 @@ const openPosition: Position = {
   status: "OPEN",
   mode: "paper",
   automation: "manual",
+  broker: "angelone",
 };
 
 const closedPosition: Position = {

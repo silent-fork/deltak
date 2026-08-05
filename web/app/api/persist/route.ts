@@ -12,11 +12,11 @@ import { insertRows, isWritable, supabaseConfigured } from "@/lib/supabase";
  * failure must never block or delay a trading decision, so the client fires
  * these without awaiting them and a 503 here is not an error state for the HUD.
  *
- * Trades are attributed here rather than by the caller. The client code comes
- * out of the httpOnly session cookie, so a row can only be filed under the
- * account whose session wrote it — a body claiming otherwise is overwritten,
- * not trusted. A paper trade taken with no broker session files under no
- * account, which is exactly what it is.
+ * Trades are attributed here rather than by the caller. The client code and
+ * broker come out of the httpOnly session cookie, so a row can only be filed
+ * under the account — and the broker — whose session wrote it, and a body
+ * claiming otherwise is overwritten, not trusted. A paper trade taken with no
+ * broker session files under no account, which is exactly what it is.
  */
 
 export const runtime = "nodejs";
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       resource,
       rows as Record<string, unknown>[],
       session?.clientCode ?? "",
+      session?.broker ?? null,
     );
     return NextResponse.json({ persisted });
   } catch (err) {

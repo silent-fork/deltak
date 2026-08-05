@@ -153,6 +153,8 @@ export interface Position {
   mode: ExecutionMode;
   /** Whether Autopilot or an operator's Execute click opened this position. */
   automation: Automation;
+  /** Which broker's session opened this position — stamped server-side, never client-supplied. */
+  broker: Broker | null;
 }
 
 export interface LedgerSnapshot {

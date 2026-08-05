@@ -333,6 +333,7 @@ export function Terminal() {
                 onExecuted={bumpRefresh}
                 ledger={snapshot?.ledger}
                 onLedgerChanged={bumpRefresh}
+                clientCode={engine.session.clientCode}
               />
             </aside>
           </section>

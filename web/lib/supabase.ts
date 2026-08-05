@@ -2,7 +2,7 @@ import "server-only";
 
 import { TABLE_COLUMNS } from "@/lib/engine/persist";
 import { mergeProfile } from "@/lib/profileMerge";
-import type { UserProfile } from "@/lib/types";
+import type { Broker, UserProfile } from "@/lib/types";
 
 /**
  * Minimal server-side PostgREST client.
@@ -142,6 +142,7 @@ export async function insertRows(
   resource: WritableResource,
   rows: Record<string, unknown>[],
   clientCode: string,
+  broker: Broker | null = null,
 ): Promise<number> {
   if (!supabaseConfigured) throw new Error("Supabase is not configured.");
   const table = WRITABLE[resource];
@@ -153,6 +154,7 @@ export async function insertRows(
     // request body: the browser says what it traded, not who it traded as.
     if (resource === "positions" || resource === "orders") {
       row.client_code = clientCode || null;
+      row.broker = broker;
     }
     if (resource === "positions") {
       row.trade_key = tradeKey(

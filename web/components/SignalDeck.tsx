@@ -42,6 +42,7 @@ export const SignalDeck = memo(function SignalDeck({
   onExecuted,
   ledger,
   onLedgerChanged,
+  clientCode,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
@@ -49,6 +50,8 @@ export const SignalDeck = memo(function SignalDeck({
   onExecuted: () => void;
   ledger: LedgerSnapshot | undefined;
   onLedgerChanged: () => void;
+  /** Re-syncs the archive whenever the signed-in account changes — see `useTradeArchive`. */
+  clientCode: string | null;
 }) {
   const [deck, setDeck] = useState<Deck>("signal");
   const meta = signal ? PROTOCOL_META[signal.protocol] : null;
@@ -60,13 +63,15 @@ export const SignalDeck = memo(function SignalDeck({
    * the operator clicked back into the book tab.
    */
   const { archive, loading: archiveLoading, error: archiveError, reload: reloadArchive } =
-    useTradeArchive();
+    useTradeArchive(clientCode);
   // `TradeBook` is memoized too; wrapping `reloadArchive` here rather than
   // inline in its JSX prop keeps that identity stable across renders that
   // don't touch the archive, instead of a fresh closure defeating the memo.
-  const handleRefreshArchive = useCallback(() => {
-    void reloadArchive();
-  }, [reloadArchive]);
+  // Returns the promise rather than firing and forgetting it — TradeBook
+  // awaits this after a position action so its own busy state (and the
+  // spinner/disabled buttons it drives) spans the refresh too, not just
+  // the action itself.
+  const handleRefreshArchive = useCallback(() => reloadArchive(), [reloadArchive]);
 
   // The badge and the header total read the same merged book the trade tab
   // itself renders — live ledger plus whatever Supabase still holds from a

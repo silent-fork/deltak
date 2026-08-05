@@ -14,9 +14,13 @@ import { api } from "@/lib/api";
  * deck, not the tab inside it), so switching between the signal panel and the
  * trade book — which mounts and unmounts the book — re-fetches nothing. The
  * read happens once, on load, the way the "Synced with Supabase" caption
- * beneath the tabs already promises.
+ * beneath the tabs already promises — and again whenever `clientCode`
+ * changes, since `/api/history` scopes by the session cookie: switching
+ * broker (or account) inside the same tab without a full reload would
+ * otherwise leave the *previous* session's archive sitting here forever,
+ * mixing one broker's history into another's book.
  */
-export function useTradeArchive() {
+export function useTradeArchive(clientCode?: string | null) {
   const [archive, setArchive] = useState<Position[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +41,7 @@ export function useTradeArchive() {
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, clientCode]);
 
   return { archive, loading, error, reload };
 }

@@ -1,4 +1,4 @@
-import type { LedgerSnapshot, OptionType, Position, Protocol, Side } from "@/lib/types";
+import type { Broker, LedgerSnapshot, OptionType, Position, Protocol, Side } from "@/lib/types";
 
 /**
  * A `positions` row, as PostgREST hands it back — Supabase's own record, not
@@ -62,6 +62,9 @@ export function archiveRowToPosition(row: ArchiveRow): Position {
     // "manual" is the correct default, since that was every fill's origin
     // before Autopilot could open a position at all.
     automation: row.automation === "auto" ? "auto" : "manual",
+    // Rows written before this column existed carry no broker — left null
+    // rather than guessed, since a wrong guess would misattribute a real trade.
+    broker: row.broker === "angelone" || row.broker === "dhan" ? (row.broker as Broker) : null,
   };
 }
 

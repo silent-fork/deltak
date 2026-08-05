@@ -12,9 +12,9 @@ import type { Automation, ExecutionMode, OptionType, Position, Protocol, Side } 
  * So the mapping is explicit and lives here, in one pure function per table,
  * where a test can hold it to the schema.
  *
- * Attribution is *not* set here. `client_code` and `trade_key` are stamped by
- * the persist route from the session cookie, because a browser should not get
- * to name the account a trade belongs to.
+ * Attribution is *not* set here. `client_code`, `trade_key` and `broker` are
+ * stamped by the persist route from the session cookie, because a browser
+ * should not get to name the account — or the broker — a trade belongs to.
  */
 
 /**
@@ -26,19 +26,20 @@ import type { Automation, ExecutionMode, OptionType, Position, Protocol, Side } 
  * it out of the `server-only` module, where nothing but the server could read
  * it.
  *
- * `client_code` and `trade_key` are stamped server-side from the session
- * cookie; they are listed because the row is projected after that stamp.
+ * `client_code`, `trade_key` and `broker` are stamped server-side from the
+ * session cookie; they are listed because the row is projected after that
+ * stamp.
  */
 export const TABLE_COLUMNS = {
   positions: [
-    "client_code", "trade_key", "ledger_id", "mode", "underlying", "token",
+    "client_code", "trade_key", "broker", "ledger_id", "mode", "underlying", "token",
     "trading_symbol", "option_type", "strike", "side", "quantity", "lots",
     "lot_size", "avg_price", "ltp", "entry_spot", "stop_loss", "target", "protocol",
     "status", "unrealised_pnl", "realised_pnl", "pnl_pct", "exit_price", "exit_reason",
     "opened_at", "closed_at", "automation",
   ],
   orders: [
-    "client_code", "mode", "underlying", "token", "trading_symbol",
+    "client_code", "broker", "mode", "underlying", "token", "trading_symbol",
     "transaction_type", "order_type", "quantity", "lots", "lot_size", "price",
     "fill_price", "status", "broker_order_id", "ledger_id", "protocol",
     "option_type", "strike", "message",

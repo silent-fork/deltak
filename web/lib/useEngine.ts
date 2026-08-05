@@ -1103,6 +1103,12 @@ export function useEngine(simulate: boolean) {
       sessionRef.current = next;
       // Anything cached from a previous session belonged to a different JWT.
       clearMarketCache();
+      // A broker switch (or re-login as a different account) without a full
+      // page reload otherwise left the previous session's own live positions
+      // sitting in memory — the Trade Book merges this against Supabase, so
+      // a stale Angel One position kept showing up even after signing into
+      // Dhan, the client_code scoping on the archive fetch below notwithstanding.
+      ledgerRef.current.reset();
       log(
         "INFO",
         `${next.broker === "dhan" ? "Dhan" : "SmartAPI"} session established for ${res.profile?.name ?? res.client_code}.`,
@@ -1448,6 +1454,7 @@ export function useEngine(simulate: boolean) {
         entrySpot: chainsRef.current[underlying]?.spot ?? null,
         mode: currentMode,
         automation,
+        broker: sessionRef.current.broker,
       });
 
       savePositions([pos]);
