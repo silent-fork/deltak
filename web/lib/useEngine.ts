@@ -87,6 +87,13 @@ const SESSION_CHECK_MS = 15 * 60_000;
 const MOBILE_PUSH_MS = 5_000;
 /** Focus fires on every alt-tab; do not spend a profile call on each one. */
 const SESSION_FOCUS_MIN_MS = 5 * 60_000;
+/**
+ * Autopilot-only: how long an underlying stays off-limits to Autopilot after
+ * a TARGET or STOP_LOSS exit — long enough that a level the protocol just
+ * proved wrong isn't immediately re-armed on the very next tick's noise.
+ * Manual re-entry is never blocked by this; see `autoCooldownUntilRef`.
+ */
+const AUTO_REENTRY_COOLDOWN_MS = 15 * 60_000;
 
 export interface EngineSession {
   authenticated: boolean;
@@ -234,6 +241,17 @@ export function useEngine(simulate: boolean) {
   const marketRef = useRef<MarketData | null>(null);
   const eventsRef = useRef<RiskEvent[]>([]);
   const scaledRef = useRef(new Set<string>());
+  /**
+   * Autopilot-only re-entry cooldown, per underlying — the epoch ms an
+   * underlying becomes eligible again after a TARGET or STOP_LOSS exit. Set
+   * in `bookExit` below, read by the Autopilot firing loop further down.
+   * Deliberately not set for MANUAL, PANIC, TP1, DAYLIGHT_REST or
+   * INVALIDATION exits: an operator's own close (or a scale-out, which
+   * isn't an exit at all) isn't the "protocol just proved this level wrong"
+   * signal a hit stop or target is — a manual close should be free to
+   * re-enter immediately if the signal is still actionable.
+   */
+  const autoCooldownUntilRef = useRef<Record<string, number>>({});
   const daylightDoneRef = useRef(false);
   const resyncRef = useRef(0);
   const checkpointRef = useRef(CHECKPOINT_EVERY_TICKS);
@@ -446,6 +464,9 @@ export function useEngine(simulate: boolean) {
       if (closed) {
         savePositions([closed]);
         saveWallet(ledgerRef.current);
+        if (reason === "TARGET" || reason === "STOP_LOSS") {
+          autoCooldownUntilRef.current[closed.underlying] = Date.now() + AUTO_REENTRY_COOLDOWN_MS;
+        }
         saveOrder(
           orderRow({
             position: closed,
@@ -1559,6 +1580,17 @@ export function useEngine(simulate: boolean) {
    * so a signal that stays actionable for minutes opens exactly one
    * position, not one a second. Nothing fires against a settled board — out
    * of hours (and not simulated) there is no live price to fill against.
+   *
+   * Two more guards, both Autopilot-only — a manual Execute click is never
+   * subject to either:
+   *  - One open position at a time, full stop, across every index — not
+   *    just the signal's own token. A book that already has a live bet on
+   *    doesn't need Autopilot compounding risk into a second, unrelated one
+   *    before the first is even settled.
+   *  - A 15-minute cooldown per underlying after a TARGET or STOP_LOSS exit
+   *    (`autoCooldownUntilRef`, set in `bookExit`) — the protocol just proved
+   *    that level wrong or right and settled the trade; re-arming the same
+   *    index on the next tick's noise is chasing it, not trading it.
    */
   const autoInFlightRef = useRef<Set<string>>(new Set());
   /**
@@ -1574,12 +1606,23 @@ export function useEngine(simulate: boolean) {
   useEffect(() => {
     if (automation !== "auto" || !snapshot) return;
     if (!snapshot.market_open && !simulated) return;
+    // One open position at a time, across every index — see this effect's
+    // own doc comment above for why. A fill already in flight (about to
+    // become an open position, but not yet in `snapshot.ledger` this tick)
+    // holds this gate too, not just a settled one.
+    if (snapshot.ledger.open_positions.length > 0 || autoInFlightRef.current.size > 0) return;
 
+    const now = Date.now();
     for (const u of UNDERLYINGS) {
+      // Re-checked every iteration, not just once above: the moment any
+      // underlying in this same pass goes in-flight, nothing else in the
+      // pass may fire either — one open position across the whole book, not
+      // one per index per tick.
+      if (autoInFlightRef.current.size > 0) break;
       const signal = snapshot.signals[u];
       if (!signal?.actionable || !signal.token) continue;
-      if (autoInFlightRef.current.has(u)) continue;
-      if (snapshot.ledger.open_positions.some((p) => p.token === signal.token)) continue;
+      const cooldownUntil = autoCooldownUntilRef.current[u];
+      if (cooldownUntil && now < cooldownUntil) continue;
 
       autoInFlightRef.current.add(u);
       void executeSignal(u, undefined, "auto")

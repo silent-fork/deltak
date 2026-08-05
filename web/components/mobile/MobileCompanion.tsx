@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wordmark } from "@/components/Wordmark";
 import { setAnalyticsContext, track } from "@/lib/analytics";
 import { api, type MobileStateResponse } from "@/lib/api";
+import { UNDERLYINGS } from "@/lib/engine/config";
 import type { Position } from "@/lib/types";
 import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney, timeAgo } from "@/lib/utils";
 
@@ -215,7 +216,7 @@ export function MobileCompanion({
                     </span>
                   </p>
                 ) : (
-                  ["NIFTY", "BANKNIFTY", "FINNIFTY"].map((u) => (
+                  UNDERLYINGS.map((u) => (
                     <SignalRow key={u} underlying={u} signal={data?.signal ?? null} />
                   ))
                 )}
