@@ -146,11 +146,11 @@ export function LoginModal({
             written to disk.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
-            {/* The same key spins rather than swapping for a generic
-                spinner — one recognizable "in progress" glyph, doing the
-                same double duty (busy *and* what it's busy doing) as the
-                sign-in screen's own phase icons. */}
-            <KeyRound className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+            {/* The same key turns (see `dk-key-turn`) rather than swapping
+                for a generic spinner — one recognizable "in progress" glyph,
+                doing the same double duty (busy *and* what it's busy doing)
+                as the sign-in screen's own phase icons. */}
+            <KeyRound className={`h-3.5 w-3.5 ${busy ? "animate-dk-key-turn" : ""}`} />
             {busy ? "Authenticating" : "Connect"}
           </Button>
         </div>

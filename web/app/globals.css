@@ -160,6 +160,22 @@
   }
 }
 
+/*
+ * A key turning in a lock, not spinning in place — a full 360 on an
+ * asymmetric glyph like KeyRound reads as the icon glitching, the same
+ * problem `dk-charge` above solves for the Zap glyph. Turns through a
+ * believable arc and back, around roughly where the key's own ring sits.
+ */
+@keyframes dk-key-turn {
+  0%,
+  100% {
+    transform: rotate(-24deg);
+  }
+  50% {
+    transform: rotate(20deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dk-scroll {
     scroll-behavior: auto;
@@ -169,6 +185,9 @@
     animation: none;
   }
   .animate-dk-charge {
+    animation: none;
+  }
+  .animate-dk-key-turn {
     animation: none;
   }
 }
@@ -186,5 +205,9 @@
   }
   .animate-dk-charge {
     animation: dk-charge 0.55s ease-in-out infinite;
+  }
+  .animate-dk-key-turn {
+    animation: dk-key-turn 0.7s ease-in-out infinite;
+    transform-origin: 30% 50%;
   }
 }
