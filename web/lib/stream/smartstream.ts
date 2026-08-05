@@ -10,6 +10,19 @@ import {
 import { type Tick, emptyTick } from "./ticks";
 
 /**
+ * `NSE_CM`/`BSE_CM` carry only this app's five index spot tokens (see
+ * `trackAngelOne` in `useEngine.ts` — nothing else is ever subscribed
+ * under a cash-market exchange type here), and an index has no order book
+ * to fill Mode 3's depth fields with. Angel One's SmartAPI docs say indices
+ * only support LTP/Quote, not SnapQuote — the same asymmetry that made
+ * Dhan's feed silently drop a Full-mode index subscription (see
+ * `dhanfeed.ts`'s own header comment). Both cash-market exchange types ride
+ * Mode 2 (Quote) instead of Mode 3 below; NSE_FO/BSE_FO keep Mode 3 for the
+ * bid/ask depth the option chain actually shows.
+ */
+const CM_EXCHANGE_TYPES: readonly number[] = [EXCHANGE_NSE_CM, EXCHANGE_BSE_CM];
+
+/**
  * SmartStream 2.0 client, running **in the browser**.
  *
  * This is the piece that makes a backend-free build possible. SmartStream
@@ -40,6 +53,7 @@ const PRICE_DIVISOR = 100;
 const HEARTBEAT_MS = 25_000;
 const MAX_TOKENS_PER_REQUEST = 1000;
 const ACTION_SUBSCRIBE = 1;
+const MODE_QUOTE = 2;
 const MODE_SNAP_QUOTE = 3;
 
 export function decodePacket(buf: ArrayBuffer): Tick | null {
@@ -163,7 +177,9 @@ export class SmartStreamClient {
   }
 
   /**
-   * Subscribe a delta (or the whole tracked set) in Mode 3 snap quote.
+   * Subscribe a delta (or the whole tracked set) — Mode 3 snap quote for
+   * everything except the cash-market exchange types, which ride Mode 2
+   * (see the file header comment).
    *
    * The default source is *every* tracked exchange type, built generically
    * from `this.tracked` rather than hardcoding the two NSE ones — this fires
@@ -180,20 +196,31 @@ export class SmartStreamClient {
         Object.entries(this.tracked).map(([exch, set]) => [exch, [...set]]),
       );
 
-    const tokenList: { exchangeType: number; tokens: string[] }[] = [];
+    const snapTokenList: { exchangeType: number; tokens: string[] }[] = [];
+    const quoteTokenList: { exchangeType: number; tokens: string[] }[] = [];
     for (const [exch, tokens] of Object.entries(source)) {
+      const exchangeType = Number(exch);
+      const list = CM_EXCHANGE_TYPES.includes(exchangeType) ? quoteTokenList : snapTokenList;
       for (let i = 0; i < tokens.length; i += MAX_TOKENS_PER_REQUEST) {
         const slice = tokens.slice(i, i + MAX_TOKENS_PER_REQUEST);
-        if (slice.length) tokenList.push({ exchangeType: Number(exch), tokens: slice });
+        if (slice.length) list.push({ exchangeType, tokens: slice });
       }
     }
-    if (!tokenList.length) return;
 
+    this.sendSubscribe(MODE_SNAP_QUOTE, snapTokenList);
+    this.sendSubscribe(MODE_QUOTE, quoteTokenList);
+  }
+
+  private sendSubscribe(
+    mode: number,
+    tokenList: { exchangeType: number; tokens: string[] }[],
+  ): void {
+    if (!tokenList.length || !this.ws) return;
     this.ws.send(
       JSON.stringify({
         correlationID: `deltak-${Date.now()}`,
         action: ACTION_SUBSCRIBE,
-        params: { mode: MODE_SNAP_QUOTE, tokenList },
+        params: { mode, tokenList },
       }),
     );
   }

@@ -37,13 +37,25 @@ import { type Tick, emptyTick } from "./ticks";
  * server-side and puts it straight in the tick. Here it is derived from the
  * "Prev Close" packet (response code 6), which every subscription triggers
  * once and which carries the previous session's closing OI.
+ *
+ * Indices (`IDX_I`) never got a single Full-mode packet in testing against
+ * Dhan's real feed — confirmed empirically, not just from the docs: a
+ * Full-mode subscribe for NIFTY's index security produced zero packets in
+ * 15s, while the same security in Ticker mode returned LTP immediately.
+ * An index has no market depth or OI to fill a Full packet with, so Dhan's
+ * feed appears to silently drop the subscription rather than answer it.
+ * Every index spot token rides Ticker mode instead — see `subscribe()`.
  */
 
 const FEED_URL = "wss://api-feed.dhan.co";
 const HEARTBEAT_MS = 8_000; // server pings every 10s; a stale ack after 40s drops the connection
 const MAX_INSTRUMENTS_PER_MESSAGE = 100;
 
+/** Indices ride this — see the file header comment for why. */
+const REQUEST_SUBSCRIBE_TICKER = 15;
 const REQUEST_SUBSCRIBE_FULL = 21;
+/** The one segment that has to subscribe in Ticker mode, not Full. */
+const TICKER_ONLY_SEGMENT: DhanSegment = "IDX_I";
 const RESPONSE_TICKER = 2;
 const RESPONSE_QUOTE = 4;
 const RESPONSE_OI = 5;
@@ -200,7 +212,14 @@ export class DhanFeedClient {
     return fresh;
   }
 
-  /** Subscribe a delta (or the whole tracked set) in Full mode. */
+  /**
+   * Subscribe a delta (or the whole tracked set) — Full mode for everything
+   * except `TICKER_ONLY_SEGMENT`, which rides Ticker mode instead (see the
+   * file header comment). Two separate request batches, not one mixed-mode
+   * message: Dhan's subscribe frame carries a single `RequestCode` for the
+   * whole `InstrumentList`, so a spot token and an option token can't share
+   * one message if they need different modes.
+   */
   subscribe(only?: Partial<Record<DhanSegment, string[]>>): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
@@ -210,17 +229,27 @@ export class DhanFeedClient {
         Object.entries(this.tracked).map(([seg, set]) => [seg, [...(set ?? [])]]),
       );
 
-    const instruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
+    const fullInstruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
+    const tickerInstruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
     for (const [segment, tokens] of Object.entries(source) as [DhanSegment, string[]][]) {
-      for (const token of tokens) instruments.push({ ExchangeSegment: segment, SecurityId: token });
+      const bucket = segment === TICKER_ONLY_SEGMENT ? tickerInstruments : fullInstruments;
+      for (const token of tokens) bucket.push({ ExchangeSegment: segment, SecurityId: token });
     }
-    if (!instruments.length) return;
 
+    this.sendSubscribe(REQUEST_SUBSCRIBE_FULL, fullInstruments);
+    this.sendSubscribe(REQUEST_SUBSCRIBE_TICKER, tickerInstruments);
+  }
+
+  private sendSubscribe(
+    requestCode: number,
+    instruments: { ExchangeSegment: DhanSegment; SecurityId: string }[],
+  ): void {
+    if (!instruments.length || !this.ws) return;
     for (let i = 0; i < instruments.length; i += MAX_INSTRUMENTS_PER_MESSAGE) {
       const slice = instruments.slice(i, i + MAX_INSTRUMENTS_PER_MESSAGE);
       this.ws.send(
         JSON.stringify({
-          RequestCode: REQUEST_SUBSCRIBE_FULL,
+          RequestCode: requestCode,
           InstrumentCount: slice.length,
           InstrumentList: slice,
         }),
