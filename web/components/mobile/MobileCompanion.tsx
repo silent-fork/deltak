@@ -150,7 +150,11 @@ export function MobileCompanion({
   // network), the exact case that checkpoint exists to cover.
   const open = data?.signal?.open_positions ?? data?.positions.filter((p) => p.status === "OPEN") ?? [];
   const closed = data?.positions.filter((p) => p.status === "CLOSED").slice(0, 20) ?? [];
-  const ledger = data?.signal?.ledger;
+  // Same fallback shape as `open` above: the desktop's live push is the
+  // fresher number whenever it's there, `data.wallet` — read straight off the
+  // DB checkpoint — covers everything else (no push yet, an older cached
+  // snapshot, a desktop that's gone quiet).
+  const ledger = data?.signal?.ledger ?? data?.wallet;
   const mode = data?.signal?.mode ?? "paper";
 
   return (

@@ -288,4 +288,21 @@ export interface MobileStateResponse {
   } | null;
   signal_updated_at: string | null;
   positions: Position[];
+  /**
+   * The paper wallet rebuilt from its own DB checkpoint (`user_profiles.paper_*`
+   * plus whatever `positions` above shows open) — always present, so the
+   * wallet card has a real number the instant a phone pairs rather than
+   * waiting on a live desktop push. `signal.ledger` is still the fresher of
+   * the two whenever it's there; this is the fallback, same role `positions`
+   * plays for `signal.open_positions`.
+   */
+  wallet: {
+    capital: number;
+    equity: number;
+    deployed_margin: number;
+    charges: number;
+    open_pnl: number;
+    realised_pnl: number;
+    total_pnl: number;
+  };
 }
