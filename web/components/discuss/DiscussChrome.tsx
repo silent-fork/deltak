@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen, ChevronRight, Zap } from "lucide-react";
+import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
@@ -42,12 +43,12 @@ export async function DiscussChrome({
       />
 
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-        <NavLink href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
             <Zap className="h-4 w-4 text-quantum" />
           </div>
           <Wordmark className="text-[15px] tracking-[0.18em]" />
-        </NavLink>
+        </Link>
         <div className="flex items-center gap-2">
           <AuthMenu
             signedIn={Boolean(viewer)}

@@ -1,7 +1,7 @@
 import { Users } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
+import { CardLink } from "@/components/discuss/CardLink";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
 import { FORUM_CATEGORIES } from "@/lib/content/forumCategories";
 import { ACCENT_CLASSES, CATEGORY_ICON } from "@/lib/content/forumCategoryStyle";
@@ -37,7 +37,7 @@ export default function DiscussHubPage() {
             const Icon = CATEGORY_ICON[c.slug as keyof typeof CATEGORY_ICON] ?? Users;
             const accent = ACCENT_CLASSES[c.accent];
             return (
-              <Link
+              <CardLink
                 key={c.slug}
                 href={`/discuss/${c.slug}`}
                 className={`dk-panel group relative flex flex-col gap-2 overflow-hidden rounded-lg p-5 transition-colors ${accent.hoverBorder}`}
@@ -55,7 +55,7 @@ export default function DiscussHubPage() {
                   <h2 className="text-[15px] font-semibold text-zinc-100">{c.name}</h2>
                 </div>
                 <p className="relative text-[12.5px] leading-relaxed text-zinc-500">{c.tagline}</p>
-              </Link>
+              </CardLink>
             );
           })}
         </div>

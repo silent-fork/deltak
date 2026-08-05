@@ -1,8 +1,8 @@
 import { AlertTriangle, FileText, MessageCircle, Pin, Rss } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CardLink } from "@/components/discuss/CardLink";
 import { DiscussChrome } from "@/components/discuss/DiscussChrome";
 import { NewThreadForm } from "@/components/discuss/NewThreadForm";
 import { getForumCategory } from "@/lib/content/forumCategories";
@@ -109,7 +109,7 @@ export default async function DiscussCategoryPage({
           <div className="flex flex-col gap-2.5">
             {ordered.map((t) =>
               t.postType === "article" ? (
-                <Link
+                <CardLink
                   key={t.id}
                   href={`/discuss/${category}/${t.id}`}
                   className={`dk-panel group rounded-lg p-5 transition-colors hover:bg-white/[0.02] ${accent.hoverBorder}`}
@@ -139,9 +139,9 @@ export default async function DiscussCategoryPage({
                   <span className="mt-3 inline-block rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
                     {t.replyCount} {t.replyCount === 1 ? "reply" : "replies"}
                   </span>
-                </Link>
+                </CardLink>
               ) : (
-                <Link
+                <CardLink
                   key={t.id}
                   href={`/discuss/${category}/${t.id}`}
                   className={`dk-panel flex items-center gap-3 rounded-lg px-4 py-3.5 transition-colors hover:bg-white/[0.02] ${accent.hoverBorder}`}
@@ -170,7 +170,7 @@ export default async function DiscussCategoryPage({
                   <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500">
                     {t.replyCount} {t.replyCount === 1 ? "reply" : "replies"}
                   </span>
-                </Link>
+                </CardLink>
               ),
             )}
           </div>
