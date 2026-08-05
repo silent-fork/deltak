@@ -24,6 +24,7 @@ export function CtaLink({
   event = "cta_click",
   data,
   className,
+  pendingClassName,
   children,
 }: {
   href: string;
@@ -33,12 +34,25 @@ export function CtaLink({
   event?: string;
   data?: Record<string, unknown>;
   className?: string;
+  /**
+   * Full className replacement for the pending state, not a merge — most
+   * callers are plain text buttons where the default swap already lands
+   * centered, but a pill sized and padded around a specific multi-part
+   * layout (see the homepage's hero Discuss pill) collapses off-center
+   * around padding that was never meant to hold just the bolt alone.
+   */
+  pendingClassName?: string;
   children: React.ReactNode;
 }) {
   const { pending, onClick } = useTransitionLink(href, () => track(event, { location, ...data }));
 
   return (
-    <Link href={href} className={className} aria-busy={pending} onClick={onClick}>
+    <Link
+      href={href}
+      className={pending && pendingClassName ? pendingClassName : className}
+      aria-busy={pending}
+      onClick={onClick}
+    >
       {/* A clean swap, not an overlay — a dimmed label with an icon stacked
           on top of it read as broken (letters bleeding through the glow)
           rather than loading. Nothing else on the button while it's pending,

@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, LockKeyhole, ShieldAlert, ShieldCheck, Zap } from "lucide-react";
+import { LockKeyhole, ShieldAlert, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
@@ -231,20 +231,13 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 text-[13px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
           >
             {/*
-              An animated icon rather than a static one keeps the familiar
-              "something is happening" read a plain Loader2 gave — but which
-              icon moves, and how, says what: a shield spins while Turnstile
-              is being satisfied, a key turns in a lock (not a full spin —
-              see `dk-key-turn`'s own comment) the instant that hands off to
-              the broker round trip, so the two waits (different systems,
-              different failure modes) look different, not just the label
-              beside them.
+              Same charging-bolt glyph the rest of the site already uses for
+              "something is happening" (see `dk-charge`, `CtaLink`) rather
+              than a bespoke icon per phase — one consistent loading language
+              instead of two more animations to get right. The label beside
+              it still says which wait this is.
             */}
-            {phase === "verifying" ? (
-              <ShieldCheck className="h-4 w-4 animate-spin text-zinc-400" />
-            ) : phase === "authenticating" ? (
-              <KeyRound className="h-4 w-4 animate-dk-key-turn text-zinc-400" />
-            ) : null}
+            {phase ? <Zap className="h-4 w-4 animate-dk-charge fill-current text-zinc-400" /> : null}
             {phase === "verifying"
               ? "Verifying you're human"
               : phase === "authenticating"

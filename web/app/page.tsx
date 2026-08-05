@@ -270,6 +270,7 @@ export default function HomePage() {
             href="/discuss"
             location="hero-discuss"
             className="group mt-2 inline-flex items-center gap-3 rounded-full border border-quantum/30 bg-quantum/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-quantum/50 hover:bg-quantum/10"
+            pendingClassName="mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-quantum/30 bg-quantum/[0.06]"
           >
             <span className="flex shrink-0 items-center -space-x-2">
               <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-zenith/20 text-[9px] font-bold text-zenith">

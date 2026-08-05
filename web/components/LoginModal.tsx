@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, ShieldAlert } from "lucide-react";
+import { ShieldAlert, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { useEngineContext } from "@/components/EngineProvider";
@@ -146,11 +146,11 @@ export function LoginModal({
             written to disk.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
-            {/* The same key turns (see `dk-key-turn`) rather than swapping
-                for a generic spinner — one recognizable "in progress" glyph,
-                doing the same double duty (busy *and* what it's busy doing)
-                as the sign-in screen's own phase icons. */}
-            <KeyRound className={`h-3.5 w-3.5 ${busy ? "animate-dk-key-turn" : ""}`} />
+            {/* Same charging-bolt loading glyph as everywhere else on the
+                site (see `dk-charge`, `CtaLink`) rather than a bespoke key
+                icon — one consistent "in progress" language, not a second
+                one just for this button. */}
+            {busy ? <Zap className="h-3.5 w-3.5 animate-dk-charge fill-current" /> : null}
             {busy ? "Authenticating" : "Connect"}
           </Button>
         </div>
