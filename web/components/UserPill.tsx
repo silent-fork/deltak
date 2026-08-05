@@ -23,7 +23,9 @@ import { PairMobileSection } from "@/components/PairMobileSection";
 import { track } from "@/lib/analytics";
 import { api } from "@/lib/api";
 import { DEFAULT_CONFIG, istParts } from "@/lib/engine/config";
+import { mergeBook } from "@/lib/engine/book";
 import type { ExecutionMode, LedgerSnapshot, UserProfile } from "@/lib/types";
+import { useTradeArchive } from "@/lib/useTradeArchive";
 import { cn, money, pnlTone, signedMoney } from "@/lib/utils";
 
 /**
@@ -340,8 +342,23 @@ export function UserPill({
   }, [open]);
 
   const name = profile?.name ?? clientCode ?? "Operator";
-  const closed = ledger?.closed_positions.length ?? 0;
-  const openCount = ledger?.open_positions.length ?? 0;
+
+  /**
+   * "Closed today" undercounted on a fresh session: `ledger.closed_positions`
+   * is only what *this tab* has closed, so a session restore (wallet totals
+   * seeded from Supabase — see `Ledger.restoreWallet`) showed a correct
+   * "Booked" total but a stuck-at-zero count next to it, since no closed
+   * position *records* come back with that restore, only the running
+   * numbers. Merging in the same account archive the Trade Book itself
+   * reads gives this pill the actual rows to count and date-filter.
+   */
+  const { archive } = useTradeArchive(clientCode);
+  const merged = mergeBook(ledger, archive);
+  const today = istParts().date;
+  const isToday = (at: string | null) =>
+    !!at && istParts(new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(at) ? at : `${at}Z`)).date === today;
+  const closed = merged.closedRows.filter((r) => isToday(r.position.closed_at)).length;
+  const openCount = merged.openRows.length;
   const free = ledger ? Math.max(0, ledger.capital - ledger.deployed_margin) : 0;
   const deployedPct =
     ledger && ledger.capital > 0
