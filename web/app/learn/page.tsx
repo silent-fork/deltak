@@ -11,7 +11,7 @@ import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 export const metadata: Metadata = {
   title: "Quantum Horizon Wiki — Options Strategies, Glossary & F&O Reference",
   description:
-    "The Quantum Horizon Wiki — DeltaK's free options trading reference: strategy payoff diagrams, " +
+    "The Quantum Horizon Wiki — a free options trading reference: strategy payoff diagrams, " +
     "a full F&O glossary, trading styles and Indian index reference.",
   keywords: [
     "options trading wiki india",

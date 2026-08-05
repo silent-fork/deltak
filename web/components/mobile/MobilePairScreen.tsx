@@ -10,8 +10,9 @@ import { MAX_PAIRED_DEVICES } from "@/lib/server/mobile";
  * A server component, deliberately: there is nothing here that needs
  * client-side state — no scanner, no form, nothing to hydrate. The phone's
  * own camera app does the actual scanning; this screen only ever explains
- * that and waits. Angel One's client-code/PIN/TOTP form never renders on
- * mobile at all — this replaces it entirely on a mobile user agent.
+ * that and waits. The broker sign-in form (client code/ID, PIN, TOTP —
+ * Angel One or Dhan) never renders on mobile at all — this replaces it
+ * entirely on a mobile user agent.
  */
 export function MobilePairScreen({
   expired,
@@ -23,7 +24,7 @@ export function MobilePairScreen({
 }) {
   const steps = limitReached
     ? [
-        "Open the DeltaK terminal on your desktop",
+        "Open the Quantum Horizon terminal on your desktop",
         "Open the profile menu, top right",
         "Remove a phone under Paired devices, then scan again",
       ]
@@ -71,10 +72,10 @@ export function MobilePairScreen({
           </h1>
           <p className="mx-auto mt-2 max-w-[22rem] text-[12.5px] leading-relaxed text-zinc-400">
             {limitReached
-              ? `This account already has ${MAX_PAIRED_DEVICES} phones paired — DeltaK's cap. Remove one from the desktop's profile menu, then scan again.`
+              ? `This account already has ${MAX_PAIRED_DEVICES} phones paired — Quantum Horizon's cap. Remove one from the desktop's profile menu, then scan again.`
               : expired
-                ? "QR codes stay valid for two minutes. Open DeltaK on your desktop and scan the fresh one."
-                : "Open the DeltaK terminal on your desktop, open the profile menu, and scan the QR with this phone's camera — not a QR reader inside this page."}
+                ? "QR codes stay valid for two minutes. Open Quantum Horizon on your desktop and scan the fresh one."
+                : "Open the Quantum Horizon terminal on your desktop, open the profile menu, and scan the QR with this phone's camera — not a QR reader inside this page."}
           </p>
 
           <ol className="mt-5 space-y-2.5 text-left">
@@ -91,7 +92,7 @@ export function MobilePairScreen({
 
         <p className="relative mt-6 flex max-w-[16rem] items-start justify-center gap-1.5 text-center text-[10.5px] uppercase tracking-wider text-zinc-600">
           <ShieldCheck className="mt-px h-3 w-3 shrink-0 text-zinc-600" />
-          No Angel One sign-in ever happens on this device
+          No broker sign-in ever happens on this device
         </p>
 
         <p className="relative mt-8 flex items-center justify-center gap-1.5 text-zinc-600">

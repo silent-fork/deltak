@@ -30,7 +30,7 @@ const SITE_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
-const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal";
+const TITLE = "Quantum Horizon — Options Terminal for the DeltaK Strategy";
 /**
  * Google truncates a meta description around 155–160 characters — the old
  * 330-character version wasn't wrong, just invisible past the cut, so every
@@ -38,32 +38,37 @@ const TITLE = "DeltaK — Quantum Horizon Options Trading Terminal";
  * Kept under 160 everywhere it's reused below (page <meta>, OG, Twitter,
  * JSON-LD) for the same reason.
  *
- * Broker-neutral by design: the terminal supports more than one broker
- * (Angel One, Dhan, more to follow) — naming one here would just need
- * editing again at the next addition, so the pitch is DKMS/Quantum Horizon
- * itself, not whichever broker happens to be wired in today.
+ * Quantum Horizon is the product; DeltaK (the DeltaK Matrix Strategy, DKMS)
+ * is the strategy it runs — not the other way around. And it's
+ * broker-neutral by design regardless: the terminal supports more than one
+ * broker (Angel One, Dhan, more to follow) — naming one here would just
+ * need editing again at the next addition.
  */
 const DESCRIPTION =
-  "DeltaK: a live options terminal on the Quantum Horizon — COA walls, " +
-  "RRG rotation, Autopilot across NIFTY, BANKNIFTY, FINNIFTY, SENSEX & BANKEX.";
+  "Quantum Horizon: a live options terminal on the DeltaK Matrix Strategy " +
+  "— COA walls, RRG rotation, Autopilot across NIFTY, BANKNIFTY, FINNIFTY, " +
+  "SENSEX & BANKEX.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
-    template: "%s · DeltaK Terminal",
+    template: "%s · Quantum Horizon",
   },
   description: DESCRIPTION,
   keywords: [
-    "DeltaK",
     "Quantum Horizon",
-    "QntmHrzn",
+    "qntmhrzn",
+    "DeltaK",
+    "DeltaK Matrix Strategy",
     "DKMS",
     "options trading",
     "futures and options",
     "F&O trading",
     "algo trading India",
     "multi-broker options trading",
+    "Angel One options trading",
+    "Dhan options trading",
     "NIFTY options",
     "BANKNIFTY options",
     "FINNIFTY options",
@@ -77,7 +82,7 @@ export const metadata: Metadata = {
     "paper trading",
     "options chain analysis",
   ],
-  applicationName: "DeltaK Terminal",
+  applicationName: "Quantum Horizon",
   robots: { index: true, follow: true },
   alternates: {
     canonical: "/",
@@ -85,7 +90,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/",
-    siteName: "DeltaK Terminal",
+    siteName: "Quantum Horizon",
     title: TITLE,
     description: DESCRIPTION,
     locale: "en_IN",
@@ -113,8 +118,8 @@ export const viewport: Viewport = {
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "DeltaK",
-  alternateName: "Quantum Horizon",
+  name: "Quantum Horizon",
+  alternateName: ["DeltaK", "qntmhrzn"],
   description: DESCRIPTION,
   url: SITE_URL,
   applicationCategory: "FinanceApplication",

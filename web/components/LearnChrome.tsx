@@ -122,7 +122,7 @@ export function LearnChrome({
                 See it read live, not just diagrammed
               </h2>
               <p className="mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
-                DeltaK reads Aegis/Zenith wall migration and RRG rotation live across
+                Quantum Horizon reads Aegis/Zenith wall migration and RRG rotation live across
                 NIFTY, BANKNIFTY and FINNIFTY — sign in and watch it work in Paper mode.
               </p>
             </div>

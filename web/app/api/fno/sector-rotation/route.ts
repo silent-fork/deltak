@@ -9,7 +9,7 @@ import type { SectorPicksEntry } from "@/lib/sectors/types";
  * one data endpoint.
  *
  * Deliberately unauthenticated, unlike every route under `/api/market/*`:
- * this dashboard's whole point is to be reachable without a DeltaK login,
+ * this dashboard's whole point is to be reachable without a broker sign-in,
  * and it never touches Angel One or this app's own session — everything
  * here comes from NSE's public bhavcopy/constituent/F&O-lot data via
  * `nse-bse-api` and niftyindices.com.

@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const entry = getGlossaryTerm(slug);
   if (!entry) return {};
   // `${entry.term} — F&O` keeps the longest real term (43 chars — "Securities
-  // Transaction Tax (STT) on Options") under 70 once " · DeltaK Terminal" is
+  // Transaction Tax (STT) on Options") under 70 once " · Quantum Horizon" is
   // appended by the root layout's title template.
   return {
     title: `${entry.term} — F&O`,

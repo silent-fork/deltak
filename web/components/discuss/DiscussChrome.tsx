@@ -104,7 +104,7 @@ export async function DiscussChrome({
                 Curious about the mechanics behind a thread?
               </h2>
               <p className="mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
-                DeltaK&apos;s glossary and strategy guides cover the mechanics behind what people
+                Quantum Horizon&apos;s glossary and strategy guides cover the mechanics behind what people
                 here are actually discussing — gamma, collars, expiry settlement, and more.
               </p>
             </div>
@@ -122,7 +122,7 @@ export async function DiscussChrome({
 
       <footer className="relative mx-auto max-w-5xl px-5 pb-8 pt-6 text-center text-[10px] leading-relaxed text-zinc-600">
         <p>
-          Community discussion, not investment advice — nothing posted here reflects DeltaK&apos;s
+          Community discussion, not investment advice — nothing posted here reflects Quantum Horizon&apos;s
           own view, and options trading carries substantial risk of loss.
         </p>
       </footer>

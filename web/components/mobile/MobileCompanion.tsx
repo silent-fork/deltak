@@ -17,7 +17,7 @@ import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney, timeAgo } from "@/lib/uti
 /** How often the phone re-polls its state. */
 const POLL_MS = 5_000;
 
-/** Same visual boot sequence as the desktop terminal, different narration — nothing here authenticates against Angel One. */
+/** Same visual boot sequence as the desktop terminal, different narration — nothing here authenticates against any broker. */
 const BOOT_LINES = [["Reading the paired desktop…", "Syncing the live signal…", "Loading the trade book…"]];
 
 function SignalRow({ underlying, signal }: { underlying: string; signal: MobileStateResponse["signal"] }) {

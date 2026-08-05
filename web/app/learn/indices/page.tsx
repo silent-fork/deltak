@@ -31,8 +31,8 @@ export default function IndicesHubPage() {
           Indian F&amp;O indices
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
-          Every major index options contract traded on NSE and BSE — DeltaK reads and trades NIFTY,
-          BANKNIFTY and FINNIFTY live; the rest are covered here for reference.
+          Every major index options contract traded on NSE and BSE — Quantum Horizon reads and trades
+          NIFTY, BANKNIFTY and FINNIFTY live; the rest are covered here for reference.
         </p>
       </section>
 
@@ -50,7 +50,7 @@ export default function IndicesHubPage() {
                 <th className="px-4 py-2.5 font-medium">Exchange</th>
                 <th className="px-4 py-2.5 text-right font-medium">Lot Size</th>
                 <th className="px-4 py-2.5 text-right font-medium">Strike Step</th>
-                <th className="px-4 py-2.5 text-right font-medium">DeltaK</th>
+                <th className="px-4 py-2.5 text-right font-medium">Live</th>
               </tr>
             </thead>
             <tbody>
@@ -78,8 +78,8 @@ export default function IndicesHubPage() {
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
           Lot sizes and strike steps are revised periodically by the exchange under SEBI&apos;s notional-value
-          rules — figures for NIFTY, BANKNIFTY and FINNIFTY come straight from DeltaK&apos;s own live engine
-          configuration; the rest link through to the exchange&apos;s current contract note.
+          rules — figures for NIFTY, BANKNIFTY and FINNIFTY come straight from Quantum Horizon&apos;s own
+          live engine configuration; the rest link through to the exchange&apos;s current contract note.
         </p>
       </section>
     </LearnChrome>

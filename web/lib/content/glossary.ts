@@ -144,10 +144,10 @@ export const GLOSSARY: GlossaryTerm[] = [
     slug: "delta-greek",
     term: "Delta (the Options Greek)",
     category: "The Greeks",
-    shortDef: "How much an option's premium moves for a ₹1 move in the underlying — not to be confused with DeltaK, the trading terminal.",
+    shortDef: "How much an option's premium moves for a ₹1 move in the underlying — not to be confused with DeltaK, the strategy this site's terminal runs.",
     body: [
       "Delta runs from 0 to 1 for calls and 0 to −1 for puts, and roughly tracks an option's probability of finishing ITM. A deep-ITM option's delta approaches 1 (moves almost point-for-point with spot); a far-OTM option's delta approaches 0 (barely moves at all).",
-      "It's a coincidence of naming, not a connection: this page is about the Greek. DeltaK, this site's own trading terminal, is named for a different idea — the wall migration and rotation its engine reads, not the options Greek.",
+      "It's a coincidence of naming, not a connection: this page is about the Greek. DeltaK, the strategy behind Quantum Horizon's terminal, is named for a different idea — the wall migration and rotation its engine reads, not the options Greek.",
       "Example: a NIFTY 24,900 call, 100 points ITM, might carry a delta near 0.65 — a 10-point move in spot shifts its premium by roughly ₹6.50. A 25,200 call, far OTM, might carry a delta near 0.15 — the same 10-point move only shifts it by about ₹1.50.",
     ],
     related: ["gamma-greek", "in-the-money-itm"],

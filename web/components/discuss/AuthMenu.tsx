@@ -118,7 +118,7 @@ function AuthForms({ onDone }: { onDone: () => void }) {
   return (
     <div>
       <p className="mb-3 text-[13px] font-semibold text-zinc-200">
-        {isSignup ? "Create your account" : "Sign in to DeltaK"}
+        {isSignup ? "Create your account" : "Sign in to Quantum Horizon"}
       </p>
 
       <div className="mb-3 flex gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5">

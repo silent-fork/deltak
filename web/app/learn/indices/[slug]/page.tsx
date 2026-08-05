@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!idx) return {};
   // "Nifty Midcap Select (MIDCPNIFTY)" (32 chars) is the longest index name —
   // `— Lot Size` keeps every combination under 70 with the root layout's
-  // " · DeltaK Terminal" template suffix appended.
+  // " · Quantum Horizon" template suffix appended.
   return {
     title: `${idx.name} — Lot Size`,
     description: idx.metaDescription,
@@ -54,12 +54,12 @@ export default async function IndexPage({ params }: { params: Promise<{ slug: st
           {idx.tradedByDeltaK ? (
             <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-quantum/40 bg-quantum/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-quantum">
               <CheckCircle2 className="h-3 w-3 shrink-0" />
-              Traded by DeltaK
+              Traded live
             </span>
           ) : (
             <span className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
               <XCircle className="h-3 w-3 shrink-0" />
-              Not traded by DeltaK
+              Not traded live
             </span>
           )}
         </div>

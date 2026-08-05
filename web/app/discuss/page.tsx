@@ -9,7 +9,7 @@ import { ACCENT_CLASSES, CATEGORY_ICON } from "@/lib/content/forumCategoryStyle"
 export const metadata: Metadata = {
   title: "Quantum Horizon — Community Forum for Options Traders",
   description:
-    "Quantum Horizon (qntmhrzn) — DeltaK's community forum. Strategy, market talk, feedback and general discussion. Free to read, sign in only to post.",
+    "Quantum Horizon (qntmhrzn) — the community forum for options traders. Strategy, market talk, feedback and general discussion. Free to read, sign in only to post.",
   alternates: { canonical: "/discuss" },
   robots: { index: true, follow: true },
 };
@@ -26,8 +26,8 @@ export default function DiscussHubPage() {
         </h1>
         <p className="mt-1.5 font-mono text-[11px] tracking-[0.14em] text-zinc-600">qntmhrzn</p>
         <p className="mx-auto mt-4 max-w-2xl text-balance text-[14px] leading-relaxed text-zinc-400">
-          DeltaK&apos;s community — strategy, market talk, feedback and everything else worth a
-          thread. Every thread here is a real trader&apos;s own words, not DeltaK&apos;s.
+          The community — strategy, market talk, feedback and everything else worth a
+          thread. Every thread here is a real trader&apos;s own words, not ours.
         </p>
       </section>
 

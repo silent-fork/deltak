@@ -26,9 +26,9 @@ function content(): string {
   ).join("\n");
   const indexList = INDICES.map((i) => `  - [${i.name}](${SITE_URL}/learn/indices/${i.slug})`).join("\n");
 
-  return `# DeltaK — full reference
+  return `# Quantum Horizon — full reference
 
-> The expanded companion to [/llms.txt](${SITE_URL}/llms.txt). DeltaK is two independent things under one brand: a live, multi-broker options-trading terminal (Angel One and Dhan today, more brokers planned; DKMS strategy, sign-in required), and a family of free NSE F&O reference tools.
+> The expanded companion to [/llms.txt](${SITE_URL}/llms.txt). Quantum Horizon is two independent things: a live, multi-broker options-trading terminal (Angel One and Dhan today, more brokers planned) running the DeltaK Matrix Strategy (DKMS, sign-in required), and a family of free NSE F&O reference tools.
 
 ## The terminal — DeltaK Matrix Strategy (DKMS)
 

@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!style) return {};
   // "Options Buying vs. Options Selling" (34 chars) is the longest style
   // name — `— How It Works` keeps every combination under 70 with the
-  // root layout's " · DeltaK Terminal" template suffix appended.
+  // root layout's " · Quantum Horizon" template suffix appended.
   return {
     title: `${style.name} — How It Works`,
     description: style.summary,

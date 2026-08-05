@@ -4,7 +4,7 @@ import { SectorDashboard } from "@/components/fno/SectorDashboard";
 import { ToolPageShell } from "@/components/tools/ToolPageShell";
 
 /**
- * Public F&O sector-rotation dashboard — no DeltaK login required, and
+ * Public F&O sector-rotation dashboard — no broker sign-in required, and
  * deliberately never touches Angel One (see `lib/sectors/*`, all sourced
  * from NSE's own bhavcopy/constituent data via `nse-bse-api` and
  * niftyindices.com). Unlike `/terminal`, this route *is* indexed: there is

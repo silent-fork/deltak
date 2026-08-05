@@ -37,7 +37,7 @@ export const FORUM_CATEGORIES: ForumCategory[] = [
   {
     slug: "feedback",
     name: "Feedback",
-    tagline: "Bugs, requests and what DeltaK should build next",
+    tagline: "Bugs, requests and what Quantum Horizon should build next",
     description: "Site feedback and bug reports — what's broken, what's missing, what to build next.",
     accent: "amber",
   },
@@ -45,7 +45,7 @@ export const FORUM_CATEGORIES: ForumCategory[] = [
     slug: "general",
     name: "General",
     tagline: "Everything else worth a thread",
-    description: "General discussion — anything about trading, the markets, or DeltaK that doesn't fit elsewhere.",
+    description: "General discussion — anything about trading, the markets, or Quantum Horizon that doesn't fit elsewhere.",
     accent: "zenith",
   },
 ];

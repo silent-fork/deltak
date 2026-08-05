@@ -32,8 +32,8 @@ import { Wordmark } from "@/components/Wordmark";
  * renders client-side — a search crawler reading "/terminal" gets nothing
  * but a login form and a boot skeleton, no matter how good Googlebot's JS
  * execution has gotten. This route is the one page in the whole product
- * whose job is to actually say, in plain server-rendered text, what DeltaK
- * is and does — the terminal itself only has to prove it.
+ * whose job is to actually say, in plain server-rendered text, what
+ * Quantum Horizon is and does — the terminal itself only has to prove it.
  */
 
 const FEATURES = [
@@ -204,10 +204,10 @@ export default function HomePage() {
         </span>
 
         <h1 className="mt-6 text-balance text-3xl font-bold leading-tight tracking-tight text-zinc-50 sm:text-5xl">
-          The DeltaK options terminal built around the{" "}
           <span className="text-quantum [text-shadow:0_0_6px_rgba(0,240,255,0.3)]">
             Quantum Horizon
-          </span>
+          </span>{" "}
+          — the options terminal running the DeltaK strategy
         </h1>
 
         {/*
@@ -219,8 +219,8 @@ export default function HomePage() {
           watches for, "five Indian indices" standing in for the roll call.
         */}
         <p className="mx-auto mt-5 max-w-2xl text-balance text-[13px] leading-relaxed text-zinc-400 sm:text-[14px]">
-          Walls shift. Rotation turns. DeltaK watches both across five Indian
-          indices — then arms your trade, or fires it itself.
+          Walls shift. Rotation turns. Quantum Horizon watches both across
+          five Indian indices — then arms your trade, or fires it itself.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3">
@@ -256,7 +256,7 @@ export default function HomePage() {
             Not a third button in the Terminal/Learn pair — that would imply
             it's a third way into the same gated app, when it's the one
             surface on this whole site nobody has to sign in for at all,
-            reads without an account, and isn't DeltaK talking at you. A
+            reads without an account, and isn't the product talking at you. A
             standalone banner earns that distinction, reskinned around
             people rather than a dashboard: three overlapping initials
             stand in for real threads across three of Discuss's own
@@ -297,7 +297,7 @@ export default function HomePage() {
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
               <span className="font-semibold uppercase tracking-wider text-quantum">Quantum Horizon</span>{" "}
-              — strategy, market talk &amp; more, from real traders, not DeltaK
+              — strategy, market talk &amp; more, from real traders, not us
             </span>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-quantum transition-transform group-hover:translate-x-0.5" />
           </CtaLink>

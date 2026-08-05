@@ -27,7 +27,7 @@ import { MOBILE_SESSION_COOKIE, mobileSessionClientCode } from "@/lib/server/mob
 export const metadata: Metadata = {
   title: "Terminal",
   description:
-    "Sign in with your Angel One SmartAPI credentials to open the live DeltaK terminal.",
+    "Sign in with your Angel One or Dhan account to open the live Quantum Horizon terminal.",
   alternates: {
     canonical: "/terminal",
   },

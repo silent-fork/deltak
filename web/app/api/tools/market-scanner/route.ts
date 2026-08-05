@@ -6,7 +6,7 @@ import { getRangeRadar, getSectorHeatmap } from "@/lib/tools/marketScanner";
  * `GET /api/tools/market-scanner` — sector heatmap + range radar, both off
  * NSE's own public bulk bhavcopy/constituent data. Unauthenticated, like
  * every route under `/api/tools/*` and `/api/fno/*`: this whole family is
- * meant to be reachable without a DeltaK login.
+ * meant to be reachable without a broker sign-in.
  *
  * The two halves are fetched and caught independently so one failing never
  * blanks out the other — sequential rather than `Promise.all` since both

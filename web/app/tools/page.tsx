@@ -8,7 +8,7 @@ import { CtaLink } from "@/components/CtaLink";
 export const metadata: Metadata = {
   title: "Tools — Free NSE F&O Market Utilities",
   description:
-    "DeltaK's free NSE F&O tools — sector rotation, a market scanner, an options volatility " +
+    "Quantum Horizon's free NSE F&O tools — sector rotation, a market scanner, an options volatility " +
     "desk, and a corporate calendar. All built on NSE's own public data.",
   alternates: { canonical: "/tools" },
   robots: { index: true, follow: true },

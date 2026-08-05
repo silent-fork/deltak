@@ -48,7 +48,7 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
     "@type": "Article",
     headline: `${strategy.name} Options Strategy`,
     description: strategy.summary,
-    author: { "@type": "Organization", name: "DeltaK" },
+    author: { "@type": "Organization", name: "Quantum Horizon" },
   };
 
   return (
