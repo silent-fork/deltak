@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SignalPanel } from "@/components/SignalPanel";
 import { TradeBook } from "@/components/TradeBook";
@@ -72,6 +72,35 @@ export const SignalDeck = memo(function SignalDeck({
   // spinner/disabled buttons it drives) spans the refresh too, not just
   // the action itself.
   const handleRefreshArchive = useCallback(() => reloadArchive(), [reloadArchive]);
+
+  /**
+   * The manual-close path in `TradeBook` awaits `onRefreshArchive` itself
+   * after the button click resolves, which is what keeps a manually-closed
+   * position from lingering as a read-only "open" ghost (its own stale
+   * archive row hasn't caught up yet — see `mergeBook`'s doc comment). A
+   * guard-driven close — TARGET, STOP_LOSS, DAYLIGHT_REST, INVALIDATION,
+   * PANIC — runs the exact same `Ledger.close()` underneath, but from the
+   * engine's own tick loop, not a button click, so nothing was ever telling
+   * the archive to catch up: the live ledger dropped the position (correct,
+   * immediate) while its last-known-OPEN row kept satisfying `mergeBook`'s
+   * `dbOpen` fallback until the next manual refresh or a full reload. This
+   * watches the live ledger's own closed list for an id that wasn't there a
+   * moment ago and refreshes the archive the same way, regardless of what
+   * closed it.
+   */
+  const knownClosedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const ids = ledger?.closed_positions.map((p) => p.id) ?? [];
+    const known = knownClosedIdsRef.current;
+    const isNew = ids.some((id) => !known.has(id));
+    knownClosedIdsRef.current = new Set(ids);
+    if (!isNew) return;
+    // Same settle delay as TradeBook's own post-action refresh: persistence
+    // is fire-and-forget, so there's no signal for "the close has actually
+    // landed in Supabase" beyond giving it a moment.
+    const id = setTimeout(() => void reloadArchive(), 900);
+    return () => clearTimeout(id);
+  }, [ledger?.closed_positions, reloadArchive]);
 
   // The badge and the header total read the same merged book the trade tab
   // itself renders — live ledger plus whatever Supabase still holds from a
