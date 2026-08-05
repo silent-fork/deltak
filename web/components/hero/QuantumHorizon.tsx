@@ -316,7 +316,19 @@ export const QuantumHorizon = memo(function QuantumHorizon({
           </div>
         ) : (
           <>
-            <div className="relative rounded-md border border-zinc-800/70 bg-zinc-950/50 px-1.5 pb-1 pt-2">
+            {/*
+              flex + min-h-0 + an explicit floor, not the plain block this
+              was: a flex item's automatic minimum height is its content's
+              natural size unless told otherwise, which is what pinned this
+              block rigid — every viewport short enough to run out of room
+              had the whole deficit fall on Spot Trace alone (the only
+              section below that opted into shrinking), and once *it* hit its
+              own floor the Card's overflow-hidden simply clipped it instead
+              of anything up here giving ground. Now this block can compress
+              too, so a short-but-wide window shrinks the OI profile and
+              keeps the trace on screen instead of losing it outright.
+            */}
+            <div className="relative flex min-h-[72px] shrink flex-[0_1_128px] flex-col rounded-md border border-zinc-800/70 bg-zinc-950/50 px-1.5 pb-1 pt-2">
               {/* ITM wash — calls left of the horizon, puts right of it */}
               <div
                 aria-hidden
@@ -338,8 +350,13 @@ export const QuantumHorizon = memo(function QuantumHorizon({
                 />
               ) : null}
 
-              {/* Profile: calls above the axis, puts below */}
-              <div className="relative flex h-[84px] items-stretch gap-[2px]">
+              {/* Profile: calls above the axis, puts below. 84px is the
+                  natural/default height (unchanged from before); flex-1
+                  min-h-0 is what lets it actually give ground when the block
+                  around it does — the bars are already percentage-of-parent
+                  heights, so shrinking this container shrinks them with it
+                  rather than clipping. */}
+              <div className="relative flex min-h-0 flex-1 items-stretch gap-[2px]">
                 {view.rows.map((row) => {
                   const call =
                     view.peak > 0 ? (view.value(row.call) / view.peak) * 100 : 0;

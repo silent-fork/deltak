@@ -18,6 +18,14 @@ import { cn } from "@/lib/utils";
  * breathing core, a filling arc, and rotating on-brand status copy — rather
  * than either.
  *
+ * Deliberately built from the homepage's own vocabulary rather than a
+ * separate "loading screen" look: the `dk-grid-bg` floor, the same top-lit
+ * glow the hero sits under, the "DeltaK Matrix Strategy · DKMS" pill and the
+ * five-index chip row all reappear here, staggered in rather than dumped at
+ * once — so the first thing an operator sees mid-load is recognisably the
+ * same product whose homepage they just clicked "Terminal" from, not a
+ * generic spinner screen bolted on afterward.
+ *
  * Never a hard, indefinite gate: the caller is expected to dismiss this on a
  * timeout even if a stage never reports done, so a slow or failed network
  * call degrades to the dashboard's own per-panel skeletons rather than
@@ -51,6 +59,9 @@ const STAGE_COPY: string[][] = [
 ];
 const DONE_COPY = "All systems engaged.";
 const LINE_MS = 1500;
+
+/** The homepage's own instrument roll call — see the hero chip row on `/`. */
+const INSTRUMENTS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX"] as const;
 
 export function BootScreen({
   stages,
@@ -90,24 +101,45 @@ export function BootScreen({
   const text = complete ? doneCopy : lines[lineIndex];
 
   return (
-    <main className="relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-zinc-950">
-      {/* A soft, breathing core — light rather than a hard scan line, the
-          quietly living thing a modern loading screen should feel like. */}
+    <main className="dk-grid-bg relative flex h-dvh flex-col items-center justify-center overflow-hidden bg-zinc-950">
+      {/* Same top-lit glow the homepage's hero sits under — a wide, static
+          anchor light — plus the breathing core beneath it for depth. Two
+          light sources read as atmosphere; either alone reads as decoration. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-quantum/[0.07] blur-[140px]"
+      />
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-1/2 h-[620px] w-[620px] animate-drift rounded-full bg-quantum/[0.09] blur-[140px]" />
       </div>
-      <div aria-hidden className="dk-grid-bg pointer-events-none absolute inset-0 opacity-30" />
 
-      <div className="relative flex animate-in flex-col items-center gap-9 fade-in zoom-in-95 duration-700">
-        {/* Core emblem — the same square mark the sign-in screen uses, just a
-            little larger for a screen with nothing else on it. Static, not
-            pulsing: the boot sequence's own progress bar and status copy
+      <div className="relative flex animate-in flex-col items-center gap-7 fade-in zoom-in-95 duration-700">
+        {/* The homepage's own hero pill, reappearing here first — the same
+            beat the hero opens on, before the wordmark even renders. */}
+        <span
+          className="animate-fade-up rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400"
+          style={{ animationDelay: "80ms" }}
+        >
+          DeltaK Matrix Strategy · DKMS
+        </span>
+
+        {/* Core emblem — the same square mark the homepage header and the
+            sign-in screen use, just larger for a screen with nothing else on
+            it. `shadow-quantum` gives it the same glow ring the terminal's
+            own focused/armed surfaces carry, instead of a plain border.
+            Static, not pulsing: the progress bar and status copy below
             already say something is moving. */}
-        <div className="relative flex h-11 w-11 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
+        <div
+          className="relative flex h-11 w-11 animate-fade-up items-center justify-center rounded-md border border-quantum/40 bg-quantum/10 shadow-quantum"
+          style={{ animationDelay: "160ms" }}
+        >
           <Zap className="relative h-5 w-5 text-quantum" />
         </div>
 
-        <div className="text-center leading-none">
+        <div
+          className="animate-fade-up text-center leading-none"
+          style={{ animationDelay: "220ms" }}
+        >
           {/* No text-shadow on the "K" here — a breathing background and a
               glowing letter both fighting for attention is the opposite of
               the calm this screen is going for. */}
@@ -119,8 +151,12 @@ export function BootScreen({
 
         {/* Fluid progress — a filling arc, and rotating status copy that
             crossfades on every line change, not a checklist accumulating
-            underneath it. */}
-        <div className="flex w-80 flex-col items-center gap-4">
+            underneath it. Housed in the same bordered, blurred surface every
+            panel on this product sits in, rather than floating bare. */}
+        <div
+          className="dk-panel flex w-80 animate-fade-up flex-col items-center gap-4 rounded-xl px-5 py-4"
+          style={{ animationDelay: "300ms" }}
+        >
           <div className="h-[3px] w-full overflow-hidden rounded-full bg-zinc-800/70">
             <div
               className={cn(
@@ -143,6 +179,22 @@ export function BootScreen({
             />
             {text}
           </div>
+        </div>
+
+        {/* The homepage's own instrument roll call, reappearing under the
+            status card — five chips fading in in sequence rather than all at
+            once, so the boot sequence itself reads as one more thing coming
+            online instead of a static footer. */}
+        <div className="flex max-w-xs flex-wrap items-center justify-center gap-1.5">
+          {INSTRUMENTS.map((chip, i) => (
+            <span
+              key={chip}
+              className="animate-fade-up rounded border border-zinc-800 bg-zinc-900/60 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-zinc-500"
+              style={{ animationDelay: `${380 + i * 60}ms` }}
+            >
+              {chip}
+            </span>
+          ))}
         </div>
       </div>
     </main>

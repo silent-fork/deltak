@@ -178,7 +178,7 @@ export function Header({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5">
         <div className="flex shrink-0 items-center gap-2.5">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10 shadow-quantum">
               <Zap className="h-4 w-4 text-quantum" />
             </div>
             <div className="leading-none">

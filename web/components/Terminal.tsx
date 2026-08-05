@@ -258,7 +258,16 @@ export function Terminal() {
 
   return (
     <EngineProvider engine={engine}>
-      <div className="dk-grid-bg flex h-dvh flex-col overflow-hidden">
+      <div className="dk-grid-bg relative flex h-dvh flex-col overflow-hidden bg-zinc-950">
+        {/* The same top-lit glow the homepage's hero and the boot sequence
+            both sit under — dimmer here, since it has to sit behind a dense
+            header and cards rather than open space, but it's what ties the
+            terminal back to the rest of the product instead of reading as a
+            separate, plainer app once you're past the sign-in screen. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum/[0.05] blur-[140px]"
+        />
         <Header
           snapshot={snapshot}
           simulated={simulated}
