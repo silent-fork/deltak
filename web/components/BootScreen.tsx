@@ -41,23 +41,29 @@ export interface BootStage {
  * information ("still checking your session") reads as alive rather than
  * frozen when it's not the same six words sitting still. Written in the
  * terminal's own vocabulary (Aegis/Zenith, RRG, Quantum Horizon, Autopilot)
- * rather than generic loading copy.
+ * plus a little F&O-trader wit, rather than generic loading copy — and
+ * deliberately broker-agnostic: this same sequence runs for an Angel One
+ * SmartAPI session and a Dhan one, so it never names either.
  */
 const STAGE_COPY: string[][] = [
-  ["Authenticating operator…", "Confirming SmartAPI session…", "Unlocking the terminal…"],
   [
-    "Loading the scrip master…",
-    "Indexing NIFTY · BANKNIFTY · FINNIFTY…",
-    "Mapping strikes to tokens…",
+    "Checking your credentials, not your greeks…",
+    "Clearing you for entry…",
+    "Unlocking the terminal — patience has no theta decay…",
   ],
   [
-    "Calibrating Aegis & Zenith walls…",
-    "Spinning up the RRG quadrants…",
-    "Charting the Quantum Horizon…",
-    "Warming the Autopilot…",
+    "Counting every strike so you don't have to…",
+    "Rounding up NIFTY, BANKNIFTY, FINNIFTY, SENSEX and BANKEX…",
+    "Mapping strikes to tokens — no assignment surprises…",
+  ],
+  [
+    "Building the walls Aegis and Zenith are about to defend…",
+    "Spinning up the RRG — momentum waits for no one…",
+    "Drawing the Quantum Horizon, where calls and puts pick sides…",
+    "Waking Autopilot — it never needs a coffee break…",
   ],
 ];
-const DONE_COPY = "All systems engaged.";
+const DONE_COPY = "All systems engaged — go find your edge.";
 const LINE_MS = 1500;
 
 /** The homepage's own instrument roll call — see the hero chip row on `/`. */
