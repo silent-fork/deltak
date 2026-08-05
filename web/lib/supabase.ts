@@ -231,6 +231,9 @@ export interface ProfileRow {
   first_seen_at?: string | null;
   last_login_at?: string | null;
   logins?: number | null;
+  paper_capital?: number | null;
+  paper_charges?: number | null;
+  paper_realised_pnl?: number | null;
 }
 
 const PROFILES = "user_profiles";
@@ -301,6 +304,40 @@ export async function saveProfile(
     );
   }
   return { profile: merged, first_seen_at: existing?.first_seen_at ?? now, logins };
+}
+
+/**
+ * Persist the paper wallet's running totals for one account.
+ *
+ * A plain last-write-wins PATCH, not an atomic increment: safe because
+ * `client_sessions` already enforces a single active session per client
+ * code, so there is no concurrent writer to race against. Best-effort like
+ * every other write on this path — a failed wallet checkpoint means the next
+ * reload starts from the previous one, not that the trade itself is lost.
+ */
+export async function updateWallet(
+  clientCode: string,
+  wallet: { capital: number; charges: number; realised: number },
+): Promise<void> {
+  if (!supabaseConfigured || !clientCode) return;
+  const res = await fetch(
+    `${base()}/${PROFILES}?client_code=eq.${encodeURIComponent(clientCode)}`,
+    {
+      method: "PATCH",
+      headers: headers("return=minimal"),
+      body: JSON.stringify({
+        paper_capital: wallet.capital,
+        paper_charges: wallet.charges,
+        paper_realised_pnl: wallet.realised,
+      }),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Supabase wallet write failed (${res.status}): ${(await res.text()).slice(0, 200)}`,
+    );
+  }
 }
 
 /**

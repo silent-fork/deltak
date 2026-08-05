@@ -169,6 +169,17 @@ export const api = {
     }),
 
   /**
+   * Best-effort wallet checkpoint; same "callers must not await this on a
+   * trading path" rule as `persist`. The account is stamped from the session
+   * cookie — see `/api/wallet`'s own comment.
+   */
+  persistWallet: (wallet: { capital: number; charges: number; realised: number }) =>
+    request<{ ok: boolean }>("/api/wallet", {
+      method: "POST",
+      body: JSON.stringify(wallet),
+    }),
+
+  /**
    * Angel One historical and market-data reads. Routed through the server for
    * the same reason orders are: the calls carry the session JWT, which the
    * browser is never given.

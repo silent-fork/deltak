@@ -1,3 +1,4 @@
+import { INDEX_UNIVERSE } from "@/lib/engine/config";
 import type { Side } from "@/lib/types";
 
 /**
@@ -10,12 +11,15 @@ import type { Side } from "@/lib/types";
  * only. A ₹25 flat fee flatters a strategy that scalps small premiums and
  * penalises one that holds size, which is exactly backwards.
  *
- * Rates below are the published NSE equity-derivatives card as of the 2024-10-01
- * revision (options STT to 0.10 % of sell premium, NSE transaction charge to
- * ₹3,503 per crore). They are a rate *card*, not constants: SEBI and the
- * exchanges revise them, so they live in one object with their basis stated, and
- * `estimateCharges` takes the card as an argument so a caller can price a trade
- * against a different one.
+ * Two cards below, one per exchange this app actually trades on — NSE
+ * (NIFTY/BANKNIFTY/FINNIFTY) and BSE (SENSEX/BANKEX), picked per underlying
+ * by `ratesForUnderlying`. Both carry the Budget 2026 options STT (0.15% of
+ * sell premium, effective 2026-04-01, up from 0.10%); the exchange
+ * transaction charge is exchange-specific — NSE's 2024-10-01 revision
+ * (~₹3,503/crore) vs BSE's own Sensex/Bankex rate (₹3,250/crore). These are
+ * rate *cards*, not constants: SEBI and the exchanges revise them, so they
+ * live in objects with their basis stated, and `estimateCharges` takes the
+ * card as an argument so a caller can price a trade against a different one.
  */
 
 export interface RateCard {
@@ -37,17 +41,49 @@ export interface RateCard {
   gstPct: number;
 }
 
-/** NSE index options, effective 2024-10-01. */
+/**
+ * NSE index options (NIFTY/BANKNIFTY/FINNIFTY). STT is the Budget 2026 rate,
+ * effective 2026-04-01 (up from 0.10% pre-Budget); the rest are the 2024-10-01
+ * exchange-transaction-charge revision.
+ */
 export const NSE_OPTIONS_RATES: RateCard = {
   brokeragePerOrder: 20,
   brokerageMaxPct: 0.0025,
-  sttSellPct: 0.001,
+  sttSellPct: 0.0015,
   exchangePct: 0.0003503,
   sebiPct: 0.000001,
   ipftPct: 0.000005,
   stampBuyPct: 0.00003,
   gstPct: 0.18,
 };
+
+/**
+ * BSE index options (SENSEX/BANKEX). BSE's own transaction-charge and STT
+ * basis differ from NSE's — same statutory STT rate, but a different exchange
+ * turnover fee (₹3,250/crore vs NSE's ~₹3,503/crore) and no published IPFT
+ * line the way NSE has one.
+ */
+export const BSE_OPTIONS_RATES: RateCard = {
+  brokeragePerOrder: 20,
+  brokerageMaxPct: 0.0025,
+  sttSellPct: 0.0015,
+  exchangePct: 0.000325,
+  sebiPct: 0.000001,
+  ipftPct: 0,
+  stampBuyPct: 0.00003,
+  gstPct: 0.18,
+};
+
+/**
+ * Which rate card applies to an underlying's options — NSE lists
+ * NIFTY/BANKNIFTY/FINNIFTY, BSE lists SENSEX/BANKEX. Using `NSE_OPTIONS_RATES`
+ * unconditionally for a BSE contract was the bug this fixes: a SENSEX signal's
+ * "Costs" estimate was quietly pricing NSE's transaction charge and pre-Budget
+ * STT instead of the exchange it actually trades on.
+ */
+export function ratesForUnderlying(underlying: string): RateCard {
+  return INDEX_UNIVERSE[underlying]?.exchange === "BSE" ? BSE_OPTIONS_RATES : NSE_OPTIONS_RATES;
+}
 
 export interface Charges {
   brokerage: number;

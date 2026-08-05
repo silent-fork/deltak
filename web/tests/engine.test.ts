@@ -931,9 +931,9 @@ test("charges follow the leg: STT on the sell, stamp duty on the buy", () => {
   const sell = estimateCharges({ side: "SELL", price, quantity: qty });
 
   assert.equal(buy.turnover, 15_000);
-  // STT is 0.10% of the sell premium, and is not levied on a purchase.
+  // STT is 0.15% of the sell premium (Budget 2026, effective 2026-04-01), and is not levied on a purchase.
   assert.equal(buy.stt, 0);
-  assert.equal(sell.stt, 15);
+  assert.equal(sell.stt, 22.5);
   // Stamp duty is the mirror image.
   assert.equal(sell.stamp, 0);
   assert.equal(buy.stamp, 0.45);

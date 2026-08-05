@@ -125,6 +125,19 @@ const saveOrder = (row: OrderRow) => {
   void api.persist("orders", [row]).catch(() => undefined);
 };
 
+/**
+ * Checkpoints the ledger's own running totals so the Paper Wallet card can
+ * seed from them on the next login instead of resetting to the default
+ * starting capital — see `Ledger.restoreWallet`. Called after every entry,
+ * exit and scale-out, each of which already moved `capital`/`charges`/
+ * `realised` locally; this just mirrors whatever the ledger now holds.
+ */
+const saveWallet = (ledger: Ledger) => {
+  void api
+    .persistWallet({ capital: ledger.capital, charges: ledger.charges, realised: ledger.realised })
+    .catch(() => undefined);
+};
+
 export function useEngine(simulate: boolean) {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
   const [session, setSession] = useState<EngineSession>(NO_SESSION);
@@ -432,6 +445,7 @@ export function useEngine(simulate: boolean) {
       const closed = ledgerRef.current.close(pos.id, fill, reason);
       if (closed) {
         savePositions([closed]);
+        saveWallet(ledgerRef.current);
         saveOrder(
           orderRow({
             position: closed,
@@ -505,6 +519,7 @@ export function useEngine(simulate: boolean) {
           : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const residual = ledgerRef.current.reduce(pos.id, lots, fill, "TP1");
       if (residual) savePositions([residual]);
+      saveWallet(ledgerRef.current);
       saveOrder(
         orderRow({
           position: pos,
@@ -887,6 +902,25 @@ export function useEngine(simulate: boolean) {
         await loadMaster("dhan");
         if (cancelled) return;
       }
+
+      // Seed the wallet from wherever this account's own checkpoint last left
+      // it, before anything below can move it — a never-traded account (or
+      // one saved before this column existed) has nothing here, and the
+      // ledger's own constructor default stands.
+      const wallet = restored.profile;
+      if (
+        restored.authenticated &&
+        wallet?.paper_capital != null &&
+        wallet?.paper_charges != null &&
+        wallet?.paper_realised_pnl != null
+      ) {
+        ledgerRef.current.restoreWallet(
+          wallet.paper_capital,
+          wallet.paper_charges,
+          wallet.paper_realised_pnl,
+        );
+      }
+
       startFeed(restored.authenticated ? restored : sessionRef.current);
 
       /**
@@ -1109,6 +1143,14 @@ export function useEngine(simulate: boolean) {
       // a stale Angel One position kept showing up even after signing into
       // Dhan, the client_code scoping on the archive fetch below notwithstanding.
       ledgerRef.current.reset();
+      // The reset above always lands on the default starting capital; if this
+      // account already has a wallet checkpoint from a previous session,
+      // restore it now rather than leaving a signed-in operator looking at a
+      // capital figure that resets every time they switch broker or re-login.
+      const wallet = res.profile;
+      if (wallet?.paper_capital != null && wallet?.paper_charges != null && wallet?.paper_realised_pnl != null) {
+        ledgerRef.current.restoreWallet(wallet.paper_capital, wallet.paper_charges, wallet.paper_realised_pnl);
+      }
       log(
         "INFO",
         `${next.broker === "dhan" ? "Dhan" : "SmartAPI"} session established for ${res.profile?.name ?? res.client_code}.`,
@@ -1458,6 +1500,7 @@ export function useEngine(simulate: boolean) {
       });
 
       savePositions([pos]);
+      saveWallet(ledger);
       saveOrder(
         orderRow({
           position: pos,
@@ -1597,6 +1640,9 @@ export function useEngine(simulate: boolean) {
     await api.resetPaper();
     ledgerRef.current.reset();
     scaledRef.current.clear();
+    // Otherwise the next login re-seeds the wallet from the pre-reset
+    // checkpoint still sitting in Supabase, silently undoing the reset.
+    saveWallet(ledgerRef.current);
     log("INFO", "Paper wallet reset — history cleared, capital back to starting.");
     track("paper_wallet_reset");
   }, [log]);

@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
-import { roundTripCharges } from "@/lib/engine/charges";
+import { ratesForUnderlying, roundTripCharges } from "@/lib/engine/charges";
+import { optionExchange } from "@/lib/engine/config";
 import { fetchMargin } from "@/lib/market/client";
-import { INDEX_UNIVERSE } from "@/lib/engine/config";
 import type {
   ExecutionMode,
   LedgerSnapshot,
@@ -155,7 +155,7 @@ export function SignalPanel({
     let cancelled = false;
     // SENSEX/BANKEX list on BSE, not NSE — the same split `dhanOptionSegment`
     // already makes for Dhan's own request shape.
-    const exchange = INDEX_UNIVERSE[signal?.underlying ?? ""]?.exchange === "BSE" ? "BFO" : "NFO";
+    const exchange = optionExchange(signal?.underlying ?? "");
     const id = setTimeout(() => {
       void fetchMargin([
         {
@@ -195,8 +195,9 @@ export function SignalPanel({
     const stop = signal.stop_loss ?? 0;
     const tp1 = signal.target_1 ?? 0;
 
-    const atStop = roundTripCharges({ price: entry, quantity }, stop || entry);
-    const atTarget = roundTripCharges({ price: entry, quantity }, tp1 || entry);
+    const rates = ratesForUnderlying(signal.underlying);
+    const atStop = roundTripCharges({ price: entry, quantity }, stop || entry, rates);
+    const atTarget = roundTripCharges({ price: entry, quantity }, tp1 || entry, rates);
 
     const grossLoss = stop > 0 ? (entry - stop) * quantity : 0;
     const grossGain = tp1 > 0 ? (tp1 - entry) * quantity : 0;
@@ -212,7 +213,7 @@ export function SignalPanel({
       // Every rupee of charge has to be earned back before the trade is level.
       breakeven: entry + atTarget.total / quantity,
     };
-  }, [signal?.entry_price, signal?.stop_loss, signal?.target_1, signal?.sizing, quantity]);
+  }, [signal?.entry_price, signal?.stop_loss, signal?.target_1, signal?.sizing, signal?.underlying, quantity]);
 
   /** The contract's own book, for the node the engine picked. */
   const leg = useMemo(() => {

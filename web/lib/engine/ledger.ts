@@ -201,6 +201,25 @@ export class Ledger {
     this.revision += 1;
   }
 
+  /**
+   * Seed the wallet's running totals from a persisted checkpoint, on a fresh
+   * session boot — the counterpart to `restore()` for positions, but for the
+   * capital/charges/realised numbers rather than an individual position.
+   * Never called mid-session: unlike `reset()` this does not touch open or
+   * closed positions, so it must run before anything else re-admits them.
+   *
+   * Deliberately leaves `startingCapital` alone: it stays the constructor's
+   * original default, so a later "reset paper wallet" (`reset()` with no
+   * argument) goes back to the app's true starting capital rather than
+   * whatever this account's wallet happened to hold at last login.
+   */
+  restoreWallet(capital: number, charges: number, realised: number): void {
+    this.capital = r2(capital);
+    this.charges = r2(charges);
+    this.realised = r2(realised);
+    this.revision += 1;
+  }
+
   /** True if marking `pos` to `ltp` would leave it exactly as it is. */
   private static markIsNoop(pos: Position, ltp: number): boolean {
     return pos.ltp === r2(ltp);

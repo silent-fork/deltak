@@ -128,5 +128,8 @@ export function profileFromRow(row: ProfileRow): UserProfile {
     broker_last_login: row.broker_last_login,
     first_seen_at: row.first_seen_at ?? null,
     logins: row.logins ?? 0,
+    paper_capital: row.paper_capital ?? null,
+    paper_charges: row.paper_charges ?? null,
+    paper_realised_pnl: row.paper_realised_pnl ?? null,
   };
 }

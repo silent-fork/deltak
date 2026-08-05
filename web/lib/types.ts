@@ -232,6 +232,14 @@ export interface UserProfile {
   /** Filled from the persisted row when Supabase has seen this account before. */
   first_seen_at?: string | null;
   logins?: number | null;
+  /**
+   * The paper wallet's own running totals, persisted on every entry/exit/
+   * scale-out — see `Ledger.restoreWallet`. Null for an account that has
+   * never traded, in which case the engine seeds from `DEFAULT_CONFIG.paperCapital`.
+   */
+  paper_capital?: number | null;
+  paper_charges?: number | null;
+  paper_realised_pnl?: number | null;
 }
 
 export interface SessionStatus {
