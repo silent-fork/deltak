@@ -87,6 +87,12 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  /** Bing Webmaster Tools site verification — renders as the `msvalidate.01` meta tag Bing asks for in `<head>`. */
+  verification: {
+    other: {
+      "msvalidate.01": "505F7A843426A291442FF98A8B3AEE73",
+    },
+  },
   openGraph: {
     type: "website",
     url: "/",
