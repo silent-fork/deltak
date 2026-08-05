@@ -33,7 +33,12 @@ export function CardLink({
   return (
     <Link href={href} className={className} aria-busy={pending} onClick={onClick}>
       {pending ? (
-        <div className="dk-skeleton flex flex-col gap-2 py-0.5" aria-hidden>
+        // `w-full` matters here, not just tidiness — the thread-card variant
+        // of this className is a horizontal flex row (`flex items-center`),
+        // and without an explicit width this column div's own width comes
+        // from its children's intrinsic size, which for percentage-width
+        // bars is ~0: the row collapsed to a sliver instead of a skeleton.
+        <div className="dk-skeleton flex w-full flex-col gap-2 py-0.5" aria-hidden>
           <div className="h-3 w-1/3 rounded bg-white/[0.06]" />
           <div className="h-4 w-3/4 rounded bg-white/[0.08]" />
           <div className="h-3 w-full rounded bg-white/[0.05]" />
