@@ -110,6 +110,11 @@ export async function dhanApiCall<T = Record<string, unknown>>(
 
   let res: Response;
   try {
+    // The 8s AbortSignal is load-bearing, not decorative — see smartApiCall's
+    // own comment for why: a bare `fetch()` has no timeout of its own, and
+    // `/api/market/batch` runs up to 25 of these per call. One slow Dhan
+    // response used to hang the whole batch until Vercel's own 60s function
+    // ceiling killed it, instead of failing just its own contract.
     res = await withRetry(
       () =>
         fetch(url, {
@@ -117,6 +122,7 @@ export async function dhanApiCall<T = Record<string, unknown>>(
           headers: dhanHeaders(init.accessToken, init.clientId),
           body: init.body === undefined ? undefined : JSON.stringify(init.body),
           cache: "no-store",
+          signal: AbortSignal.timeout(8_000),
         }),
       2,
       300,

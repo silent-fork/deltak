@@ -132,6 +132,13 @@ export async function smartApiCall<T = Record<string, unknown>>(
     // are classified from a real response below and never reach this catch)
     // — most of these clear in under a second and never need to surface as
     // the 502 the browser console otherwise shows for every one of them.
+    //
+    // The 8s AbortSignal is load-bearing, not decorative: a bare `fetch()`
+    // has no timeout of its own, so one slow Angel One response used to hang
+    // until Vercel's own hard function ceiling killed the whole request —
+    // fatal for `/api/market/batch`, where up to 25 of these run per call
+    // and one straggler took the entire ladder down with it instead of
+    // failing just its own contract.
     res = await withRetry(
       () =>
         fetch(url, {
@@ -139,6 +146,7 @@ export async function smartApiCall<T = Record<string, unknown>>(
           headers: smartApiHeaders(init.jwt),
           body: init.body === undefined ? undefined : JSON.stringify(init.body),
           cache: "no-store",
+          signal: AbortSignal.timeout(8_000),
         }),
       2,
       300,
