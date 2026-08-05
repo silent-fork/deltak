@@ -41,10 +41,29 @@ import { type Tick, emptyTick } from "./ticks";
  * Indices (`IDX_I`) never got a single Full-mode packet in testing against
  * Dhan's real feed — confirmed empirically, not just from the docs: a
  * Full-mode subscribe for NIFTY's index security produced zero packets in
- * 15s, while the same security in Ticker mode returned LTP immediately.
- * An index has no market depth or OI to fill a Full packet with, so Dhan's
+ * 15s. An index has no market depth to fill a Full packet with, so Dhan's
  * feed appears to silently drop the subscription rather than answer it.
- * Every index spot token rides Ticker mode instead — see `subscribe()`.
+ *
+ * Quote mode (response code 4, layout below) does work for indices —
+ * confirmed the same way, real LTP/open/close streaming immediately — and
+ * unlike Ticker mode (response code 2, LTP + timestamp only) it still
+ * carries `close`, which `change`/`change%` are computed from downstream.
+ * Every index spot token rides Quote mode instead of Full — see
+ * `subscribe()`.
+ *
+ * Binary layout (little-endian), Quote Packet (response code 4):
+ *   0-7    header: code(1) · msgLen i16(2) · exchSeg(1) · securityId i32(4)
+ *   8-11   f32   LTP
+ *   12-13  i16   last traded qty
+ *   14-17  i32   last trade time (epoch)
+ *   18-21  f32   average trade price
+ *   22-25  i32   volume
+ *   26-29  i32   total sell qty
+ *   30-33  i32   total buy qty
+ *   34-37  f32   day open
+ *   38-41  f32   day close
+ *   42-45  f32   day high
+ *   46-49  f32   day low
  */
 
 const FEED_URL = "wss://api-feed.dhan.co";
@@ -52,10 +71,10 @@ const HEARTBEAT_MS = 8_000; // server pings every 10s; a stale ack after 40s dro
 const MAX_INSTRUMENTS_PER_MESSAGE = 100;
 
 /** Indices ride this — see the file header comment for why. */
-const REQUEST_SUBSCRIBE_TICKER = 15;
+const REQUEST_SUBSCRIBE_QUOTE = 17;
 const REQUEST_SUBSCRIBE_FULL = 21;
-/** The one segment that has to subscribe in Ticker mode, not Full. */
-const TICKER_ONLY_SEGMENT: DhanSegment = "IDX_I";
+/** The one segment that has to subscribe in Quote mode, not Full. */
+const QUOTE_ONLY_SEGMENT: DhanSegment = "IDX_I";
 const RESPONSE_TICKER = 2;
 const RESPONSE_QUOTE = 4;
 const RESPONSE_OI = 5;
@@ -214,7 +233,7 @@ export class DhanFeedClient {
 
   /**
    * Subscribe a delta (or the whole tracked set) — Full mode for everything
-   * except `TICKER_ONLY_SEGMENT`, which rides Ticker mode instead (see the
+   * except `QUOTE_ONLY_SEGMENT`, which rides Quote mode instead (see the
    * file header comment). Two separate request batches, not one mixed-mode
    * message: Dhan's subscribe frame carries a single `RequestCode` for the
    * whole `InstrumentList`, so a spot token and an option token can't share
@@ -230,14 +249,14 @@ export class DhanFeedClient {
       );
 
     const fullInstruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
-    const tickerInstruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
+    const quoteInstruments: { ExchangeSegment: DhanSegment; SecurityId: string }[] = [];
     for (const [segment, tokens] of Object.entries(source) as [DhanSegment, string[]][]) {
-      const bucket = segment === TICKER_ONLY_SEGMENT ? tickerInstruments : fullInstruments;
+      const bucket = segment === QUOTE_ONLY_SEGMENT ? quoteInstruments : fullInstruments;
       for (const token of tokens) bucket.push({ ExchangeSegment: segment, SecurityId: token });
     }
 
     this.sendSubscribe(REQUEST_SUBSCRIBE_FULL, fullInstruments);
-    this.sendSubscribe(REQUEST_SUBSCRIBE_TICKER, tickerInstruments);
+    this.sendSubscribe(REQUEST_SUBSCRIBE_QUOTE, quoteInstruments);
   }
 
   private sendSubscribe(

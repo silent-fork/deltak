@@ -104,27 +104,32 @@ const pick = (row: Record<string, unknown>, allowed: readonly string[]) => {
  *
  * A ledger id restarts at `DK-hhmmss-001` in every browser tab, so on its own it
  * would collide between two operators, or between today's book and tomorrow's.
- * Pairing it with the account and the moment the position opened makes it
+ * Pairing it with the account and the *day* the position opened makes it
  * unique, and — because none of the three ever changes once a position exists —
  * stable: the entry, every mark-to-market checkpoint and the exit all upsert
  * onto one row rather than appending twenty.
  *
- * `openedAt` is parsed and re-serialized rather than used as-is: the exact
- * same instant can reach here as `...T05:29:25Z` on one call (the engine's
- * own timestamp) and `...T05:29:25+00:00` on another (Postgres's own
- * rendering of the same `timestamptz`, round-tripped back through a position
- * refresh) — two different strings for one moment, which used to compute two
- * different trade keys and upsert onto two different rows instead of one.
- * The exit write landing on a key the open write never used is exactly why a
- * manually closed position could come back from Supabase still `OPEN`.
+ * Deliberately day-precision, not the full timestamp: the exact same instant
+ * has reached here as `...T05:29:25Z` on one call (the engine's own
+ * timestamp), `...T05:29:25+00:00` on another (Postgres's own rendering of
+ * the same `timestamptz`, round-tripped back through a position refresh),
+ * and `...T05:29:25.000Z` on a third (`Date.toISOString()`'s own output,
+ * which always carries milliseconds a hand-written engine timestamp
+ * doesn't) — three different strings for one moment, each computing a
+ * different trade key and upserting onto a different row instead of one.
+ * `ledger_id` already carries hhmmss precision (unique per account per day
+ * on its own), so the date alone is all this needs to add — and unlike
+ * second/millisecond-precision formatting, two calls that agree on the
+ * calendar day always agree on the string, regardless of which of the three
+ * formats above `openedAt` happened to arrive in.
  *
  * Composed here rather than in the browser so it cannot be spoofed into
  * overwriting another account's trade.
  */
 export const tradeKey = (clientCode: string, ledgerId: string, openedAt: string) => {
   const ms = Date.parse(openedAt);
-  const normalized = Number.isFinite(ms) ? new Date(ms).toISOString() : openedAt;
-  return `${clientCode || "ANON"}|${ledgerId}|${normalized}`;
+  const day = Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : openedAt.slice(0, 10);
+  return `${clientCode || "ANON"}|${ledgerId}|${day}`;
 };
 
 /**
