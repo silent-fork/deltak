@@ -93,10 +93,12 @@ export function MobileUserMenu({
     };
   }, [open]);
 
-  const free = wallet ? Math.max(0, wallet.capital - wallet.deployed_margin) : 0;
+  // Against equity, not raw capital — see the same fix and its full
+  // rationale in the desktop UserPill this menu mirrors.
+  const free = wallet ? Math.max(0, wallet.equity - wallet.deployed_margin) : 0;
   const deployedPct =
-    wallet && wallet.capital > 0
-      ? Math.min(100, Math.max(0, (wallet.deployed_margin / wallet.capital) * 100))
+    wallet && wallet.equity > 0
+      ? Math.min(100, Math.max(0, (wallet.deployed_margin / wallet.equity) * 100))
       : 0;
 
   return (
