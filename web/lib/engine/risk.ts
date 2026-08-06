@@ -11,7 +11,7 @@ import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import type { Ledger } from "./ledger";
 import type { RrgEngine } from "./rrg";
 import type { EngineConfig } from "./config";
-import { isWeekend, istMinutes, MARKET_CLOSE_MIN, secondsToDaylightRest } from "./config";
+import { effectiveConfig, isWeekend, istMinutes, MARKET_CLOSE_MIN, secondsToDaylightRest } from "./config";
 
 /**
  * Capital-preservation circuit breakers — port of `backend/app/risk.py`.
@@ -294,13 +294,14 @@ export async function checkStops(d: GuardDeps): Promise<void> {
   }
 }
 
-/** 0.35 % index break invalidation against the COA 2.0 bounds. */
+/** Index break invalidation against the COA 2.0 bounds — invalidationPct itself is per-index, see `effectiveConfig`. */
 export async function checkInvalidation(d: GuardDeps): Promise<void> {
   for (const [underlying, chain] of Object.entries(d.chains)) {
     if (!chain || chain.spot <= 0) continue;
     const { levels } = chain;
-    const supportBroken = breach(chain.spot, levels.aegis_1, "below", d.cfg.invalidationPct);
-    const resistanceBroken = breach(chain.spot, levels.zenith_1, "above", d.cfg.invalidationPct);
+    const invalidationPct = effectiveConfig(underlying, d.cfg).invalidationPct;
+    const supportBroken = breach(chain.spot, levels.aegis_1, "below", invalidationPct);
+    const resistanceBroken = breach(chain.spot, levels.zenith_1, "above", invalidationPct);
     if (!supportBroken && !resistanceBroken) continue;
 
     for (const pos of d.ledger.positionsFor(underlying)) {
@@ -314,7 +315,7 @@ export async function checkInvalidation(d: GuardDeps): Promise<void> {
       d.log(
         "INVALIDATION",
         `${underlying} spot ${chain.spot.toLocaleString("en-IN")} breached ${label} ${level?.toLocaleString("en-IN")} ` +
-          `by >${d.cfg.invalidationPct}% — liquidating ${pos.trading_symbol}.`,
+          `by >${invalidationPct}% — liquidating ${pos.trading_symbol}.`,
         underlying,
       );
       await d.exit(pos, "INVALIDATION");
@@ -365,7 +366,7 @@ export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
         pos.option_type,
         pos.entry_spot,
         spot,
-        d.cfg.weakeningMinAdverseMovePct,
+        effectiveConfig(pos.underlying, d.cfg).weakeningMinAdverseMovePct,
       );
       if (!corroborated) continue; // premium drifted, spot did not — theta, not rotation
     }
@@ -452,7 +453,7 @@ export async function checkWallTrail(d: GuardDeps): Promise<void> {
       spot: chain.spot,
       aegis1: chain.levels.aegis_1,
       zenith1: chain.levels.zenith_1,
-      invalidationPct: d.cfg.invalidationPct,
+      invalidationPct: effectiveConfig(pos.underlying, d.cfg).invalidationPct,
       itmDeltaApprox: d.cfg.itmDeltaApprox,
     });
     if (points === null) continue;
