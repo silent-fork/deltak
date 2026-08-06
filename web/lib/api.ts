@@ -33,12 +33,37 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
-  });
+/**
+ * `timeoutMs` is opt-in per call, not a global default — every other caller
+ * here relies on the browser's own (much longer) fetch timeout and nothing
+ * about that needs to change. It exists for the mobile companion's poll
+ * loop specifically: with no cap, a hung connection there left the boot
+ * screen spinning forever (see `MobileCompanion.tsx`'s own poll effect).
+ */
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs?: number,
+): Promise<T> {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      cache: "no-store",
+      signal: controller?.signal ?? init?.signal,
+    });
+  } catch (err) {
+    if (controller?.signal.aborted) {
+      throw new ApiError("Timed out reaching the server.", 0);
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   const text = await res.text();
   let body: unknown = null;
@@ -238,8 +263,12 @@ export const api = {
         method: "POST",
         body: JSON.stringify(snapshot),
       }),
-    /** What the paired phone polls — never touches Angel One. */
-    state: () => request<MobileStateResponse>("/api/mobile/state"),
+    /**
+     * What the paired phone polls — never touches Angel One. Capped at 10s:
+     * this runs on a tight interval forever, so a hung request must fail
+     * fast rather than pile up or leave the boot screen stuck.
+     */
+    state: () => request<MobileStateResponse>("/api/mobile/state", undefined, 10_000),
     logout: () => request<{ paired: boolean }>("/api/mobile/logout", { method: "POST" }),
     /** Desktop's own list of every phone currently paired to this account. */
     devices: () =>

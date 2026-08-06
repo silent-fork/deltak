@@ -11,6 +11,7 @@ import {
   readMobileSession,
   revokeMobileSession,
   revokeMobileSessionForClient,
+  touchMobileSession,
   writeLiveSignal,
 } from "@/lib/supabase";
 
@@ -124,6 +125,11 @@ export async function removePairedDevice(clientCode: string, sessionId: string):
 export async function mobileSessionClientCode(sessionId: string | undefined): Promise<string | null> {
   if (!sessionId) return null;
   return readMobileSession(sessionId);
+}
+
+/** Marks this phone as still active — see `touchMobileSession`'s own comment. */
+export async function touchMobileSessionActivity(sessionId: string): Promise<void> {
+  await touchMobileSession(sessionId);
 }
 
 /** "Sign out this device" from the phone itself. */

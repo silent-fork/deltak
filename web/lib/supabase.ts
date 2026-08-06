@@ -634,6 +634,26 @@ export async function readMobileSession(sessionId: string): Promise<string | nul
     : null;
 }
 
+/**
+ * Bumped on every poll from a paired phone, so the desktop's own device list
+ * can tell an actually-active phone apart from one that hasn't been opened in
+ * weeks — `paired_at` alone can't answer that. Best-effort: a missed touch
+ * just means the device list shows an older "last seen" than reality, not a
+ * broken session.
+ */
+export async function touchMobileSession(sessionId: string): Promise<void> {
+  if (!supabaseConfigured || !sessionId) return;
+  await fetch(
+    `${base()}/${MOBILE_SESSIONS}?session_id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null`,
+    {
+      method: "PATCH",
+      headers: headers("return=minimal"),
+      body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+      cache: "no-store",
+    },
+  ).catch(() => undefined);
+}
+
 /** "Sign out this device" — the phone's own cookie stops resolving to anything. */
 export async function revokeMobileSession(sessionId: string): Promise<void> {
   if (!supabaseConfigured || !sessionId) return;

@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 
 import { DEFAULT_CONFIG } from "@/lib/engine/config";
 import type { Position } from "@/lib/types";
-import { MOBILE_SESSION_COOKIE, mobileSessionClientCode } from "@/lib/server/mobile";
+import {
+  MOBILE_SESSION_COOKIE,
+  mobileSessionClientCode,
+  touchMobileSessionActivity,
+} from "@/lib/server/mobile";
 import { readLiveSignal, readProfile, selectFrom, supabaseConfigured } from "@/lib/supabase";
 
 /**
@@ -60,10 +64,15 @@ export async function GET() {
     return NextResponse.json({ detail: "This phone isn't paired." }, { status: 401 });
   }
 
+  // Bumps `last_seen_at` so the desktop's device list can tell an actively
+  // polling phone apart from one abandoned weeks ago — every poll is this
+  // route's own signal of "still active," so it rides along with the reads
+  // below rather than needing a separate endpoint.
   const [signalRow, positions, profile] = await Promise.all([
     readLiveSignal(clientCode),
     selectFrom("positions", { client_code: `eq.${clientCode}`, limit: "50" }).catch(() => []),
     readProfile(clientCode).catch(() => null),
+    touchMobileSessionActivity(sessionId!),
   ]);
 
   return NextResponse.json({

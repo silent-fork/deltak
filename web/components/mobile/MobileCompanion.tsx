@@ -10,13 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wordmark } from "@/components/Wordmark";
 import { setAnalyticsContext, track } from "@/lib/analytics";
-import { api, type MobileStateResponse } from "@/lib/api";
+import { ApiError, api, type MobileStateResponse } from "@/lib/api";
 import { UNDERLYINGS } from "@/lib/engine/config";
 import type { Position } from "@/lib/types";
 import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney, timeAgo } from "@/lib/utils";
 
-/** How often the phone re-polls its state. */
+/** How often the phone re-polls its state, on a healthy connection. */
 const POLL_MS = 5_000;
+/** Ceiling for the backoff a run of failed polls climbs to — never worse than once a minute. */
+const MAX_POLL_BACKOFF_MS = 60_000;
 
 /** Same visual boot sequence as the desktop terminal, different narration — nothing here authenticates against any broker. */
 const BOOT_LINES = [["Reading the paired desktop…", "Syncing the live signal…", "Loading the trade book…"]];
@@ -112,32 +114,84 @@ export function MobileCompanion({
   const [signingOut, setSigningOut] = useState(false);
   const viewTracked = useRef(false);
 
+  /**
+   * A self-scheduling poll rather than a fixed `setInterval`, for three
+   * things a flat 5s tick can't do:
+   *
+   * - Pauses entirely while the tab is backgrounded (`visibilitychange`),
+   *   resuming with an immediate poll the moment it's foregrounded again,
+   *   instead of burning battery/data on a phone nobody's looking at.
+   * - Backs off exponentially (capped at `MAX_POLL_BACKOFF_MS`) on repeated
+   *   failures rather than hammering a struggling server every 5s forever,
+   *   and resets to the normal cadence the moment a poll succeeds again.
+   * - Treats a 401 as terminal, not just another error: the phone's pairing
+   *   was revoked or expired server-side, so no amount of retrying this
+   *   session will ever succeed. A reload re-enters `/terminal` fresh, which
+   *   resolves server-side to the pairing screen instead of leaving this
+   *   view stuck showing stale data behind a permanent error banner.
+   */
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = POLL_MS;
+    let pausedForVisibility = false;
+
+    const scheduleNext = (delay: number) => {
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void poll();
+      }, delay);
+    };
+
     const poll = async () => {
+      if (cancelled) return;
       try {
         const res = await api.mobile.state();
-        if (!cancelled) {
-          setData(res);
-          setError(null);
-          if (!viewTracked.current) {
-            viewTracked.current = true;
-            setAnalyticsContext({ mobile: true, client_code: res.client_code });
-            if (justPaired) track("mobile_paired", { client_code: res.client_code });
-            track("mobile_companion_view", { client_code: res.client_code });
-          }
+        if (cancelled) return;
+        setData(res);
+        setError(null);
+        backoffMs = POLL_MS;
+        if (!viewTracked.current) {
+          viewTracked.current = true;
+          setAnalyticsContext({ mobile: true, client_code: res.client_code });
+          if (justPaired) track("mobile_paired", { client_code: res.client_code });
+          track("mobile_companion_view", { client_code: res.client_code });
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't reach the terminal.");
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          setError("This phone's pairing ended — reconnecting…");
+          setTimeout(() => {
+            if (!cancelled) window.location.reload();
+          }, 1500);
+          return;
+        }
+        setError(err instanceof Error ? err.message : "Couldn't reach the terminal.");
+        backoffMs = Math.min(backoffMs * 2, MAX_POLL_BACKOFF_MS);
       }
+      if (cancelled) return;
+      if (document.hidden) {
+        pausedForVisibility = true;
+        return;
+      }
+      scheduleNext(backoffMs);
     };
+
+    const onVisibility = () => {
+      if (cancelled || document.hidden || !pausedForVisibility) return;
+      pausedForVisibility = false;
+      void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     void poll();
-    const id = setInterval(() => void poll(), POLL_MS);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [justPaired]);
 
   const unpair = async () => {
     setSigningOut(true);
@@ -165,6 +219,11 @@ export function MobileCompanion({
   // network), the exact case that checkpoint exists to cover.
   const open = data?.signal?.open_positions ?? data?.positions.filter((p) => p.status === "OPEN") ?? [];
   const closed = data?.positions.filter((p) => p.status === "CLOSED").slice(0, 20) ?? [];
+  // Whether `open` above actually came from the fresh desktop push or fell
+  // back to the DB checkpoint — the one thing the Live Signal card's own
+  // `desktop · Ns ago` label already tells you and Open Positions didn't,
+  // despite carrying the exact same fallback split.
+  const openIsLive = !!data?.signal?.open_positions;
   // Same fallback shape as `open` above: the desktop's live push is the
   // fresher number whenever it's there, `data.wallet` — read straight off the
   // DB checkpoint — covers everything else (no push yet, an older cached
@@ -259,7 +318,19 @@ export function MobileCompanion({
           <Card className="min-h-0 flex-1">
             <CardHeader className="shrink-0">
               <CardTitle>Open Positions</CardTitle>
-              <Badge className="h-4.5">{open.length}</Badge>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="text-[9.5px] text-zinc-600"
+                  title={
+                    openIsLive
+                      ? "Live from the desktop's own push"
+                      : "Desktop hasn't pushed recently — reading the last saved checkpoint instead"
+                  }
+                >
+                  {openIsLive ? `live · ${timeAgo(data?.signal_updated_at)}` : "checkpoint"}
+                </span>
+                <Badge className="h-4.5">{open.length}</Badge>
+              </span>
             </CardHeader>
             <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
               {open.length ? (

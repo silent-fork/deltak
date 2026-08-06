@@ -264,7 +264,12 @@ export function PairMobileSection({
                   <div className="flex min-w-0 items-center gap-1.5">
                     <Smartphone className="h-3 w-3 shrink-0 text-zinc-500" />
                     <span className="truncate text-[10px] text-zinc-300">Phone {i + 1}</span>
-                    <span className="shrink-0 text-[9px] text-zinc-600">· {timeAgo(d.paired_at)}</span>
+                    <span
+                      className="shrink-0 text-[9px] text-zinc-600"
+                      title={`Paired ${timeAgo(d.paired_at)}`}
+                    >
+                      · seen {timeAgo(d.last_seen_at)}
+                    </span>
                   </div>
                   <button
                     onClick={() => void removeDevice(d.session_id)}
