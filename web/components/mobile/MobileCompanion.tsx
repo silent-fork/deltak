@@ -226,10 +226,13 @@ export function MobileCompanion({
             </div>
           ) : null}
 
-          {/* Fixed-list, capped rather than flex-1 — five underlyings never
-              need to fight Open/Closed for the rest of the screen, but the
-              cap plus internal scroll keeps it safe if that ever changes. */}
-          <Card className="max-h-[34%] shrink-0">
+          {/* Fixed-list, not flex-1 — five underlyings render at their full
+              natural height rather than fighting Open/Closed for space or
+              scrolling internally; the internal `overflow-y-auto` on its
+              body stays only as a safety net if that list ever grows.
+              Open Positions and Closed Trades are the ones that absorb
+              whatever height this leaves, splitting it dynamically. */}
+          <Card className="shrink-0">
             <CardHeader className="shrink-0">
               <CardTitle>Live Signal</CardTitle>
               <span className="text-[9.5px] text-zinc-600">
