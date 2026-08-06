@@ -359,18 +359,21 @@ export function UserPill({
     !!at && istParts(new Date(/[Zz]|[+-]\d{2}:?\d{2}$/.test(at) ? at : `${at}Z`)).date === today;
   const closed = merged.closedRows.filter((r) => isToday(r.position.closed_at)).length;
   const openCount = merged.openRows.length;
-  // Against equity (capital plus today's unrealised P&L), not raw capital —
-  // `capital` never actually moves when a position opens (the ledger only
-  // debits it for fees; `deployed_margin` is tracked separately, see
-  // `Ledger.open`), so it stays flat while a trade is open regardless of
-  // whether that trade is up or down. Basing "free" and "% deployed" on it
-  // meant both sat frozen through a swing that should have moved them —
-  // equity is the number that actually reflects what the account is worth
-  // right now, deployed money included.
-  const free = ledger ? Math.max(0, ledger.equity - ledger.deployed_margin) : 0;
+  // `ledger.capital` never actually moves when a position opens — the ledger
+  // only debits it for fees, and tracks the position's real cost separately
+  // as `deployed_margin` (see `Ledger.open`) — so it's really "capital
+  // including what's tied up in open positions," not free cash. `free`
+  // strips that back out; the "Capital" row below shows this, not the raw
+  // ledger field, so what an operator reads as "my capital" is money they
+  // could actually deploy on a new trade, not money already spent on one.
+  // Equity un-does the same subtraction (`free + deployed_margin`) and adds
+  // the day's unrealised swing on top — algebraically just
+  // `ledger.capital + open_pnl`, which is exactly what `Ledger.equity`
+  // already computes.
+  const free = ledger ? Math.max(0, ledger.capital - ledger.deployed_margin) : 0;
   const deployedPct =
-    ledger && ledger.equity > 0
-      ? Math.min(100, Math.max(0, (ledger.deployed_margin / ledger.equity) * 100))
+    ledger && ledger.capital > 0
+      ? Math.min(100, Math.max(0, (ledger.deployed_margin / ledger.capital) * 100))
       : 0;
 
   async function refresh() {
@@ -598,7 +601,7 @@ export function UserPill({
             </div>
 
             <div className="mt-2.5">
-              <Row icon={Wallet} label="Capital" value={money(ledger?.capital ?? 0, 0)} />
+              <Row icon={Wallet} label="Capital" value={money(free, 0)} />
               <Row label="Equity" value={money(ledger?.equity ?? 0, 0)} />
               <Row label="Deployed" value={money(ledger?.deployed_margin ?? 0, 0)} />
               <Row label="Charges" value={money(ledger?.charges ?? 0, 0)} />

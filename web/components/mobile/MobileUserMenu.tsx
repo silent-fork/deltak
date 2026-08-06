@@ -93,12 +93,14 @@ export function MobileUserMenu({
     };
   }, [open]);
 
-  // Against equity, not raw capital — see the same fix and its full
-  // rationale in the desktop UserPill this menu mirrors.
-  const free = wallet ? Math.max(0, wallet.equity - wallet.deployed_margin) : 0;
+  // `free` is capital with what's tied up in open positions backed back
+  // out — see the desktop UserPill this menu mirrors for the full
+  // rationale. The "Capital" row below shows this, not the raw
+  // `wallet.capital` field.
+  const free = wallet ? Math.max(0, wallet.capital - wallet.deployed_margin) : 0;
   const deployedPct =
-    wallet && wallet.equity > 0
-      ? Math.min(100, Math.max(0, (wallet.deployed_margin / wallet.equity) * 100))
+    wallet && wallet.capital > 0
+      ? Math.min(100, Math.max(0, (wallet.deployed_margin / wallet.capital) * 100))
       : 0;
 
   return (
@@ -171,7 +173,7 @@ export function MobileUserMenu({
                 </div>
 
                 <div className="mt-2.5 space-y-px">
-                  <WalletRow icon={Wallet} label="Capital" value={money(wallet.capital, 0)} />
+                  <WalletRow icon={Wallet} label="Capital" value={money(free, 0)} />
                   <WalletRow icon={PiggyBank} label="Equity" value={money(wallet.equity, 0)} />
                   <WalletRow icon={Layers} label="Deployed" value={money(wallet.deployed_margin, 0)} />
                   <WalletRow icon={Receipt} label="Charges" value={money(wallet.charges, 0)} />
