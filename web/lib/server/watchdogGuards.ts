@@ -8,7 +8,7 @@ import {
   secondsToDaylightRest,
 } from "@/lib/engine/config";
 import { applySlippage } from "@/lib/engine/ledger";
-import { decideExit, type ExitReason } from "@/lib/engine/risk";
+import { decideExit, decideTrail, type ExitReason } from "@/lib/engine/risk";
 import { insertRows, selectFrom, updatePositionByTradeKey } from "@/lib/supabase";
 import type { Broker, Side } from "@/lib/types";
 import { NoBrokerSessionError, watchdogLtp } from "./watchdogMarket";
@@ -16,18 +16,21 @@ import { NoBrokerSessionError, watchdogLtp } from "./watchdogMarket";
 /**
  * The guard-only watchdog tick.
  *
- * Re-runs the two guards that need nothing but a position's own numbers and a
- * fresh price — stop/target (`decideExit`) and the 3:15 PM IST Daylight Rest
- * flatten — against every OPEN paper position in Supabase, independent of
- * whether any browser tab is open. Invalidation (needs the COA walls) and the
- * Weakening-quadrant scale-out (needs live RRG rotation) are not decidable
- * this way and stay browser-only until there is a server-side home for that
- * state — see the module doc in `lib/engine/risk.ts`.
+ * Re-runs the guards that need nothing but a position's own numbers and a
+ * fresh price — stop/target (`decideExit`), the breakeven-then-trail stop
+ * (`decideTrail`), and the 3:15 PM IST Daylight Rest flatten — against every
+ * OPEN paper position in Supabase, independent of whether any browser tab is
+ * open. Invalidation (needs the COA walls) and the Weakening-quadrant
+ * scale-out (needs live RRG rotation) are not decidable this way and stay
+ * browser-only until there is a server-side home for that state — see the
+ * module doc in `lib/engine/risk.ts`. Trailing is the one guard that moved
+ * off that list: it only ever needed a position's own `protocol`, `avg_price`
+ * and a live LTP, all of which this tick already has.
  *
  * Live positions are never touched: the query below is filtered to
- * `mode = 'paper'` explicitly, and `bookExit`/`markToMarket` never call
- * anything that can place a broker order — `watchdogMarket.ts` doesn't even
- * import the endpoint that does.
+ * `mode = 'paper'` explicitly, and `bookExit`/`markToMarket`/`applyTrail`
+ * never call anything that can place a broker order — `watchdogMarket.ts`
+ * doesn't even import the endpoint that does.
  */
 
 const r2 = (n: number) => Number(n.toFixed(2));
@@ -70,6 +73,7 @@ export interface WatchdogTickResult {
   accounts: number;
   positionsChecked: number;
   exits: { ledgerId: string; reason: ExitReason }[];
+  trailed: { ledgerId: string; newStop: number }[];
   skipped: { ledgerId: string; reason: string }[];
   errors: { ledgerId?: string; clientCode?: string; message: string }[];
 }
@@ -85,6 +89,17 @@ async function markToMarket(row: OpenPositionRow, ltp: number): Promise<void> {
     unrealised_pnl: unrealisedPnl,
     pnl_pct: pnlPct,
   });
+}
+
+/** Reconstructs a position's own "1R" from its stored protocol's configured stop% — see the same helper's twin in `lib/engine/risk.ts`. */
+function riskPointsFor(row: OpenPositionRow): number | null {
+  const protocol = row.protocol as "ALPHA" | "BETA" | "GAMMA" | "DELTA" | null;
+  if (!protocol || protocol === "DELTA") return null; // no live position is ever opened under Delta
+  return num(row.avg_price) * DEFAULT_CONFIG.stopPctByProtocol[protocol];
+}
+
+async function applyTrail(row: OpenPositionRow, newStop: number): Promise<void> {
+  await updatePositionByTradeKey(row.trade_key, { stop_loss: newStop });
 }
 
 async function bookExit(row: OpenPositionRow, ltp: number, reason: ExitReason): Promise<void> {
@@ -158,6 +173,7 @@ export async function runWatchdogTick(): Promise<WatchdogTickResult> {
     accounts: 0,
     positionsChecked: 0,
     exits: [],
+    trailed: [],
     skipped: [],
     errors: [],
   };
@@ -211,6 +227,21 @@ export async function runWatchdogTick(): Promise<WatchdogTickResult> {
 
           if (decision.action === "HOLD") {
             await markToMarket(row, ltp);
+
+            const riskPoints = riskPointsFor(row);
+            if (riskPoints !== null && riskPoints > 0) {
+              const newStop = decideTrail({
+                side: row.side as Side,
+                avgPrice: num(row.avg_price),
+                stopLoss: numOrNull(row.stop_loss),
+                ltp,
+                riskPoints,
+              });
+              if (newStop !== null) {
+                await applyTrail(row, newStop);
+                result.trailed.push({ ledgerId: row.ledger_id, newStop });
+              }
+            }
           } else {
             await bookExit(row, ltp, decision.action);
             result.exits.push({ ledgerId: row.ledger_id, reason: decision.action });

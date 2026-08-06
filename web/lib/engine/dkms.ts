@@ -253,10 +253,36 @@ export class SignalEngine {
     // -- risk geometry --------------------------------------------------- //
     const r2 = (n: number) => Number(n.toFixed(2));
     const entry = leg.best_ask > 0 ? leg.best_ask : leg.ltp;
-    const stopPoints = r2(entry * this.cfg.defaultStopPct);
+    const stopPoints = r2(entry * this.cfg.stopPctByProtocol[protocol]);
     const stop = r2(Math.max(0.05, entry - stopPoints));
-    const target1 = r2(entry + stopPoints * 1.5);
+    let target1 = r2(entry + stopPoints * 1.5);
     const target2 = r2(entry + stopPoints * 3.0);
+
+    // Alpha buys near a wall expecting a move to the *opposite* one — anchor
+    // TP1 to that actual distance instead of a blind 1.5R wherever there's
+    // COA data to do it with. `itmDeltaApprox` translates the wall's
+    // distance in underlying points into an approximate premium distance
+    // (see its own doc comment — this is a stated approximation, not a real
+    // Greek). Clamped to [old 1.5R, 2.9R] either way: a wall right on top of
+    // entry must not produce a worse target than before, and a distant one
+    // must not reach all the way to `target2` (3R) — TP1 has to stay a real
+    // scale-out level strictly ahead of the final target, not collapse onto
+    // it.
+    if (protocol === "ALPHA") {
+      const wallDistance =
+        optionType === "CE"
+          ? levels.zenith_1 !== null
+            ? Math.max(0, levels.zenith_1 - spot)
+            : null
+          : levels.aegis_1 !== null
+            ? Math.max(0, spot - levels.aegis_1)
+            : null;
+      if (wallDistance !== null && wallDistance > 0) {
+        const wallImpliedTarget = r2(entry + wallDistance * this.cfg.itmDeltaApprox);
+        const ceiling = r2(entry + stopPoints * 2.9);
+        target1 = r2(Math.min(ceiling, Math.max(target1, wallImpliedTarget)));
+      }
+    }
 
     const sizing = calculateSize({
       underlying: this.underlying,

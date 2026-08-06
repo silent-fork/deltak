@@ -27,8 +27,10 @@ import {
 import {
   breach,
   checkStops,
+  checkTrailingStop,
   checkWeakeningRotation,
   decideExit,
+  decideTrail,
   weakeningCorroborated,
 } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
@@ -88,6 +90,36 @@ test("invalid stop is rejected and lot helpers behave", () => {
   assert.equal(roundToLot(163, 75), 150);
   assert.equal(resolveLotSize("FINNIFTY"), 40);
   assert.equal(resolveLotSize("BANKNIFTY"), 15);
+});
+
+test("single_lot_constrained is set only when the capital clamp is what actually knocked lots down to 1", () => {
+  // Risk math alone wants floor(100000*5% / (10*75)) = 6 lots; capital only
+  // affords floor(100000 / (400*75)) = 3 — clamped, but not to exactly 1.
+  const notSingleLot = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 10, capital: 100_000, riskPct: 5,
+    lotSize: 75, entryPrice: 400,
+  });
+  assert.ok(notSingleLot.lots > 1);
+  assert.equal(notSingleLot.single_lot_constrained, false);
+
+  // Same risk math, but capital only affords exactly 1 lot.
+  const single = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 10, capital: 100_000, riskPct: 5,
+    lotSize: 75, entryPrice: 1_300,
+  });
+  assert.equal(single.lots, 1);
+  assert.equal(single.capped_by, "CAPITAL");
+  assert.equal(single.single_lot_constrained, true);
+
+  // The risk math itself only ever wanted 1 lot — floor(50000*10% / (50*75))
+  // = 1 — no clamp involved (no entryPrice given, so affordability never
+  // runs), so this is not "constrained", just how the trade always sized.
+  const naturallyOne = calculateSize({
+    underlying: "NIFTY", stopLossPoints: 50, capital: 50_000, riskPct: 10, lotSize: 75,
+  });
+  assert.equal(naturallyOne.lots, 1);
+  assert.equal(naturallyOne.capped_by, null);
+  assert.equal(naturallyOne.single_lot_constrained, false);
 });
 
 /* ---------------------------------------------------------- index universe */
@@ -645,6 +677,7 @@ test("restore re-admits a position into live monitoring — mark-to-market and t
     ltp: (token) => ticks.ltp(token),
     exit: async (pos) => { exitedId = pos.id; },
     scaleOut: async () => {},
+    trail: async () => {},
     log: () => {},
     scaled: new Set<string>(),
     daylightRestDone: true,
@@ -712,6 +745,7 @@ test("weakening scale-out is suppressed on a flat tape and fires on a real pullb
       ltp: () => 0,
       exit: async () => {},
       scaleOut: async () => { scaledOut = true; },
+      trail: async () => {},
       log: () => {},
       scaled: new Set<string>(),
       daylightRestDone: true,
@@ -722,6 +756,118 @@ test("weakening scale-out is suppressed on a flat tape and fires on a real pullb
 
   assert.equal(await scenario(24_000), false); // premium drifted, spot did not
   assert.equal(await scenario(23_950), true); // spot actually pulled back
+});
+
+test("a Weakening rotation on a 1-lot position locks the stop to breakeven instead of scaling out", async () => {
+  const ledger = new Ledger(500_000, 0, 25);
+  ledger.open({
+    underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY23900CE",
+    quantity: 75, lots: 1, lotSize: 75, price: 100,
+    optionType: "CE", strike: 23_900, stopLoss: 75, target: 150,
+    entrySpot: 24_000, mode: "paper",
+  });
+  const ticks = new TickStore();
+  const t = emptyTick("1001"); t.ltp = 105; // a winner
+  ticks.apply(t);
+  ledger.markToMarket(ticks);
+
+  let scaledOut = false;
+  let trailedTo: number | null = null;
+  await checkWeakeningRotation({
+    ledger,
+    chains: { NIFTY: { spot: 23_950 } as unknown as OptionChain }, // real pullback, corroborated
+    rrg: { NIFTY: { quadrant: () => "WEAKENING" } as unknown as RrgEngine },
+    cfg: DEFAULT_CONFIG,
+    ltp: () => 0,
+    exit: async () => {},
+    scaleOut: async () => { scaledOut = true; },
+    trail: async (_pos, newStop) => { trailedTo = newStop; },
+    log: () => {},
+    scaled: new Set<string>(),
+    daylightRestDone: true,
+    onDaylightRestDone: () => {},
+  });
+
+  assert.equal(scaledOut, false); // can't reduce a 1-lot position
+  assert.equal(trailedTo, 100); // locked to breakeven (avg_price) instead
+});
+
+test("decideTrail: no move yet, breakeven at 1R, trails behind price past 2R, never loosens", () => {
+  // Below 1R favourable move — nothing to do yet.
+  assert.equal(
+    decideTrail({ side: "BUY", avgPrice: 100, stopLoss: 75, ltp: 110, riskPoints: 25 }),
+    null,
+  );
+
+  // At exactly 1R — ratchets to breakeven.
+  assert.equal(
+    decideTrail({ side: "BUY", avgPrice: 100, stopLoss: 75, ltp: 125, riskPoints: 25 }),
+    100,
+  );
+
+  // Past 2R — trails a further R behind the current price instead of
+  // sitting fixed at breakeven.
+  assert.equal(
+    decideTrail({ side: "BUY", avgPrice: 100, stopLoss: 75, ltp: 160, riskPoints: 25 }),
+    135, // 160 - 25
+  );
+
+  // Never loosens: a stop already better than what this tick would propose
+  // is left alone.
+  assert.equal(
+    decideTrail({ side: "BUY", avgPrice: 100, stopLoss: 140, ltp: 160, riskPoints: 25 }),
+    null,
+  );
+
+  // Short side is the mirror image throughout.
+  assert.equal(
+    decideTrail({ side: "SELL", avgPrice: 100, stopLoss: 125, ltp: 75, riskPoints: 25 }),
+    100,
+  );
+  assert.equal(
+    decideTrail({ side: "SELL", avgPrice: 100, stopLoss: 125, ltp: 40, riskPoints: 25 }),
+    65, // 40 + 25
+  );
+});
+
+test("checkTrailingStop ratchets a favourable position's stop and leaves a flat one alone", async () => {
+  const ledger = new Ledger(500_000, 0, 25);
+  ledger.open({
+    underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY23900CE",
+    quantity: 75, lots: 1, lotSize: 75, price: 100,
+    optionType: "CE", strike: 23_900, stopLoss: 75, target: 300,
+    protocol: "ALPHA", mode: "paper",
+  });
+
+  const trailedStops: number[] = [];
+  const deps = {
+    ledger,
+    chains: {},
+    rrg: {},
+    cfg: DEFAULT_CONFIG, // stopPctByProtocol.ALPHA = 0.25 -> riskPoints = 100*0.25 = 25
+    ltp: () => 125, // exactly 1R favourable
+    exit: async () => {},
+    scaleOut: async () => {},
+    // Mirrors `bookTrail` in useEngine.ts: the guard only proposes a new
+    // stop, this is what actually applies it — without that, a second
+    // pass would keep seeing the stale stop and keep re-proposing the
+    // same move forever.
+    trail: async (pos: { id: string }, newStop: number) => {
+      trailedStops.push(newStop);
+      ledger.tightenStop(pos.id, newStop);
+    },
+    log: () => {},
+    scaled: new Set<string>(),
+    daylightRestDone: true,
+    onDaylightRestDone: () => {},
+  };
+
+  await checkTrailingStop(deps);
+  assert.deepEqual(trailedStops, [100]); // moved to breakeven
+
+  // A second pass at the same price proposes nothing new — already there.
+  await checkTrailingStop(deps);
+  assert.deepEqual(trailedStops, [100]);
 });
 
 test("decideExit prioritises stop and target over the daylight clock, for both sides", () => {

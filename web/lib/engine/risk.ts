@@ -20,6 +20,8 @@ export type ExitFn = (
 
 export type ScaleFn = (position: Position, fraction: number) => Promise<void> | void;
 
+export type TrailFn = (position: Position, newStop: number) => Promise<void> | void;
+
 /** True when spot has breached *level* by more than the invalidation band. */
 export function breach(
   spot: number,
@@ -69,6 +71,51 @@ export function decideExit(params: {
   return { action: "HOLD" };
 }
 
+/**
+ * Breakeven-then-trail: once a position has moved favourably by at least
+ * one risk-multiple (R — the premium distance its stop originally sized
+ * against, reconstructed from its own `protocol`'s configured stop%, see
+ * `EngineConfig.stopPctByProtocol`), the stop ratchets to breakeven — the
+ * trade can no longer close at a loss. Past 2R it trails a further R
+ * behind the current price instead of sitting fixed at breakeven forever.
+ *
+ * Needs only a position's own numbers and a fresh price — same shape as
+ * `decideExit` and for the same reason: a background job can reach the
+ * identical verdict without a live COA chain or RRG window, so unlike
+ * invalidation and the Weakening scale-out, trailing can run in the
+ * server watchdog too.
+ *
+ * Returns the new stop only when it's an actual improvement (mirrors
+ * `Ledger.tightenStop`'s own one-way check) — `null` means nothing to do,
+ * so a caller can invoke this every tick with no extra bookkeeping.
+ */
+export function decideTrail(params: {
+  side: Side;
+  avgPrice: number;
+  stopLoss: number | null;
+  ltp: number;
+  /** The premium distance this position's stop was originally sized against — its "1R". */
+  riskPoints: number;
+}): number | null {
+  const { side, avgPrice, stopLoss, ltp, riskPoints } = params;
+  if (riskPoints <= 0 || ltp <= 0 || avgPrice <= 0) return null;
+
+  const long = side === "BUY";
+  const favourableMove = long ? ltp - avgPrice : avgPrice - ltp;
+  if (favourableMove < riskPoints) return null; // not yet breakeven-eligible
+
+  let candidate = avgPrice;
+  if (favourableMove >= riskPoints * 2) {
+    const trailing = long ? ltp - riskPoints : ltp + riskPoints;
+    candidate = long ? Math.max(candidate, trailing) : Math.min(candidate, trailing);
+  }
+
+  const improves = long
+    ? stopLoss === null || candidate > stopLoss
+    : stopLoss === null || candidate < stopLoss;
+  return improves ? Number(candidate.toFixed(2)) : null;
+}
+
 export interface GuardDeps {
   ledger: Ledger;
   chains: Record<string, OptionChain>;
@@ -77,6 +124,7 @@ export interface GuardDeps {
   ltp: (token: string) => number;
   exit: ExitFn;
   scaleOut: ScaleFn;
+  trail: TrailFn;
   log: (kind: RiskEvent["kind"], message: string, underlying?: string) => void;
   /** Position ids already scaled out once. */
   scaled: Set<string>;
@@ -162,10 +210,19 @@ export function weakeningCorroborated(
   return optionType === "PE" ? spot > entrySpot + band : spot < entrySpot - band;
 }
 
-/** Automated TP1 scale-out when a held node rotates into Weakening. */
+/**
+ * Automated TP1 scale-out when a held node rotates into Weakening.
+ *
+ * A 1-lot position can't be reduced (the exchange only trades whole lots),
+ * which used to mean the rotation was silently skipped — the position rode
+ * out unmodified whatever conviction triggered a scale-out on a 2+-lot
+ * position. It falls back to locking the stop to breakeven instead: it
+ * can't take money off the table, but it can guarantee the trade won't give
+ * back what it's already up.
+ */
 export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
   for (const pos of d.ledger.openPositions) {
-    if (d.scaled.has(pos.id) || pos.lots < 2) continue;
+    if (d.scaled.has(pos.id)) continue;
     if (d.rrg[pos.underlying]?.quadrant(pos.token) !== "WEAKENING") continue;
     if (pos.unrealised_pnl <= 0) continue; // only scale out of a winner
 
@@ -180,9 +237,52 @@ export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
       if (!corroborated) continue; // premium drifted, spot did not — theta, not rotation
     }
 
+    if (pos.lots < 2) {
+      d.log(
+        "TARGET",
+        `${pos.trading_symbol} rotated into Weakening at 1 lot — locking the stop to breakeven instead of scaling out.`,
+        pos.underlying,
+      );
+      await d.trail(pos, pos.avg_price);
+      d.scaled.add(pos.id);
+      continue;
+    }
+
     d.log("TARGET", `${pos.trading_symbol} rotated into Weakening — TP1 scale-out.`, pos.underlying);
     await d.scaleOut(pos, 0.5);
     d.scaled.add(pos.id);
+  }
+}
+
+/** Reconstructs a position's own "1R" from its stored protocol's configured stop%, since the original distance isn't persisted separately. */
+function riskPointsFor(pos: Position, cfg: EngineConfig): number | null {
+  if (!pos.protocol || pos.protocol === "DELTA") return null; // no live position is ever opened under Delta
+  return pos.avg_price * cfg.stopPctByProtocol[pos.protocol];
+}
+
+/** Breakeven-then-trail on every open position — see `decideTrail` for the rule itself. */
+export async function checkTrailingStop(d: GuardDeps): Promise<void> {
+  for (const pos of d.ledger.openPositions) {
+    const riskPoints = riskPointsFor(pos, d.cfg);
+    if (riskPoints === null || riskPoints <= 0) continue;
+    const ltp = d.ltp(pos.token);
+    if (ltp <= 0) continue;
+
+    const newStop = decideTrail({
+      side: pos.side,
+      avgPrice: pos.avg_price,
+      stopLoss: pos.stop_loss,
+      ltp,
+      riskPoints,
+    });
+    if (newStop === null) continue;
+
+    d.log(
+      "INFO",
+      `${pos.trading_symbol} trailed — stop moved to ${newStop.toFixed(2)}.`,
+      pos.underlying,
+    );
+    await d.trail(pos, newStop);
   }
 }
 
@@ -207,6 +307,7 @@ export async function checkDaylightRest(d: GuardDeps): Promise<void> {
 export async function runGuards(d: GuardDeps): Promise<void> {
   await checkStops(d);
   await checkInvalidation(d);
+  await checkTrailingStop(d);
   await checkWeakeningRotation(d);
   await checkDaylightRest(d);
 }

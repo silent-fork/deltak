@@ -505,6 +505,19 @@ export function useEngine(simulate: boolean) {
 
   const bookScaleOut = useCallback(
     async (pos: Position, fraction: number) => {
+      // A 1-lot position can't be *scaled* at all — the exchange only
+      // trades whole lots, so the fraction has nothing left to reduce.
+      // This used to fall through to `lots >= pos.lots` below and silently
+      // execute a full close instead, which reads as "scale out" doing
+      // something the caller didn't ask for. The trade book's own scale
+      // button is already disabled below 2 lots; this is the function
+      // itself refusing to guess for whatever calls it next.
+      if (pos.lots < 2) {
+        throw new Error(
+          `Cannot scale out ${pos.trading_symbol} — only 1 lot is open. Close the position instead.`,
+        );
+      }
+
       const lots = Math.max(1, Math.floor(pos.lots * fraction));
       if (lots >= pos.lots) {
         await bookExit(pos, "TP1");
@@ -574,6 +587,18 @@ export function useEngine(simulate: boolean) {
     },
     [bookExit, log],
   );
+
+  /**
+   * Ratchets a position's stop — the trailing-stop guard's own write path,
+   * same shape as `bookExit`/`bookScaleOut`: the guard in `risk.ts` only
+   * decides *what* the new stop should be, this is what actually mutates
+   * the ledger and persists it. No order is placed — a stop move is
+   * bookkeeping, not a fill.
+   */
+  const bookTrail = useCallback(async (pos: Position, newStop: number) => {
+    const updated = ledgerRef.current.tightenStop(pos.id, newStop);
+    if (updated) savePositions([updated]);
+  }, []);
 
   /* ---------------------------------------------------------- snapshot */
 
@@ -746,6 +771,7 @@ export function useEngine(simulate: boolean) {
           ltp: (token) => ticksRef.current.ltp(token),
           exit: bookExit,
           scaleOut: bookScaleOut,
+          trail: bookTrail,
           log,
           scaled: scaledRef.current,
           daylightRestDone: daylightDoneRef.current,
@@ -827,7 +853,7 @@ export function useEngine(simulate: boolean) {
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, buildSnapshot, feedLive, log, spotMap]);
+  }, [bookExit, bookScaleOut, bookTrail, buildSnapshot, feedLive, log, spotMap]);
 
   /**
    * Repaint the instant the tab comes back into view, rather than leaving it

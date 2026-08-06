@@ -194,8 +194,26 @@ export interface EngineConfig {
   shiftLookback: number;
 
   riskPct: number;
-  /** Stop distance as a fraction of option premium. */
-  defaultStopPct: number;
+  /**
+   * Stop distance as a fraction of option premium, per protocol — Alpha's
+   * range trade at a wall behaves differently from Beta/Gamma's momentum
+   * entries, so each gets its own knob rather than one number shared
+   * across all three. Protocol Delta never reaches this: it's blocked
+   * before any risk geometry is computed (see `SignalEngine.evaluate`).
+   * Also doubles as the "1R" reference for the trailing-stop guards
+   * (`decideTrail`) — a position's own stored `protocol` is enough to
+   * reconstruct roughly how far its stop started out, without needing a
+   * separately persisted risk-distance field.
+   */
+  stopPctByProtocol: Record<"ALPHA" | "BETA" | "GAMMA", number>;
+  /**
+   * Rough delta approximation for a 2nd/3rd-ITM long — the Zero-OTM rule's
+   * own strike band. Used only to translate a COA wall's distance in
+   * underlying points into an approximate option-premium distance for
+   * Alpha's wall-anchored target; this is an approximation; the engine has
+   * no live delta from either broker's option chain today.
+   */
+  itmDeltaApprox: number;
   maxConcurrentPositions: number;
   /** Index break invalidation threshold, percent. */
   invalidationPct: number;
@@ -257,7 +275,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
    * `calculateSize` remains the real backstop.
    */
   riskPct: 30.0,
-  defaultStopPct: 0.25,
+  // Same 25% every protocol used before this was split out — no behaviour
+  // change until one of these is tuned independently.
+  stopPctByProtocol: { ALPHA: 0.25, BETA: 0.25, GAMMA: 0.25 },
+  itmDeltaApprox: 0.7,
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
   weakeningMinAdverseMovePct: 0.05,

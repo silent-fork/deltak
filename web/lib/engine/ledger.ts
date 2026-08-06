@@ -187,6 +187,27 @@ export class Ledger {
   }
 
   /**
+   * Ratchet a position's stop toward its favourable side only — a trailing
+   * stop that could also loosen wouldn't be protecting anything. No-op
+   * (returns `null`, nothing charged, no fill) if the position isn't open
+   * or `newStop` would not actually tighten what's already there, so a
+   * guard can call this every tick without needing its own "already
+   * trailed" bookkeeping.
+   */
+  tightenStop(positionId: string, newStop: number): Position | null {
+    const pos = this.positions.get(positionId);
+    if (!pos) return null;
+    const improves =
+      pos.side === "BUY"
+        ? pos.stop_loss === null || newStop > pos.stop_loss
+        : pos.stop_loss === null || newStop < pos.stop_loss;
+    if (!improves) return null;
+    pos.stop_loss = r2(newStop);
+    this.revision += 1;
+    return pos;
+  }
+
+  /**
    * Re-admit a position a previous session left open — same map a freshly
    * opened position lives in, so `markToMarket` and every `runGuards` check
    * (stop, target, invalidation, Weakening scale-out) treat it identically to

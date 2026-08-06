@@ -99,6 +99,14 @@ export interface SizingResult {
   capital: number;
   risk_pct: number;
   capped_by: string | null;
+  /**
+   * True when the risk-% math wanted more than 1 lot but the capital/
+   * concentration budget clamped it down to exactly 1 — the case where a
+   * later Weakening-quadrant rotation won't be able to scale out (that
+   * needs 2+ lots) and falls back to locking the stop to breakeven instead
+   * (see `checkWeakeningRotation` in `lib/engine/risk.ts`).
+   */
+  single_lot_constrained: boolean;
 }
 
 export interface Signal {
