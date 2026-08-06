@@ -187,6 +187,49 @@ export class Ledger {
   }
 
   /**
+   * Add to an already-open position — Phase 4's manually-triggered scale-in.
+   * `open()`'s counterpart for growing an existing row instead of starting a
+   * new one, so the book stays one row per token the same way `reduce()` and
+   * `close()` keep it: `avg_price` blends as a quantity-weighted average
+   * rather than tracking the two fills separately.
+   *
+   * `deployed`/`equity` need no separate update — both are derived getters
+   * off `avg_price`/`quantity`, which this already mutates. Only the add's
+   * own charges touch `capital` directly, same as `open()`'s own charges-only
+   * deduction (the premium itself was never subtracted from `capital` at
+   * entry either — it lives in `deployed`).
+   *
+   * `newStop`/`newTarget` are the caller's to compute (mirrors `open()`
+   * taking `stopLoss`/`target` as params) — `risk.ts`'s `decideScaleIn`
+   * re-anchors them to the new blended price before calling this.
+   */
+  addToPosition(
+    positionId: string,
+    addLots: number,
+    price: number,
+    newStop: number | null,
+    newTarget: number | null,
+  ): Position | null {
+    const pos = this.positions.get(positionId);
+    if (!pos || addLots <= 0) return null;
+
+    const fill = r2(price);
+    const addQty = addLots * pos.lot_size;
+    const totalQty = pos.quantity + addQty;
+    pos.avg_price = r2((pos.avg_price * pos.quantity + fill * addQty) / totalQty);
+    pos.quantity = totalQty;
+    pos.lots += addLots;
+    if (newStop !== null) pos.stop_loss = r2(newStop);
+    if (newTarget !== null) pos.target = r2(newTarget);
+
+    const cost = this.legCharges(pos.side, fill, addQty);
+    this.charges = r2(this.charges + cost);
+    this.capital = r2(this.capital - cost);
+    this.revision += 1;
+    return pos;
+  }
+
+  /**
    * Ratchet a position's stop toward its favourable side only — a trailing
    * stop that could also loosen wouldn't be protecting anything. No-op
    * (returns `null`, nothing charged, no fill) if the position isn't open

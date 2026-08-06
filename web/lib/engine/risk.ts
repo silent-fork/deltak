@@ -1,4 +1,13 @@
-import type { OptionChain, OptionType, Position, RiskEvent, Side } from "@/lib/types";
+import type {
+  OptionChain,
+  OptionType,
+  Position,
+  Quadrant,
+  RiskEvent,
+  ScaleInDecision,
+  Side,
+} from "@/lib/types";
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import type { Ledger } from "./ledger";
 import type { RrgEngine } from "./rrg";
 import type { EngineConfig } from "./config";
@@ -150,6 +159,94 @@ export function decideTrail(params: {
     ? stopLoss === null || candidate > stopLoss
     : stopLoss === null || candidate < stopLoss;
   return improves ? Number(candidate.toFixed(2)) : null;
+}
+
+/**
+ * Whether an open, winning position has earned a single manually-triggered
+ * add-on — Phase 4. Never proposed by Autopilot, and the caller is expected
+ * to check this at most once per position per session (see `useEngine`'s
+ * own `scaledIn` set — the same in-memory-only posture `checkWeakeningRotation`'s
+ * `scaled` set already uses for the opposite action): a position that has
+ * already been added to must not be added to again just because it keeps
+ * trending favourably.
+ *
+ * Gated on all of:
+ *  - still in a strong RRG quadrant (LEADING/IMPROVING) — a WEAKENING node
+ *    is `checkWeakeningRotation`'s to scale *out* of, never a candidate to add to.
+ *  - at least 1R favourable already (the same threshold `decideTrail` uses
+ *    to lock breakeven) — adding to a position that hasn't even earned back
+ *    its own risk yet is pyramiding into an unconfirmed move.
+ *  - the wall it was anchored to at entry is still intact with room left
+ *    (`wallStopPoints` returning `null` — breached or not yet known — refuses).
+ *  - VIX isn't in Panic — the one regime the sizing table already treats as
+ *    "shrink risk", not "add more".
+ *
+ * `newStop`/`newTarget` re-anchor to the *blended* average price this add
+ * would produce, preserving the original position's risk distance and
+ * target distance rather than leaving the old absolute levels sitting
+ * against a now-cheaper cost basis.
+ *
+ * Capital affordability is deliberately NOT this function's job — `addLots`
+ * here only proposes doubling the position's existing size; the caller
+ * (`useEngine`'s `scaleInPosition`) re-checks portfolio risk and available
+ * capital against the live ledger immediately before actually filling, the
+ * same way `executeSignal` does for a fresh entry.
+ */
+export function decideScaleIn(params: {
+  pos: Position;
+  ltp: number;
+  spot: number;
+  aegis1: number | null;
+  zenith1: number | null;
+  quadrant: Quadrant | null;
+  vixRegime: VixRegime | null;
+  alreadyScaledIn: boolean;
+  cfg: EngineConfig;
+}): ScaleInDecision | null {
+  const { pos, ltp, spot, aegis1, zenith1, quadrant, vixRegime, alreadyScaledIn, cfg } = params;
+  if (alreadyScaledIn) return null;
+  if (!pos.option_type || !pos.protocol || pos.protocol === "DELTA") return null;
+  if (quadrant !== "LEADING" && quadrant !== "IMPROVING") return null;
+  if (vixRegime === "Panic") return null;
+  if (ltp <= 0) return null;
+
+  const riskPoints = riskPointsFor(pos, cfg);
+  if (riskPoints === null || riskPoints <= 0) return null;
+
+  const long = pos.side === "BUY";
+  const favourableMove = long ? ltp - pos.avg_price : pos.avg_price - ltp;
+  if (favourableMove < riskPoints) return null; // hasn't earned back its own risk yet
+
+  const wallPoints = wallStopPoints({
+    optionType: pos.option_type,
+    spot,
+    aegis1,
+    zenith1,
+    invalidationPct: cfg.invalidationPct,
+    itmDeltaApprox: cfg.itmDeltaApprox,
+  });
+  if (wallPoints === null) return null; // wall breached, or not known yet — no room to add safely
+
+  const addLots = pos.lots;
+  const addQty = addLots * pos.lot_size;
+  const blendedAvg = (pos.avg_price * pos.quantity + ltp * addQty) / (pos.quantity + addQty);
+  const newStop = Number((long ? blendedAvg - wallPoints : blendedAvg + wallPoints).toFixed(2));
+  const newTarget =
+    pos.target !== null
+      ? Number(
+          (long
+            ? blendedAvg + (pos.target - pos.avg_price)
+            : blendedAvg - (pos.avg_price - pos.target)
+          ).toFixed(2),
+        )
+      : null;
+
+  return {
+    addLots,
+    newStop,
+    newTarget,
+    reason: `${pos.trading_symbol} up ${(favourableMove / riskPoints).toFixed(1)}R in ${quadrant.toLowerCase()} — room to add ${addLots} lot(s).`,
+  };
 }
 
 export interface GuardDeps {

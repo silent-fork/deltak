@@ -31,6 +31,7 @@ import {
   checkWallTrail,
   checkWeakeningRotation,
   decideExit,
+  decideScaleIn,
   decideTrail,
   wallStopPoints,
   weakeningCorroborated,
@@ -50,7 +51,7 @@ import {
   secondsToDaylightRest,
   secondsToNextOpen,
 } from "../lib/engine/config";
-import type { CoaLevels, OptionChain } from "../lib/types";
+import type { CoaLevels, OptionChain, Position } from "../lib/types";
 import { withRetry } from "../lib/retry";
 
 /* ------------------------------------------------------------------ sizing */
@@ -990,6 +991,90 @@ test("checkWallTrail tightens a CE long's stop toward Aegis-1 and is idempotent 
   // Same price, same wall — nothing further to improve.
   await checkWallTrail(deps);
   assert.deepEqual(trailedStops, [105.5]);
+});
+
+test("Ledger.addToPosition blends avg_price by quantity, applies the caller's stop/target, and charges the add leg", () => {
+  const ledger = new Ledger(500_000, 0, 25);
+  const pos = ledger.open({
+    underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY23900CE",
+    quantity: 75, lots: 1, lotSize: 75, price: 100,
+    optionType: "CE", strike: 23_900, stopLoss: 75, target: 300,
+    protocol: "ALPHA", mode: "paper",
+  });
+  const chargesAfterOpen = ledger.charges;
+  const capitalAfterOpen = ledger.capital;
+
+  const updated = ledger.addToPosition(pos.id, 1, 150, 110, 350);
+  assert.ok(updated);
+  // (100*75 + 150*75) / 150 = 125.
+  assert.equal(updated!.avg_price, 125);
+  assert.equal(updated!.quantity, 150);
+  assert.equal(updated!.lots, 2);
+  assert.equal(updated!.stop_loss, 110);
+  assert.equal(updated!.target, 350);
+
+  const addCost = Math.max(25, estimateCharges({ side: "BUY", price: 150, quantity: 75 }).total);
+  assert.equal(ledger.charges, Number((chargesAfterOpen + addCost).toFixed(2)));
+  assert.equal(ledger.capital, Number((capitalAfterOpen - addCost).toFixed(2)));
+  // `deployed`/`equity` are derived off avg_price/quantity — no separate bookkeeping needed.
+  assert.equal(ledger.deployed, 125 * 150);
+
+  // A null stop/target from the caller leaves whatever is already there.
+  const again = ledger.addToPosition(pos.id, 1, 200, null, null);
+  assert.equal(again!.stop_loss, 110);
+  assert.equal(again!.target, 350);
+
+  assert.equal(ledger.addToPosition("nope", 1, 100, null, null), null);
+  assert.equal(ledger.addToPosition(pos.id, 0, 100, null, null), null);
+});
+
+test("decideScaleIn gates on quadrant, 1R profit, wall room, VIX Panic and one-add-per-session", () => {
+  const cfg = { ...DEFAULT_CONFIG, invalidationPct: 0.5, itmDeltaApprox: 0.7 };
+  const pos: Position = {
+    id: "DK-1", underlying: "NIFTY", token: "1001", trading_symbol: "NIFTY23900CE",
+    option_type: "CE", strike: 23_900, side: "BUY", quantity: 75, lots: 1, lot_size: 75,
+    avg_price: 100, ltp: 100, entry_spot: 24_500, stop_loss: 75, target: 300,
+    unrealised_pnl: 0, realised_pnl: 0, pnl_pct: 0, protocol: "ALPHA",
+    opened_at: "", closed_at: null, exit_price: null, exit_reason: null,
+    status: "OPEN", mode: "paper", automation: "manual", broker: null,
+  };
+  // riskPoints = 100 * stopPctByProtocol.ALPHA(0.25) = 25 -> 1R at ltp 125.
+  const base = {
+    pos, spot: 24_500, aegis1: 24_000, zenith1: null,
+    quadrant: "LEADING" as const, vixRegime: "Normal" as const,
+    alreadyScaledIn: false, cfg,
+  };
+
+  const eligible = decideScaleIn({ ...base, ltp: 125 });
+  assert.ok(eligible);
+  assert.equal(eligible!.addLots, 1);
+  // blendedAvg = (100*75 + 125*75) / 150 = 112.5; wallStopPoints(same inputs as
+  // the wallStopPoints test) = 434 -> newStop = 112.5 - 434, floored by nothing
+  // here (deep OTM band on purpose — the test only needs the arithmetic, not realism).
+  assert.equal(eligible!.newStop, Number((112.5 - 434).toFixed(2)));
+  // target distance preserved: original was +200 from avg_price -> +200 from blendedAvg.
+  assert.equal(eligible!.newTarget, Number((112.5 + 200).toFixed(2)));
+
+  // Not yet 1R favourable.
+  assert.equal(decideScaleIn({ ...base, ltp: 110 }), null);
+  // Weakening/Lagging is checkWeakeningRotation's territory, never an add candidate.
+  assert.equal(decideScaleIn({ ...base, ltp: 125, quadrant: "WEAKENING" }), null);
+  assert.equal(decideScaleIn({ ...base, ltp: 125, quadrant: "LAGGING" }), null);
+  // Improving is as eligible as Leading.
+  assert.ok(decideScaleIn({ ...base, ltp: 125, quadrant: "IMPROVING" }));
+  // Panic VIX refuses regardless of everything else lining up.
+  assert.equal(decideScaleIn({ ...base, ltp: 125, vixRegime: "Panic" }), null);
+  // Already added once this session.
+  assert.equal(decideScaleIn({ ...base, ltp: 125, alreadyScaledIn: true }), null);
+  // Wall breached (spot already through the invalidation band) — no room to add.
+  assert.equal(decideScaleIn({ ...base, ltp: 125, spot: 23_800 }), null);
+  // No wall on this option's own side at all.
+  assert.equal(decideScaleIn({ ...base, ltp: 125, aegis1: null, zenith1: null }), null);
+  // Delta never carries a live position — nothing to add to.
+  assert.equal(
+    decideScaleIn({ ...base, ltp: 125, pos: { ...pos, protocol: "DELTA" } }),
+    null,
+  );
 });
 
 test("decideExit prioritises stop and target over the daylight clock, for both sides", () => {
