@@ -339,7 +339,7 @@ export default function HomePage() {
               this session — never a setting anyone chooses. Every candidate
               still has to clear the Zero-OTM rule (longs restricted to the
               2nd/3rd deepest ITM strike) and the RRG gate (a Lagging quadrant
-              is high-decay and forbidden outright) before it's actionable.
+              is high-decay and forbidden outright) before it&apos;s actionable.
             </p>
           </div>
 

@@ -54,7 +54,7 @@ export function MoneynessStrip({ emphasis }: { emphasis: Emphasis }) {
       <Row label="Call strikes" itmSide="left" emphasis={emphasis} />
       <Row label="Put strikes" itmSide="right" emphasis={emphasis} />
       <p className="text-center font-mono text-[9px] uppercase tracking-wider text-quantum">
-        ↑ Quantum Horizon — the ATM strike, spot's current position
+        ↑ Quantum Horizon — the ATM strike, spot&apos;s current position
       </p>
     </div>
   );
