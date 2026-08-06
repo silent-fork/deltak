@@ -514,13 +514,17 @@ export function UserPill({
 
           {pairExpanded ? null : (
             <>
-              <Section title="Segments enabled">
-                <Chips values={profile?.exchanges ?? []} empty="Not reported" />
-              </Section>
+              {profile?.exchanges?.length ? (
+                <Section title="Segments enabled">
+                  <Chips values={profile.exchanges} empty="Not reported" />
+                </Section>
+              ) : null}
 
-              <Section title="Product types">
-                <Chips values={profile?.products ?? []} empty="Not reported" />
-              </Section>
+              {profile?.products?.length ? (
+                <Section title="Product types">
+                  <Chips values={profile.products} empty="Not reported" />
+                </Section>
+              ) : null}
             </>
           )}
 
