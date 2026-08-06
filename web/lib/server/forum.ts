@@ -1,7 +1,5 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
 import {
   createDocument,
   deleteDocument,
@@ -408,31 +406,6 @@ export async function reportPost(
       resolved: false,
     },
     idToken,
-  );
-}
-
-/* --------------------------------------------------------- feed ingestion */
-
-/** A stable, filesystem-safe Firestore doc ID from a feed item's own URL — the dedup key. */
-function feedItemId(link: string): string {
-  return createHash("sha1").update(link).digest("hex");
-}
-
-export async function wasFeedItemIngested(link: string, idToken: string): Promise<boolean> {
-  const doc = await getDocument(`forumFeedItems/${feedItemId(link)}`, idToken);
-  return doc !== null;
-}
-
-export async function markFeedItemIngested(
-  link: string,
-  threadId: string,
-  idToken: string,
-): Promise<void> {
-  await createDocument(
-    "forumFeedItems",
-    { link, threadId, ingestedAt: new Date() },
-    idToken,
-    feedItemId(link),
   );
 }
 

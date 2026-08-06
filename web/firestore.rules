@@ -42,12 +42,11 @@ service cloud.firestore {
     // wrote this comment originally left that unrestricted, which let any
     // signed-in user grant themselves `moderator` with a single PATCH.
     // Only an existing moderator can change *anyone's* role now, including
-    // granting the first one — which makes the very first moderator (and
-    // this app's feed-ingestion bot, see forumFeedItems below) a manual
-    // grant via the Firebase console, not something the app can bootstrap
-    // through its own rules. Console writes go through Firebase's own
-    // admin path, not these rules, so that bootstrap step is unaffected by
-    // anything written here.
+    // granting the first one — which makes the very first moderator a
+    // manual grant via the Firebase console, not something the app can
+    // bootstrap through its own rules. Console writes go through Firebase's
+    // own admin path, not these rules, so that bootstrap step is unaffected
+    // by anything written here.
     match /forumProfiles/{uid} {
       allow read: if true;
       allow create: if isOwner(uid);
@@ -109,17 +108,6 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.reporterUid == request.auth.uid;
       allow update: if isModerator();
       allow delete: if false;
-    }
-
-    // Dedup bookkeeping for RSS-ingested threads — doc ID is a hash of the
-    // source item's link, value is which thread it became. Nothing in the
-    // UI ever reads this; it exists purely so a cron run doesn't create a
-    // second thread for a story it already posted. Moderator-gated because
-    // the ingestion route authenticates as the feed bot's own account,
-    // which is granted that role manually (see forumProfiles above) —
-    // there is no separate "service account" concept in these rules.
-    match /forumFeedItems/{itemId} {
-      allow read, write: if isModerator();
     }
   }
 }
