@@ -100,7 +100,7 @@ function SpotTicker({
       {activeTrade ? (
         <span
           title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
-          className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5"
+          className="absolute -right-0.5 -bottom-0.5 flex h-2.5 w-2.5"
         >
           <span
             className={cn(
