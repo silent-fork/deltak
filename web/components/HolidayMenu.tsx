@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, PartyPopper } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { istMinutes } from "@/lib/engine/config";
@@ -12,27 +12,6 @@ import { cn } from "@/lib/utils";
 const POLL_START_MIN = 9 * 60;
 const POLL_END_MIN = 15 * 60 + 45;
 const POLL_INTERVAL_MS = 15 * 60_000;
-
-/** One glance at the kind of day it is, ahead of reading the name. */
-function festivalIcon(description: string): string {
-  const d = description.toLowerCase();
-  if (d.includes("diwali") || d.includes("deepavali")) return "🪔";
-  if (d.includes("holi")) return "🎨";
-  if (d.includes("eid") || d.includes("id-ul") || d.includes("bakri")) return "🌙";
-  if (d.includes("muharram")) return "🕌";
-  if (d.includes("christmas")) return "🎄";
-  if (d.includes("independence")) return "🇮🇳";
-  if (d.includes("republic day")) return "🇮🇳";
-  if (d.includes("gandhi") || d.includes("ambedkar") || d.includes("guru nanak") || d.includes("gurpurb"))
-    return "🕊️";
-  if (d.includes("ganesh")) return "🐘";
-  if (d.includes("dussehra") || d.includes("dasara") || d.includes("vijaya")) return "🏹";
-  if (d.includes("ram navami") || d.includes("mahavir") || d.includes("shivratri") || d.includes("navratri"))
-    return "🙏";
-  if (d.includes("good friday")) return "✝️";
-  if (d.includes("election")) return "🗳️";
-  return "📅";
-}
 
 /** "in 3 days", "tomorrow", "today" — a countdown reads faster than a date. */
 function relativeDay(daysAway: number): string {
@@ -124,9 +103,18 @@ export function HolidayMenu() {
       >
         <CalendarDays className="h-3 w-3" />
         {next ? (
-          <span className="flex items-center gap-1">
-            <span aria-hidden>{festivalIcon(next.description)}</span>
-            <span className="normal-case tracking-normal text-zinc-500">
+          <span className="flex items-center gap-1.5">
+            {/* Near-term amber, further out a quiet dot — the same urgency
+                language the badge in the dropdown uses, just compressed to
+                one glyph for the collapsed state. */}
+            <span
+              aria-hidden
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                (nextDays ?? 0) <= 3 ? "bg-amber-400" : "bg-zinc-600",
+              )}
+            />
+            <span className="normal-case tracking-normal text-zinc-400">
               {relativeDay(nextDays ?? 0)}
             </span>
           </span>
@@ -141,8 +129,7 @@ export function HolidayMenu() {
           className="dk-scroll absolute right-0 top-full z-50 mt-1 max-h-[60vh] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60"
         >
           <div className="sticky top-0 flex items-center justify-between border-b border-zinc-800 bg-[#0b0b0e] px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-300">
-              <PartyPopper className="h-3 w-3 text-quantum" />
+            <span className="dk-label text-[10px] leading-none">
               NSE F&amp;O Holidays
             </span>
             <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">
@@ -167,29 +154,41 @@ export function HolidayMenu() {
                 // worth the same weight as one that bites into a weekday.
                 const onWeekend = h.weekday === "Saturday" || h.weekday === "Sunday";
                 const date = new Date(`${h.date}T00:00:00+05:30`);
-                const label = date.toLocaleDateString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                });
+                const dayNum = date.toLocaleDateString("en-IN", { day: "2-digit" });
+                const monthAbbrev = date
+                  .toLocaleDateString("en-IN", { month: "short" })
+                  .toUpperCase();
 
                 return (
                   <li
                     key={h.date}
                     className={cn(
-                      "flex items-center gap-2 rounded px-1.5 py-1.5 text-[11px] leading-snug hover:bg-zinc-900/70",
+                      "flex items-center gap-2.5 rounded px-1.5 py-1.5 text-[11px] leading-snug hover:bg-zinc-900/70",
                       onWeekend && "opacity-50",
                     )}
                   >
-                    <span aria-hidden className="text-base leading-none">
-                      {festivalIcon(h.description)}
+                    {/* A dated block, not an icon — the calendar the rest of the
+                        terminal already speaks (see the ticker's own numeric
+                        badges) rather than a festival glyph. */}
+                    <span className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md border border-zinc-800 bg-zinc-950/60">
+                      <span className="font-mono text-[13px] font-bold leading-none text-zinc-200">
+                        {dayNum}
+                      </span>
+                      <span className="mt-1 text-[8px] font-medium uppercase tracking-wider text-zinc-600">
+                        {monthAbbrev}
+                      </span>
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-zinc-200">
                         {h.description}
                       </span>
-                      <span className="block font-mono text-[9px] uppercase tracking-wider text-zinc-600">
-                        {label} · {h.weekday}
-                        {onWeekend ? " · weekend" : ""}
+                      <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+                        {h.weekday}
+                        {onWeekend ? (
+                          <span className="rounded border border-zinc-800 px-1 text-zinc-500">
+                            weekend
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                     <span
