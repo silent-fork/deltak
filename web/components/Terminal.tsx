@@ -341,6 +341,7 @@ export function Terminal() {
                 chain={chain}
                 onExecuted={bumpRefresh}
                 ledger={snapshot?.ledger}
+                scaleIn={snapshot?.scale_in ?? {}}
                 onLedgerChanged={bumpRefresh}
                 clientCode={engine.session.clientCode}
               />

@@ -202,6 +202,14 @@ export interface SpotQuote {
   change_pct: number;
 }
 
+/** A position eligible for a manually-triggered scale-in — see `lib/engine/risk.ts`'s `decideScaleIn`. */
+export interface ScaleInDecision {
+  addLots: number;
+  newStop: number;
+  newTarget: number | null;
+  reason: string;
+}
+
 export interface EngineSnapshot {
   ts: string;
   mode: ExecutionMode;
@@ -217,6 +225,8 @@ export interface EngineSnapshot {
   signals: Record<string, Signal>;
   ledger: LedgerSnapshot;
   events: RiskEvent[];
+  /** Open position ids currently eligible for a scale-in add — empty when none are. */
+  scale_in: Record<string, ScaleInDecision>;
 }
 
 /**

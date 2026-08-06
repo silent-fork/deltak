@@ -11,6 +11,7 @@ import type {
   ExecutionMode,
   LedgerSnapshot,
   OptionChain,
+  ScaleInDecision,
   Signal,
 } from "@/lib/types";
 import { useTradeArchive } from "@/lib/useTradeArchive";
@@ -41,6 +42,7 @@ export const SignalDeck = memo(function SignalDeck({
   chain,
   onExecuted,
   ledger,
+  scaleIn,
   onLedgerChanged,
   clientCode,
 }: {
@@ -49,6 +51,7 @@ export const SignalDeck = memo(function SignalDeck({
   chain?: OptionChain;
   onExecuted: () => void;
   ledger: LedgerSnapshot | undefined;
+  scaleIn: Record<string, ScaleInDecision>;
   onLedgerChanged: () => void;
   /** Re-syncs the archive whenever the signed-in account changes — see `useTradeArchive`. */
   clientCode: string | null;
@@ -213,6 +216,7 @@ export const SignalDeck = memo(function SignalDeck({
       ) : (
         <TradeBook
           ledger={ledger}
+          scaleIn={scaleIn}
           onChanged={onLedgerChanged}
           archive={archive}
           archiveLoading={archiveLoading}

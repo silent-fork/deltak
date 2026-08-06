@@ -11,6 +11,7 @@ import type {
   Position,
   RiskEvent,
   RrgNode,
+  ScaleInDecision,
   Signal,
   SpotQuote,
   Underlying,
@@ -38,7 +39,7 @@ import { Ledger, applySlippage } from "@/lib/engine/ledger";
 import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
 import { ScripMaster, type MasterPayload } from "@/lib/engine/scripMaster";
 import { planTick } from "@/lib/engine/loop";
-import { runGuards } from "@/lib/engine/risk";
+import { decideScaleIn, runGuards } from "@/lib/engine/risk";
 import { legRiskAtStop, portfolioRiskAtStop } from "@/lib/engine/sizing";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
@@ -257,6 +258,14 @@ export function useEngine(simulate: boolean) {
   const marketRef = useRef<MarketData | null>(null);
   const eventsRef = useRef<RiskEvent[]>([]);
   const scaledRef = useRef(new Set<string>());
+  /**
+   * Positions already given their one manually-triggered scale-in add —
+   * in-memory only, same posture as `scaledRef` above: a reload before the
+   * position closes loses the flag, which is an accepted gap for a
+   * capital-gated, manual-only action rather than something worth a DB
+   * migration to close. See `decideScaleIn` in `risk.ts` for the rule.
+   */
+  const scaledInRef = useRef(new Set<string>());
   /**
    * Autopilot-only re-entry cooldown, per underlying — the epoch ms an
    * underlying becomes eligible again after a TARGET or STOP_LOSS exit. Set
@@ -689,6 +698,30 @@ export function useEngine(simulate: boolean) {
       lastRrgNodesRef.current[u] = nodes;
     }
 
+    /**
+     * Scale-in eligibility, recomputed fresh every snapshot rather than
+     * cached anywhere — cheap (one `decideScaleIn` per open position) and
+     * this is purely informational for the UI's "Add" affordance;
+     * `scaleInPosition` re-derives it again itself right before actually
+     * filling, so a snapshot that's a tick stale here costs nothing.
+     */
+    const scaleIn: Record<string, ScaleInDecision> = {};
+    for (const pos of ledgerRef.current.openPositions) {
+      const chain = chainsRef.current[pos.underlying];
+      const decision = decideScaleIn({
+        pos,
+        ltp: ticks.ltp(pos.token, pos.ltp),
+        spot: chain?.spot ?? 0,
+        aegis1: chain?.levels.aegis_1 ?? null,
+        zenith1: chain?.levels.zenith_1 ?? null,
+        quadrant: rrgRef.current[pos.underlying]?.quadrant(pos.token) ?? null,
+        vixRegime: vixRef.current,
+        alreadyScaledIn: scaledInRef.current.has(pos.id),
+        cfg,
+      });
+      if (decision) scaleIn[pos.id] = decision;
+    }
+
     return {
       ts: new Date().toISOString().slice(0, 19),
       mode: modeRef.current,
@@ -703,6 +736,7 @@ export function useEngine(simulate: boolean) {
       signals: { ...signalsRef.current },
       ledger: ledgerRef.current.snapshot(modeRef.current),
       events: eventsRef.current.slice(0, 20),
+      scale_in: scaleIn,
     };
   }, [feedLive]);
 
@@ -1647,6 +1681,132 @@ export function useEngine(simulate: boolean) {
   );
 
   /**
+   * Phase 4's scale-in — manual only, never called by Autopilot or any
+   * guard in `risk.ts`. Re-derives `decideScaleIn` fresh against the live
+   * chain/RRG/VIX state rather than trusting whatever the last snapshot's
+   * `scale_in` map said, the same "never trust stale UI state for a real
+   * fill" posture `executeSignal` already takes for a fresh entry — and
+   * re-checks the portfolio-risk ceiling and free capital against the add's
+   * own numbers, since `decideScaleIn` deliberately leaves both to the caller.
+   *
+   * The risk-ceiling check decomposes the position's total risk-at-new-stop
+   * into its existing lots (at the old avg price) plus the add (at the fresh
+   * fill price) rather than computing a blended average here — the two sums
+   * to the same rupee figure `legRiskAtStop` would give a true blended
+   * position, since `(newAvg - stop) * totalQty` distributes exactly over
+   * `(oldAvg - stop) * oldQty + (fill - stop) * addQty` by construction.
+   */
+  const scaleInPosition = useCallback(
+    async (positionId: string) => {
+      const ledger = ledgerRef.current;
+      const pos = ledger.get(positionId);
+      if (!pos) throw new Error("Position not found.");
+
+      const chain = chainsRef.current[pos.underlying];
+      const ltp = ticksRef.current.ltp(pos.token, pos.ltp);
+      const decision = decideScaleIn({
+        pos,
+        ltp,
+        spot: chain?.spot ?? 0,
+        aegis1: chain?.levels.aegis_1 ?? null,
+        zenith1: chain?.levels.zenith_1 ?? null,
+        quadrant: rrgRef.current[pos.underlying]?.quadrant(pos.token) ?? null,
+        vixRegime: vixRef.current,
+        alreadyScaledIn: scaledInRef.current.has(pos.id),
+        cfg: cfgRef.current,
+      });
+      if (!decision) {
+        throw new Error(`${pos.trading_symbol} is not eligible for a scale-in right now.`);
+      }
+
+      const addQty = decision.addLots * pos.lot_size;
+      const existingRisk = legRiskAtStop({
+        side: pos.side,
+        avg_price: pos.avg_price,
+        stop_loss: decision.newStop,
+        quantity: pos.quantity,
+      });
+      const addRisk = legRiskAtStop({
+        side: pos.side,
+        avg_price: ltp,
+        stop_loss: decision.newStop,
+        quantity: addQty,
+      });
+      const otherRisk = portfolioRiskAtStop(ledger.openPositions.filter((p) => p.id !== pos.id));
+      const riskCeiling = ledger.equity * (cfgRef.current.maxPortfolioRiskPct / 100);
+      if (otherRisk + existingRisk + addRisk > riskCeiling) {
+        throw new Error(
+          `Scale-in rejected: portfolio at-risk ₹${Math.round(otherRisk + existingRisk + addRisk).toLocaleString("en-IN")} ` +
+            `would exceed the ${cfgRef.current.maxPortfolioRiskPct}% ceiling ` +
+            `(₹${Math.round(riskCeiling).toLocaleString("en-IN")}).`,
+        );
+      }
+
+      const addCost = ltp * addQty;
+      const free = Math.max(0, ledger.equity - ledger.deployed);
+      if (addCost > free) {
+        throw new Error(
+          `Scale-in rejected: adding ${decision.addLots} lot(s) of ${pos.trading_symbol} needs ` +
+            `₹${Math.round(addCost).toLocaleString("en-IN")}, only ₹${Math.round(free).toLocaleString("en-IN")} free.`,
+        );
+      }
+
+      const currentMode = modeRef.current;
+      let fill = ltp;
+      let brokerOrderId: string | null = null;
+
+      if (currentMode === "live") {
+        const res = await api.placeOrder({
+          trading_symbol: pos.trading_symbol,
+          symbol_token: pos.token,
+          transaction_type: pos.side,
+          quantity: addQty,
+          order_type: "MARKET",
+        });
+        brokerOrderId = res.order_id ?? null;
+      } else {
+        fill = applySlippage(ltp, pos.side, cfgRef.current.slippagePct);
+      }
+
+      const updated = ledger.addToPosition(pos.id, decision.addLots, fill, decision.newStop, decision.newTarget);
+      if (!updated) throw new Error("Scale-in failed to apply.");
+      scaledInRef.current.add(pos.id);
+
+      savePositions([updated]);
+      saveWallet(ledger);
+      saveOrder(
+        orderRow({
+          position: updated,
+          transactionType: pos.side,
+          quantity: addQty,
+          lots: decision.addLots,
+          fillPrice: fill,
+          status: "ACCEPTED",
+          brokerOrderId,
+          message: "ADD",
+        }),
+      );
+      log(
+        "INFO",
+        `Scaled in ${decision.addLots}×${pos.lot_size} ${pos.trading_symbol} @ ${fill.toFixed(2)} — ${decision.reason}`,
+        pos.underlying,
+      );
+      track("position_scaled_in", {
+        underlying: pos.underlying,
+        protocol: pos.protocol,
+        mode: currentMode,
+        lots: decision.addLots,
+      });
+
+      return {
+        ok: true,
+        message: `Added ${decision.addLots} lot(s) of ${pos.trading_symbol} @ ₹${fill.toLocaleString("en-IN")}.`,
+      };
+    },
+    [log],
+  );
+
+  /**
    * Autopilot. When `automation` is `"auto"`, an actionable signal
    * fires itself exactly the way a manual Execute click does — same sizing,
    * same portfolio-risk gate, same everything in `executeSignal` above.
@@ -1759,6 +1919,7 @@ export function useEngine(simulate: boolean) {
     await api.resetPaper();
     ledgerRef.current.reset();
     scaledRef.current.clear();
+    scaledInRef.current.clear();
     // Otherwise the next login re-seeds the wallet from the pre-reset
     // checkpoint still sitting in Supabase, silently undoing the reset.
     saveWallet(ledgerRef.current);
@@ -1798,6 +1959,7 @@ export function useEngine(simulate: boolean) {
     autoFills,
     exitPosition,
     scaleOutPosition,
+    scaleInPosition,
     panicFlatten,
     resetPaper,
     reloadMaster: loadMaster,

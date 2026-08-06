@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertOctagon, Loader2, RefreshCw, Scissors, X } from "lucide-react";
+import { AlertOctagon, Layers, Loader2, RefreshCw, Scissors, X } from "lucide-react";
 import { memo, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
@@ -9,7 +9,7 @@ import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
 import { mergeBook } from "@/lib/engine/book";
 import { istParts } from "@/lib/engine/config";
-import type { LedgerSnapshot, Position } from "@/lib/types";
+import type { LedgerSnapshot, Position, ScaleInDecision } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
 
 type Tab = "open" | "history";
@@ -73,6 +73,8 @@ function PositionCard({
   busy,
   readOnly = false,
   dateLabel,
+  scaleIn,
+  onScaleIn,
   onScaleOut,
   onExit,
 }: {
@@ -83,6 +85,9 @@ function PositionCard({
   readOnly?: boolean;
   /** When trades can span more than one day, the day has to be on the card. */
   dateLabel?: string;
+  /** Present only when `decideScaleIn` (Phase 4) currently allows an add — see `risk.ts`. */
+  scaleIn?: ScaleInDecision;
+  onScaleIn?: () => void;
   onScaleOut?: () => void;
   onExit?: () => void;
 }) {
@@ -111,8 +116,25 @@ function PositionCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-mono text-[11px] font-semibold text-zinc-100">
-            {p.trading_symbol}
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono text-[11px] font-semibold text-zinc-100">
+              {p.trading_symbol}
+            </span>
+            {!closed && !readOnly && scaleIn ? (
+              <button
+                title={scaleIn.reason}
+                aria-label={`Add to ${p.trading_symbol}`}
+                disabled={busy !== null}
+                onClick={onScaleIn}
+                className="shrink-0 rounded p-0.5 text-quantum/80 transition-colors hover:bg-quantum/15 hover:text-quantum disabled:opacity-30"
+              >
+                {busy === `a-${p.id}` ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : (
+                  <Layers className="h-2.5 w-2.5" />
+                )}
+              </button>
+            ) : null}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             <span>
@@ -249,6 +271,7 @@ function PositionCard({
  */
 export const TradeBook = memo(function TradeBook({
   ledger,
+  scaleIn,
   onChanged,
   archive,
   archiveLoading,
@@ -256,6 +279,8 @@ export const TradeBook = memo(function TradeBook({
   onRefreshArchive,
 }: {
   ledger: LedgerSnapshot | undefined;
+  /** Open position ids currently eligible for a Phase 4 scale-in add — see `EngineSnapshot.scale_in`. */
+  scaleIn: Record<string, ScaleInDecision>;
   onChanged: () => void;
   /**
    * What Supabase holds for this account — every session that ever wrote to
@@ -430,6 +455,12 @@ export const TradeBook = memo(function TradeBook({
                 busy={busy}
                 readOnly={readOnly}
                 dateLabel={archiveDateLabel(p.opened_at)}
+                scaleIn={readOnly ? undefined : scaleIn[p.id]}
+                onScaleIn={
+                  readOnly
+                    ? undefined
+                    : () => run(`a-${p.id}`, () => engine.scaleInPosition(p.id))
+                }
                 onScaleOut={
                   readOnly
                     ? undefined
