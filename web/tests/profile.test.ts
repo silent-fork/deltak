@@ -33,6 +33,9 @@ const stored = (over: Partial<StoredContact> = {}): StoredContact => ({
   exchanges: ["NSE_FO", "BSE_CM"],
   products: ["MARGIN", "MIS"],
   broker_last_login: "2026-08-01 10:42",
+  paper_capital: 23_460.13,
+  paper_charges: 34.47,
+  paper_realised_pnl: -1_505.4,
   ...over,
 });
 
@@ -85,4 +88,39 @@ test("name and broker survive a silent getProfile", () => {
 test("the client code always comes from the live session, never the row", () => {
   const merged = mergeProfile(broker({ client_code: "B2000001" }), stored());
   assert.equal(merged.client_code, "B2000001");
+});
+
+/**
+ * The regression this file's own header warns about, for the wallet fields
+ * instead of contact ones: `getProfile` has no concept of the paper wallet,
+ * so `broker` never carries `paper_capital`/`paper_charges`/`paper_realised_pnl`
+ * at all — not even `null`, the key is simply absent. A merge that only
+ * special-cased the seven contact fields (as this one originally did) spread
+ * `broker` as its base and silently dropped the wallet checkpoint from the
+ * result, which meant `useEngine.ts`'s `wallet?.paper_capital != null` gate
+ * always saw `undefined` and skipped `Ledger.restoreWallet` — on every
+ * session check, forever, regardless of what the row actually held.
+ */
+test("the paper wallet checkpoint always comes from the stored row — the broker never reports it", () => {
+  const merged = mergeProfile(broker(), stored());
+  assert.equal(merged.paper_capital, 23_460.13);
+  assert.equal(merged.paper_charges, 34.47);
+  assert.equal(merged.paper_realised_pnl, -1_505.4);
+});
+
+test("no stored row yet leaves the wallet checkpoint absent, not defaulted to zero", () => {
+  const merged = mergeProfile(broker(), null);
+  assert.equal(merged.paper_capital, undefined);
+  assert.equal(merged.paper_charges, undefined);
+  assert.equal(merged.paper_realised_pnl, undefined);
+});
+
+test("a stored row with a genuinely null checkpoint (never traded) stays null, not undefined", () => {
+  const merged = mergeProfile(
+    broker(),
+    stored({ paper_capital: null, paper_charges: null, paper_realised_pnl: null }),
+  );
+  assert.equal(merged.paper_capital, null);
+  assert.equal(merged.paper_charges, null);
+  assert.equal(merged.paper_realised_pnl, null);
 });
