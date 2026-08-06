@@ -257,11 +257,35 @@ export function MobileCompanion({
   // `desktop · Ns ago` label already tells you and Open Positions didn't,
   // despite carrying the exact same fallback split.
   const openIsLive = !!data?.signal?.open_positions;
-  // Same fallback shape as `open` above: the desktop's live push is the
-  // fresher number whenever it's there, `data.wallet` — read straight off the
-  // DB checkpoint — covers everything else (no push yet, an older cached
-  // snapshot, a desktop that's gone quiet).
-  const ledger = data?.signal?.ledger ?? data?.wallet;
+  /**
+   * Capital, charges and booked P&L always come from `data.wallet` — the
+   * same `paper_capital`/`paper_charges`/`paper_realised_pnl` checkpoint the
+   * desktop itself persists after every trade (`saveWallet` in useEngine.ts)
+   * and restores from on its own next login (`Ledger.restoreWallet`). That
+   * checkpoint, not the throttled push below, is genuinely the number any
+   * terminal session will show — a push mirrors whatever tab happens to be
+   * open right now and goes stale the moment that tab closes (an old
+   * `live_signals` row lingers with its last pushed figures frozen forever),
+   * which is exactly what made this drawer disagree with the terminal.
+   *
+   * Open P&L (and the equity/deployed figures built from it) still prefer
+   * the live push when it's there: those move every tick on a running tab,
+   * while the checkpoint's own copy — computed from `positions` rows below —
+   * only updates on the desktop's ~1-minute position checkpoint or a trade
+   * event, so it's the laggier of the two for that one number specifically.
+   */
+  const openPnl = data?.signal?.ledger?.open_pnl ?? data?.wallet?.open_pnl ?? 0;
+  const ledger = data?.wallet
+    ? {
+        capital: data.wallet.capital,
+        charges: data.wallet.charges,
+        realised_pnl: data.wallet.realised_pnl,
+        deployed_margin: data?.signal?.ledger?.deployed_margin ?? data.wallet.deployed_margin,
+        open_pnl: openPnl,
+        equity: data.wallet.capital + openPnl,
+        total_pnl: data.wallet.realised_pnl + openPnl,
+      }
+    : (data?.signal?.ledger ?? null);
   const mode = data?.signal?.mode ?? "paper";
 
   return (
