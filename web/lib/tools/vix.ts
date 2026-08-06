@@ -4,6 +4,10 @@ import os from "node:os";
 
 import { NSEClient } from "nse-bse-api";
 
+import { DHAN_SPOT_SEGMENT } from "@/lib/market/dhanRequest";
+import { dhanQuote } from "@/lib/server/dhan";
+import { loadDhanMaster } from "@/lib/server/dhanMaster";
+
 import type { VixReading, VixRegime } from "./volatilityDeskTypes";
 
 export type { VixReading, VixRegime } from "./volatilityDeskTypes";
@@ -63,6 +67,35 @@ export async function getVix(): Promise<VixReading | null> {
     return reading;
   } catch {
     cache = { at: Date.now(), value: null };
+    return null;
+  }
+}
+
+/**
+ * Dhan-session VIX — the same regime classifier as `getVix`, but off a live
+ * quote (`dhanQuote`) rather than NSE's EOD history, and never cached: this
+ * is the whole point of a Dhan-specific path (see `/api/tools/vix-live`),
+ * so the 30-minute staleness `getVix` accepts for its unauthenticated,
+ * Angel-One-and-Dhan-alike route is exactly what this exists to avoid.
+ */
+export async function getDhanVix(creds: {
+  accessToken: string;
+  clientId: string;
+}): Promise<VixReading | null> {
+  const master = await loadDhanMaster();
+  const securityId = master.vixSpot?.token;
+  if (!securityId) return null;
+
+  try {
+    const quotes = await dhanQuote(creds, { [DHAN_SPOT_SEGMENT]: [Number(securityId)] });
+    const leg = quotes[DHAN_SPOT_SEGMENT]?.[securityId];
+    if (!leg || !leg.last_price) return null;
+
+    const value = leg.last_price;
+    const prevClose = leg.ohlc?.close;
+    const changePct = prevClose ? Number((((value - prevClose) / prevClose) * 100).toFixed(2)) : 0;
+    return { value, changePct, asOf: new Date().toISOString(), regime: vixRegime(value) };
+  } catch {
     return null;
   }
 }

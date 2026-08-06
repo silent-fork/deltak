@@ -1147,18 +1147,22 @@ export function useEngine(simulate: boolean) {
   /**
    * India VIX's regime, read into the signal engine's own `evaluate()`
    * context (see the `tick` loop below). Independent of `session.authenticated`
-   * on purpose: the Volatility Desk route is public NSE data, unauthenticated
-   * and the same regardless of which broker session is active, so this polls
-   * on its own schedule rather than riding `useMarketData`'s broker-gated one.
-   * Best-effort — a failed read just leaves stop/risk sizing at their
-   * VIX-unaware baseline, same as before this existed.
+   * on purpose for Angel One and signed-out tabs alike: the Volatility Desk
+   * route is public NSE data, so it polls on its own schedule rather than
+   * riding `useMarketData`'s broker-gated one. A Dhan session gets a live
+   * read instead (`/api/tools/vix-live`, off Dhan's own market feed) rather
+   * than NSE's ~EOD-cadence history — see that route's own comment for why
+   * Angel One keeps the historical path. Best-effort either way — a failed
+   * read just leaves stop/risk sizing at their VIX-unaware baseline, same as
+   * before this existed.
    */
   const vixRef = useRef<VixRegime | null>(null);
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await api.tools.volatilityDesk();
+        const res =
+          session.broker === "dhan" ? await api.tools.vixLive() : await api.tools.volatilityDesk();
         if (!cancelled) vixRef.current = res.vix?.regime ?? null;
       } catch {
         // Leave whatever the last good read was rather than blanking it on
@@ -1171,7 +1175,7 @@ export function useEngine(simulate: boolean) {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [session.broker]);
 
   /**
    * The index itself, out of hours.

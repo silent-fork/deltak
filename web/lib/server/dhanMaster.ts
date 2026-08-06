@@ -39,6 +39,13 @@ export interface DhanMasterIndex {
   options: Record<string, Instrument[]>;
   /** Nearest-expiry FUTIDX contract per underlying — what OI-buildup classification is computed against. */
   futures: Record<string, DhanFuture>;
+  /**
+   * India VIX's own spot row — server-only, never part of `toMasterPayload`.
+   * Not a tradeable underlying so it sits outside `INDEX_UNIVERSE` and the
+   * main per-row filter below; captured separately for the live-VIX quote
+   * path (`getDhanVix`), which needs its security id to call `dhanQuote`.
+   */
+  vixSpot: Instrument | null;
 }
 
 let cached: { at: number; index: Promise<DhanMasterIndex> } | null = null;
@@ -86,6 +93,7 @@ async function parseDhanMaster(): Promise<DhanMasterIndex> {
   const options: Record<string, Instrument[]> = {};
   const futuresByUnderlying: Record<string, DhanFuture[]> = {};
   const today = new Date().toISOString().slice(0, 10);
+  let vixSpot: Instrument | null = null;
 
   let totalRecords = 0;
   for (let i = 1; i < lines.length; i++) {
@@ -102,6 +110,20 @@ async function parseDhanMaster(): Promise<DhanMasterIndex> {
     if (!exchSeg) continue;
 
     const underlying = (row[iUnderlying] ?? row[iSymbolName] ?? "").trim().toUpperCase();
+
+    if (!vixSpot && exchId === "NSE" && underlying === "INDIA VIX" && row[iInstrument] === "INDEX") {
+      vixSpot = {
+        token: row[iSecId],
+        symbol: "INDIA VIX",
+        name: "INDIA VIX",
+        exchSeg,
+        strike: 0,
+        lotSize: 1,
+        expiry: null,
+        optionType: null,
+      };
+    }
+
     const spec = INDEX_UNIVERSE[underlying];
     if (!spec) continue;
     if (spec.exchange !== exchId) continue; // same cross-segment guard as Angel One's projection
@@ -192,7 +214,23 @@ async function parseDhanMaster(): Promise<DhanMasterIndex> {
     };
   }
 
-  return { generatedAt: new Date().toISOString(), totalRecords, spots, options, futures };
+  // Same fallback posture as `FALLBACK_SPOT_ID` above — India VIX's live
+  // IDX_I security id, confirmed directly against a live master fetch.
+  if (!vixSpot) {
+    console.warn("[dhanMaster] INDIA VIX spot not found in the live master — falling back to security id 21.");
+    vixSpot = {
+      token: "21",
+      symbol: "INDIA VIX",
+      name: "INDIA VIX",
+      exchSeg: "NSE",
+      strike: 0,
+      lotSize: 1,
+      expiry: null,
+      optionType: null,
+    };
+  }
+
+  return { generatedAt: new Date().toISOString(), totalRecords, spots, options, futures, vixSpot };
 }
 
 export function loadDhanMaster(): Promise<DhanMasterIndex> {

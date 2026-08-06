@@ -246,6 +246,8 @@ export const api = {
   tools: {
     /** OI buildup, per-index PCR/max pain, and India VIX — public NSE data, no broker session involved. */
     volatilityDesk: () => request<VolatilityDeskResponse>("/api/tools/volatility-desk"),
+    /** India VIX's live LTP off Dhan's own market feed — Dhan sessions only, see the route's own comment. */
+    vixLive: () => request<{ asOf: string; vix: VolatilityDeskResponse["vix"] }>("/api/tools/vix-live"),
   },
 
   history: (resource: string, params: Record<string, string> = {}) =>
