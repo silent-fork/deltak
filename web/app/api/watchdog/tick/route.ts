@@ -7,13 +7,16 @@ import { runWatchdogTick } from "@/lib/server/watchdogGuards";
  * `GET /api/watchdog/tick` — the risk guard that runs with no browser tab
  * open.
  *
- * Invoked once a minute by Vercel Cron (`vercel.json`), authenticated by the
- * `Authorization: Bearer $CRON_SECRET` header Vercel attaches automatically
- * when that env var is set — nobody else can trigger this route. Paper
- * positions only: it enforces stop/target and the 3:15 PM IST Daylight Rest
- * flatten against every account's open paper book, using each account's own
- * stored (encrypted) session to read a live price. See `watchdogGuards.ts`
- * for what this does and does not cover yet.
+ * Invoked once a minute by Supabase's own `pg_cron` + `pg_net` (the
+ * `watchdog-tick` job, `select net.http_get(...)` against this route with an
+ * `Authorization: Bearer` header pulled from `vault.decrypted_secrets` at
+ * fire time) — there is no Vercel Cron entry for this; `CRON_SECRET` here is
+ * just this route's own bearer-token convention, matched against whatever
+ * that vault secret holds, so nobody else can trigger it. Paper positions
+ * only: it enforces stop/target and the 3:15 PM IST Daylight Rest flatten
+ * against every account's open paper book, using each account's own stored
+ * (encrypted) session to read a live price. See `watchdogGuards.ts` for what
+ * this does and does not cover yet.
  *
  * Always 200 with a summary body, even when nothing fired — a cron dashboard
  * reading a non-200 as "the schedule is broken" should not confuse "ran and
