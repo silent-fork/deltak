@@ -89,41 +89,6 @@ function SpotTicker({
             : "border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900/70",
       )}
     >
-      {/*
-        A trade sitting on this index, at a glance, without opening the book —
-        a radar-style ping in the same emerald/rose the P&L itself uses, so
-        "there's a live position here" and "it's up or down right now" read
-        off one glyph instead of two. A plain dot rather than a numbered
-        badge: the count/P&L still ride the tooltip, but a wider glyph here
-        sat over the ticker's own change/% text at this card's width.
-
-        Inset (bottom-0.5/right-0.5), not overflowing past the button's own
-        edge — the ticker rail is `overflow-x-auto`, and a browser forces
-        overflow-y to `auto` too the moment one axis isn't `visible`, so even
-        a couple of overflowing pixels here was enough to put a scrollbar (and
-        extra height) on the whole row.
-      */}
-      {activeTrade ? (
-        <span
-          title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
-          className="absolute bottom-0.5 right-0.5 flex h-2.5 w-2.5"
-        >
-          <span
-            className={cn(
-              "absolute inset-0 animate-ping rounded-full opacity-75",
-              activeTrade.pnl >= 0 ? "bg-emerald-500" : "bg-rose-500",
-            )}
-          />
-          <span
-            className={cn(
-              "relative h-2.5 w-2.5 rounded-full border",
-              activeTrade.pnl >= 0
-                ? "border-emerald-300 bg-emerald-500"
-                : "border-rose-300 bg-rose-500",
-            )}
-          />
-        </span>
-      ) : null}
       <span
         className={cn(
           "h-6 w-[3px] shrink-0 rounded-full",
@@ -132,8 +97,36 @@ function SpotTicker({
         )}
       />
       <span className="min-w-0 flex-1">
-        <span className="dk-label block truncate text-[9px] leading-none">
-          {quote.label}
+        <span className="dk-label flex items-center gap-1 text-[9px] leading-none">
+          <span className="truncate">{quote.label}</span>
+          {/*
+            A trade sitting on this index, at a glance, without opening the
+            book — riding beside the name rather than pinned to a corner,
+            which twice put it in the way: once overflowing past the
+            button's own edge (grew the whole rail's height), once sitting
+            over the change/% column on the right.
+          */}
+          {activeTrade ? (
+            <span
+              title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
+              className="relative flex h-1.5 w-1.5 shrink-0"
+            >
+              <span
+                className={cn(
+                  "absolute inset-0 animate-ping rounded-full opacity-75",
+                  activeTrade.pnl >= 0 ? "bg-emerald-500" : "bg-rose-500",
+                )}
+              />
+              <span
+                className={cn(
+                  "relative h-1.5 w-1.5 rounded-full border",
+                  activeTrade.pnl >= 0
+                    ? "border-emerald-300 bg-emerald-500"
+                    : "border-rose-300 bg-rose-500",
+                )}
+              />
+            </span>
+          ) : null}
         </span>
         <span
           className={cn(
