@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertOctagon, Loader2, Plus, RefreshCw, Scissors, X } from "lucide-react";
+import { AlertOctagon, Layers, Loader2, RefreshCw, Scissors, X } from "lucide-react";
 import { memo, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
@@ -116,8 +116,25 @@ function PositionCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-mono text-[11px] font-semibold text-zinc-100">
-            {p.trading_symbol}
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono text-[11px] font-semibold text-zinc-100">
+              {p.trading_symbol}
+            </span>
+            {!closed && !readOnly && scaleIn ? (
+              <button
+                title={scaleIn.reason}
+                aria-label={`Add to ${p.trading_symbol}`}
+                disabled={busy !== null}
+                onClick={onScaleIn}
+                className="shrink-0 rounded p-0.5 text-quantum/80 transition-colors hover:bg-quantum/15 hover:text-quantum disabled:opacity-30"
+              >
+                {busy === `a-${p.id}` ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : (
+                  <Layers className="h-2.5 w-2.5" />
+                )}
+              </button>
+            ) : null}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
             <span>
@@ -176,21 +193,6 @@ function PositionCard({
 
           {!closed && !readOnly ? (
             <div className="flex items-center gap-0.5">
-              {scaleIn ? (
-                <button
-                  title={scaleIn.reason}
-                  aria-label={`Add to ${p.trading_symbol}`}
-                  disabled={busy !== null}
-                  onClick={onScaleIn}
-                  className="rounded p-1 text-quantum/80 transition-colors hover:bg-quantum/15 hover:text-quantum disabled:opacity-30"
-                >
-                  {busy === `a-${p.id}` ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Plus className="h-3 w-3" />
-                  )}
-                </button>
-              ) : null}
               <button
                 title="Scale out 50% (TP1)"
                 aria-label={`Scale out ${p.trading_symbol}`}
