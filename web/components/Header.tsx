@@ -26,7 +26,7 @@ import type {
   SpotQuote,
 } from "@/lib/types";
 import { useTickFlash } from "@/lib/useEngine";
-import { cn, fmt, signed } from "@/lib/utils";
+import { cn, fmt, signed, signedMoney } from "@/lib/utils";
 
 /** Sensex ahead of Bankex in the header rail — the more heavily-traded of BSE's two. */
 const BSE_TICKER_ORDER: Record<string, number> = { SENSEX: 0, BANKEX: 1 };
@@ -48,13 +48,19 @@ function useIstClock(): string {
     .join(":");
 }
 
+/** Open-position rollup for one underlying — what the header rail's own live-trade badge is built from. */
+type ActiveTrade = { count: number; pnl: number };
+
 function SpotTicker({
   quote,
   active,
+  activeTrade,
   onSelect,
 }: {
   quote: SpotQuote;
   active: boolean;
+  /** Non-null while this index has at least one open position — drives the corner badge. */
+  activeTrade: ActiveTrade | null;
   onSelect: () => void;
 }) {
   const flash = useTickFlash(quote.ltp);
@@ -75,12 +81,43 @@ function SpotTicker({
         // rectangle — the active tab additionally picks up a quiet quantum
         // glow, echoing the hero's own accent-lit cards instead of a plain
         // colour swap.
-        "dk-panel flex h-9 w-[162px] shrink-0 items-center gap-2 border px-2 text-left transition-all duration-150",
+        "dk-panel relative flex h-9 w-[162px] shrink-0 items-center gap-2 border px-2 text-left transition-all duration-150",
         active
           ? "border-quantum/60 bg-quantum/10 shadow-[0_0_18px_-6px_rgba(0,240,255,0.45)]"
-          : "border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900/70",
+          : activeTrade
+            ? "border-amber-500/40 bg-zinc-900/40 hover:border-amber-500/60 hover:bg-zinc-900/70"
+            : "border-zinc-800/70 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900/70",
       )}
     >
+      {/*
+        A trade sitting on this index, at a glance, without opening the book —
+        a radar-style ping in the same emerald/rose the P&L itself uses, so
+        "there's a live position here" and "it's up or down right now" read
+        off one glyph instead of two.
+      */}
+      {activeTrade ? (
+        <span
+          title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
+          className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4"
+        >
+          <span
+            className={cn(
+              "absolute inset-0 animate-ping rounded-full opacity-60",
+              activeTrade.pnl >= 0 ? "bg-emerald-500" : "bg-rose-500",
+            )}
+          />
+          <span
+            className={cn(
+              "relative flex h-4 min-w-4 items-center justify-center rounded-full border px-1 font-mono text-[9px] font-bold leading-none text-zinc-950",
+              activeTrade.pnl >= 0
+                ? "border-emerald-300 bg-emerald-500"
+                : "border-rose-300 bg-rose-500",
+            )}
+          >
+            {activeTrade.count}
+          </span>
+        </span>
+      ) : null}
       <span
         className={cn(
           "h-6 w-[3px] shrink-0 rounded-full",
@@ -158,6 +195,25 @@ export function Header({
     return { nseSpots: nse, bseSpots: bse };
   }, [snapshot?.spots]);
 
+  /**
+   * Every open position, rolled up by its underlying — the header rail's own
+   * feed for "is a trade live here," independent of whether the Trade Book
+   * happens to be the visible tab. Summing `unrealised_pnl` alongside the
+   * count lets the badge itself carry the same up/down colour language as
+   * the rest of the terminal, rather than a single neutral "something's
+   * open" tone.
+   */
+  const activeByUnderlying = useMemo(() => {
+    const map: Record<string, { count: number; pnl: number }> = {};
+    for (const p of snapshot?.ledger?.open_positions ?? []) {
+      const entry = map[p.underlying] ?? { count: 0, pnl: 0 };
+      entry.count += 1;
+      entry.pnl += p.unrealised_pnl;
+      map[p.underlying] = entry;
+    }
+    return map;
+  }, [snapshot?.ledger?.open_positions]);
+
   const engine = useEngineContext();
   const clock = useIstClock();
   const marketOpen = snapshot?.market_open ?? false;
@@ -202,6 +258,7 @@ export function Header({
               key={quote.underlying}
               quote={quote}
               active={quote.underlying === selected}
+              activeTrade={activeByUnderlying[quote.underlying] ?? null}
               onSelect={() => onSelect(quote.underlying)}
             />
           ))}
@@ -216,6 +273,7 @@ export function Header({
               key={quote.underlying}
               quote={quote}
               active={quote.underlying === selected}
+              activeTrade={activeByUnderlying[quote.underlying] ?? null}
               onSelect={() => onSelect(quote.underlying)}
             />
           ))}

@@ -107,7 +107,6 @@ export const SignalDeck = memo(function SignalDeck({
   // session this tab never saw — so a reload never drops them back to zero.
   const merged = useMemo(() => mergeBook(ledger, archive), [ledger, archive]);
   const openCount = merged.openRows.length;
-  const totalPnl = merged.openPnl + merged.bookedPnl;
   /**
    * `mergeBook` treats a not-yet-loaded archive the same as an empty one, so
    * for the moment before Supabase answers, a position open only there —
@@ -189,16 +188,16 @@ export const SignalDeck = memo(function SignalDeck({
           <span
             title={
               archiveReady
-                ? undefined
+                ? "Open P&L — unrealised, across every live position"
                 : "Still confirming against Supabase — this total may still move."
             }
             className={cn(
               "shrink-0 font-mono text-xs font-bold transition-opacity",
-              pnlTone(totalPnl),
+              pnlTone(merged.openPnl),
               !archiveReady && "opacity-50",
             )}
           >
-            {signedMoney(totalPnl)}
+            {signedMoney(merged.openPnl)}
           </span>
         )}
       </CardHeader>
