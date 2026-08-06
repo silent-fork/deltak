@@ -152,4 +152,8 @@ export const BLOCK_REASONS: Record<string, string> = {
   BUILDUP_MISMATCH: "Futures OI buildup contradicts this thesis.",
   PCR_DIVERGENCE: "Window PCR diverges too far from the cumulative reading.",
   AWAITING_CONFIRMATION: "Setup qualifies — confirming it holds before arming.",
+  OPENING_QUIET: "Opening — settling in, no new entries yet.",
+  CLOSING_QUIET: "Daylight Rest — no new entries.",
+  WIDE_SPREAD: "Bid-ask spread too wide for clean execution.",
+  FLAT_TAPE: "Realised range too flat — no real momentum to trade.",
 };

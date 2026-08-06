@@ -23,6 +23,7 @@ import {
   classifyProtocol,
   emptyDwellState,
   rollingExtremeBreak,
+  rollingRangePct,
   SignalEngine,
 } from "../lib/engine/dkms";
 import { Ledger, applySlippage } from "../lib/engine/ledger";
@@ -48,12 +49,14 @@ import { decodePacket } from "../lib/stream/smartstream";
 import { TickStore, emptyTick } from "../lib/stream/ticks";
 import { ScripMaster, type Instrument, type MasterPayload } from "../lib/engine/scripMaster";
 import {
+  DAYLIGHT_REST_MIN,
   DEFAULT_CONFIG,
   EXCHANGE_BSE_CM,
   EXCHANGE_BSE_FO,
   EXCHANGE_NSE_CM,
   EXCHANGE_NSE_FO,
   INDEX_UNIVERSE,
+  MARKET_OPEN_MIN,
   effectiveConfig,
   nextMidnightIst,
   secondsToDaylightRest,
@@ -799,6 +802,102 @@ test("Beta arms on a genuine micro-dip and Gamma on a genuine micro-rally", () =
   assert.equal(gammaSig.protocol, "GAMMA");
   assert.notEqual(gammaSig.blocked_reason, "AWAIT_RALLY");
   assert.equal(gammaSig.option_type, "PE");
+});
+
+/* ---------------------------------------------- Phase 3: execution and regime */
+
+test("rollingRangePct: (max-min)/mean as a percent, 0 with fewer than 2 samples or a non-positive mean", () => {
+  assert.equal(rollingRangePct([]), 0);
+  assert.equal(rollingRangePct([24_500]), 0);
+  assert.equal(rollingRangePct([0, 0]), 0);
+  // 40pt range on a ~24,520 mean.
+  assert.equal(Number(rollingRangePct([24_500, 24_540, 24_510]).toFixed(3)), 0.163);
+});
+
+function widenSpread(chain: OptionChain): void {
+  for (const row of chain.rows) {
+    for (const leg of [row.call, row.put]) {
+      if (!leg || leg.ltp <= 0) continue;
+      leg.best_bid = Number((leg.ltp * 0.5).toFixed(2));
+      leg.best_ask = Number((leg.ltp * 1.5).toFixed(2));
+    }
+  }
+}
+
+test("a wide bid-ask spread blocks entry even once everything else qualifies", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  widenSpread(chain);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.actionable, false);
+  assert.equal(sig.blocked_reason, "WIDE_SPREAD");
+});
+
+test("a tight spread (the fixture default) never trips the spread gate", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.notEqual(sig.blocked_reason, "WIDE_SPREAD");
+});
+
+test("a flat tape blocks Beta/Gamma but not Alpha, even at the same realised range", () => {
+  // High 24,505 -> low 24,487: an 18pt move is enough to clear the 0.05%
+  // dip trigger (~12.3pt) but the window's own range (0.073%) stays under
+  // the 0.1% chop floor — armed on the trigger, vetoed on the regime.
+  const beta = warmEngine(24_500);
+  for (const s of [24_500, 24_505]) {
+    beta.engine.evaluate(beta.builder.build(beta.master, beta.ticks, s), beta.master, 1_000_000);
+  }
+  const betaChain = beta.builder.build(beta.master, beta.ticks, 24_487);
+  betaChain.levels.aegis_shift = 0;
+  betaChain.levels.zenith_shift = 3;
+  forceLeadingQuadrant(betaChain);
+  const betaSig = beta.engine.evaluate(betaChain, beta.master, 1_000_000);
+  assert.equal(betaSig.protocol, "BETA");
+  assert.notEqual(betaSig.blocked_reason, "AWAIT_DIP");
+  assert.equal(betaSig.actionable, false);
+  assert.equal(betaSig.blocked_reason, "FLAT_TAPE");
+
+  // Alpha, warmed on the same tiny-range spot sequence, is exempt.
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  for (const s of [24_300, 24_303]) {
+    engine.evaluate(builder.build(master, ticks, s), master, 1_000_000);
+  }
+  const chain = builder.build(master, ticks, 24_297);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(sig.protocol, "ALPHA");
+  assert.notEqual(sig.blocked_reason, "FLAT_TAPE");
+});
+
+test("the opening quiet window and Daylight Rest both suppress fresh entries when sessionMinute is supplied", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+
+  const atOpen = engine.evaluate(chain, master, 1_000_000, undefined, {
+    sessionMinute: MARKET_OPEN_MIN,
+  });
+  assert.equal(atOpen.actionable, false);
+  assert.equal(atOpen.blocked_reason, "OPENING_QUIET");
+
+  const pastRest = engine.evaluate(chain, master, 1_000_000, undefined, {
+    sessionMinute: DAYLIGHT_REST_MIN,
+  });
+  assert.equal(pastRest.actionable, false);
+  assert.equal(pastRest.blocked_reason, "CLOSING_QUIET");
+
+  const midday = engine.evaluate(chain, master, 1_000_000, undefined, {
+    sessionMinute: 12 * 60,
+  });
+  assert.notEqual(midday.blocked_reason, "OPENING_QUIET");
+  assert.notEqual(midday.blocked_reason, "CLOSING_QUIET");
+});
+
+test("omitting sessionMinute skips the opening/closing gate entirely, same as every pre-Phase-3 caller", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+  const sig = engine.evaluate(chain, master, 1_000_000);
+  assert.notEqual(sig.blocked_reason, "OPENING_QUIET");
+  assert.notEqual(sig.blocked_reason, "CLOSING_QUIET");
 });
 
 test("a qualifying setup is held for confirmation before it arms, then arms on the Nth consecutive tick", () => {
