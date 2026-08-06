@@ -558,6 +558,43 @@ test("signal geometry is internally consistent", () => {
   assert.equal(Number((sig.entry_price! - sig.stop_loss!).toFixed(2)), sig.stop_loss_points);
 });
 
+test("VIX Panic widens the stop and shrinks effective risk%; Calm leaves both unchanged", () => {
+  const r2 = (n: number) => Number(n.toFixed(2));
+
+  const baselineEngine = warmEngine(24_300, WALLS);
+  const baseline = baselineEngine.engine.evaluate(
+    baselineEngine.builder.build(baselineEngine.master, baselineEngine.ticks, 24_300),
+    baselineEngine.master,
+    1_000_000,
+  );
+
+  const calmEngine = warmEngine(24_300, WALLS);
+  const calm = calmEngine.engine.evaluate(
+    calmEngine.builder.build(calmEngine.master, calmEngine.ticks, 24_300),
+    calmEngine.master,
+    1_000_000,
+    undefined,
+    { vixRegime: "Calm" },
+  );
+  assert.equal(calm.stop_loss_points, baseline.stop_loss_points); // 1x multiplier — no change
+  assert.equal(calm.sizing!.risk_pct, baseline.sizing!.risk_pct);
+
+  const panicEngine = warmEngine(24_300, WALLS);
+  const panic = panicEngine.engine.evaluate(
+    panicEngine.builder.build(panicEngine.master, panicEngine.ticks, 24_300),
+    panicEngine.master,
+    1_000_000,
+    undefined,
+    { vixRegime: "Panic" },
+  );
+  assert.equal(panic.stop_loss_points, r2(baseline.stop_loss_points! * 1.5));
+  assert.equal(panic.sizing!.risk_pct, r2(DEFAULT_CONFIG.riskPct * 0.5));
+  // A wider stop still leaves a coherent, ordered geometry.
+  assert.ok(panic.stop_loss! < panic.entry_price!);
+  assert.ok(panic.entry_price! < panic.target_1!);
+  assert.ok(panic.target_1! < panic.target_2!);
+});
+
 test("buildup contradicts a thesis only when it opposes the direction", () => {
   assert.equal(buildupContradicts("CE", "Short Built Up"), true);
   assert.equal(buildupContradicts("CE", "Long Built Up"), false);

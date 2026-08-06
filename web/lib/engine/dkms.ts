@@ -8,6 +8,7 @@ import type {
   Signal,
 } from "@/lib/types";
 import type { OiBuildupType } from "@/lib/market/constants";
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import type { EngineConfig } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
@@ -79,6 +80,15 @@ export interface EvaluateContext {
    * real caller that ever passes `false`.
    */
   trading?: boolean;
+  /**
+   * India VIX's current regime (`lib/tools/vix.ts`), if the Volatility
+   * Desk's public NSE read has landed — `null`/absent leaves stop sizing
+   * and risk% exactly as they were before this existed. Same public,
+   * unauthenticated source regardless of broker, so this is the one piece
+   * of market-data context here that isn't gated on which broker session
+   * is active.
+   */
+  vixRegime?: VixRegime | null;
 }
 
 const emptyLevels = (): CoaLevels => ({
@@ -143,7 +153,7 @@ export class SignalEngine {
     maxDeployable?: number,
     context: EvaluateContext = {},
   ): Signal {
-    const { marketPcr = null, buildupClass = null, trading = true } = context;
+    const { marketPcr = null, buildupClass = null, trading = true, vixRegime = null } = context;
     const levels = chain.levels;
     const spot = chain.spot;
     const prevSpot = this.lastSpot;
@@ -280,6 +290,15 @@ export class SignalEngine {
       stopPoints = r2(Math.min(stopPoints * 1.5, Math.max(stopPoints * 0.5, wsp)));
     }
 
+    // A genuinely riskier tape widens the stop on top of whatever the
+    // %/wall blend above already settled on — applied last, as a final
+    // regime-level adjustment rather than folded into the wall-anchor
+    // clamp, so the two stay independently reasoned about. Calm/Normal
+    // are 1x by default; see `vixStopMultiplier`'s own doc comment.
+    if (vixRegime) {
+      stopPoints = r2(stopPoints * this.cfg.vixStopMultiplier[vixRegime]);
+    }
+
     const stop = r2(Math.max(0.05, entry - stopPoints));
     let target1 = r2(entry + stopPoints * 1.5);
     const target2 = r2(entry + stopPoints * 3.0);
@@ -310,11 +329,20 @@ export class SignalEngine {
       }
     }
 
+    // A wider stop (above) already shrinks lot count on its own —
+    // `riskPerLot` grows with it — but scaling `riskPct` down too in
+    // Elevated/Panic makes the size-down a deliberate, additional choice
+    // rather than an accident of the stop-distance formula. Calm/Normal
+    // are 1x by default; see `vixRiskPctMultiplier`'s own doc comment.
+    const effectiveRiskPct = vixRegime
+      ? r2(this.cfg.riskPct * this.cfg.vixRiskPctMultiplier[vixRegime])
+      : this.cfg.riskPct;
+
     const sizing = calculateSize({
       underlying: this.underlying,
       stopLossPoints: stopPoints,
       capital,
-      riskPct: this.cfg.riskPct,
+      riskPct: effectiveRiskPct,
       lotSize: inst!.lotSize || undefined,
       entryPrice: entry,
       maxDeployable,
@@ -328,6 +356,11 @@ export class SignalEngine {
     if (quadrant) {
       rationale.push(
         `RRG node ${quadrant} — RS-Ratio ${leg.rs_ratio?.toFixed(2)} / RS-Momentum ${leg.rs_momentum?.toFixed(2)}`,
+      );
+    }
+    if (vixRegime && vixRegime !== "Calm" && vixRegime !== "Normal") {
+      rationale.push(
+        `India VIX ${vixRegime} — stop widened ${this.cfg.vixStopMultiplier[vixRegime]}x, risk sized to ${effectiveRiskPct.toFixed(1)}% of ${this.cfg.riskPct}%.`,
       );
     }
 

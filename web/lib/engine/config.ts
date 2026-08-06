@@ -1,3 +1,5 @@
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
+
 /**
  * DeltaK strategy configuration — the TypeScript twin of `backend/app/config.py`.
  *
@@ -246,6 +248,23 @@ export interface EngineConfig {
    */
   pcrDivergencePct: number;
 
+  /**
+   * Final multiplier on the stop distance per India VIX regime (Calm /
+   * Normal / Elevated / Panic — `lib/tools/vix.ts`'s own bands), applied
+   * after the per-protocol %/wall-anchor blend above. Elevated/Panic widen
+   * it so ordinary noise in a genuinely riskier tape doesn't stop a trade
+   * out prematurely; Calm/Normal are 1 (no change) by default.
+   */
+  vixStopMultiplier: Record<VixRegime, number>;
+  /**
+   * Multiplier on `riskPct` per the same VIX regime, applied independently
+   * of `vixStopMultiplier` — a wider stop already shrinks lot count on its
+   * own (`riskPerLot` grows), but sizing down the risk-money budget too in
+   * Elevated/Panic makes that a deliberate, additional choice rather than
+   * an accident of the stop-distance formula.
+   */
+  vixRiskPctMultiplier: Record<VixRegime, number>;
+
   paperCapital: number;
   slippagePct: number;
   costPerOrder: number;
@@ -285,6 +304,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
   maxPositionCapitalPct: 40,
   maxPortfolioRiskPct: 60,
   pcrDivergencePct: 40,
+
+  vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
+  vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
 
   paperCapital: 25_000,
   slippagePct: 0.0015,
