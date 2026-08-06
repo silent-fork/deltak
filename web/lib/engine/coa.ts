@@ -29,6 +29,41 @@ export function nearestStrike(spot: number, strikes: number[]): number {
   );
 }
 
+export interface WallCandidate {
+  strike: number;
+  oiChange: number;
+}
+
+/**
+ * COA 2.0's own hysteresis — Phase 2 of the signal-noise reduction. Before
+ * this, `aegis_1`/`zenith_1` was a raw `argmax(oi_change)` recomputed from
+ * scratch every tick: two neighbouring strikes trading the "highest fresh
+ * OI" title back and forth on ordinary fills flipped the wall (and with it
+ * the wall-anchored stop/target and Alpha's entry proximity band) a full
+ * strike step, tick to tick, with no regard for how close the contest was.
+ *
+ * A challenger now has to beat the *incumbent's own current* `oi_change` by
+ * `marginPct` before it takes over — a near-tie leaves the standing wall
+ * alone. `candidates` should already be pre-filtered to whatever counts as
+ * a real print (see `EngineConfig.earlyOiChangeFloor`); this function only
+ * decides *which* of those candidates wins, not whether any of them are
+ * real. No candidates at all keeps the current incumbent rather than
+ * reverting to a fallback — the caller's job, same as before this existed.
+ */
+export function challengeWall(
+  incumbentStrike: number | null,
+  candidates: WallCandidate[],
+  marginPct: number,
+): number | null {
+  if (!candidates.length) return incumbentStrike;
+  const best = candidates.reduce((a, b) => (b.oiChange > a.oiChange ? b : a));
+  if (incumbentStrike === null || best.strike === incumbentStrike) return best.strike;
+
+  const incumbent = candidates.find((c) => c.strike === incumbentStrike);
+  const incumbentOiChange = incumbent?.oiChange ?? 0;
+  return best.oiChange > incumbentOiChange * (1 + marginPct / 100) ? best.strike : incumbentStrike;
+}
+
 /** How many strikes ITM a contract sits. Positive = ITM, 0 = ATM, negative = OTM. */
 export function itmDepth(
   strike: number,
@@ -217,15 +252,23 @@ export class ChainBuilder {
       levels.zenith_0 = best.call!.oi > 0 ? best.strike : null;
     }
 
-    // --- COA 2.0: intraday OI accumulation ---
-    const putWrites = putsBelow.filter((r) => r.put!.oi_change > 0);
-    const callWrites = callsAbove.filter((r) => r.call!.oi_change > 0);
-    levels.aegis_1 = putWrites.length
-      ? putWrites.reduce((a, b) => (b.put!.oi_change > a.put!.oi_change ? b : a)).strike
-      : levels.aegis_0;
-    levels.zenith_1 = callWrites.length
-      ? callWrites.reduce((a, b) => (b.call!.oi_change > a.call!.oi_change ? b : a)).strike
-      : levels.zenith_0;
+    // --- COA 2.0: intraday OI accumulation, with challenge-margin hysteresis ---
+    // Below the floor, a strike's `oi_change` is closer to noise than to a
+    // real writer accumulating a position — not a candidate at all, the
+    // same posture as having no positive `oi_change` anywhere yet.
+    const putCandidates: WallCandidate[] = putsBelow
+      .filter((r) => r.put!.oi_change >= this.cfg.earlyOiChangeFloor)
+      .map((r) => ({ strike: r.strike, oiChange: r.put!.oi_change }));
+    const callCandidates: WallCandidate[] = callsAbove
+      .filter((r) => r.call!.oi_change >= this.cfg.earlyOiChangeFloor)
+      .map((r) => ({ strike: r.strike, oiChange: r.call!.oi_change }));
+
+    levels.aegis_1 =
+      challengeWall(this.levels.aegis_1, putCandidates, this.cfg.wallChallengeMarginPct) ??
+      levels.aegis_0;
+    levels.zenith_1 =
+      challengeWall(this.levels.zenith_1, callCandidates, this.cfg.wallChallengeMarginPct) ??
+      levels.zenith_0;
 
     if (levels.aegis_1 !== null) this.push(this.aegisHist, levels.aegis_1);
     if (levels.zenith_1 !== null) this.push(this.zenithHist, levels.zenith_1);

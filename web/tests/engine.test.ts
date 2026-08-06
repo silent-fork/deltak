@@ -16,7 +16,7 @@ import {
   resolveLotSize,
 } from "../lib/engine/sizing";
 import { RrgEngine, classifyQuadrant, MIN_SAMPLES } from "../lib/engine/rrg";
-import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
+import { ChainBuilder, challengeWall, itmDepth, nearestStrike } from "../lib/engine/coa";
 import {
   applyDwellLatch,
   buildupContradicts,
@@ -54,6 +54,7 @@ import {
   EXCHANGE_NSE_CM,
   EXCHANGE_NSE_FO,
   INDEX_UNIVERSE,
+  effectiveConfig,
   nextMidnightIst,
   secondsToDaylightRest,
   secondsToNextOpen,
@@ -456,6 +457,104 @@ test("wall shift looks at a recent window, not the whole trail", () => {
   // 3-strike jump from the stale 24_300 print; the recent window reads a wall
   // that has held for longer than it as settled.
   assert.equal(chain.levels.aegis_shift, 0);
+});
+
+/* ------------------------------------------------------ Phase 2: wall hysteresis */
+
+test("challengeWall: a challenger must beat the incumbent's own oi_change by the margin, not just edge it out", () => {
+  // No incumbent yet — the best candidate wins outright, no contest.
+  assert.equal(challengeWall(null, [{ strike: 100, oiChange: 5_000 }], 15), 100);
+  assert.equal(
+    challengeWall(null, [{ strike: 100, oiChange: 5_000 }, { strike: 150, oiChange: 9_000 }], 15),
+    150,
+  );
+
+  // No candidates at all — incumbent (even a null one) is untouched.
+  assert.equal(challengeWall(100, [], 15), 100);
+  assert.equal(challengeWall(null, [], 15), null);
+
+  // The incumbent's own strike is still the best candidate — no margin math needed.
+  assert.equal(
+    challengeWall(100, [{ strike: 100, oiChange: 5_000 }, { strike: 150, oiChange: 5_200 }], 15),
+    100,
+  );
+
+  // A near-tie challenger (under the 15% margin) does not flip the wall.
+  assert.equal(
+    challengeWall(100, [{ strike: 100, oiChange: 5_000 }, { strike: 150, oiChange: 5_700 }], 15), // +14%
+    100,
+  );
+  // Clearing the margin does.
+  assert.equal(
+    challengeWall(100, [{ strike: 100, oiChange: 5_000 }, { strike: 150, oiChange: 5_800 }], 15), // +16%
+    150,
+  );
+
+  // The incumbent strike has since dropped out of the candidate list
+  // entirely (rolled below the floor elsewhere, or out of the window) —
+  // treated as zero, so any real candidate beats it.
+  assert.equal(challengeWall(100, [{ strike: 150, oiChange: 1 }], 15), 150);
+});
+
+test("a near-tie OI challenger does not flip the wall; a real one does", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore(), 24_500, { "24300PE": 10_000 });
+  const cfg = { ...DEFAULT_CONFIG, wallChallengeMarginPct: 15, earlyOiChangeFloor: 100 };
+  const builder = new ChainBuilder("NIFTY", new RrgEngine(), cfg);
+
+  // First build establishes the session-open baseline (no delta yet).
+  builder.build(master, ticks, 24_500);
+
+  // 24,300 becomes the real, challenge-margin-cleared incumbent wall.
+  const incumbent = master.find("NIFTY", 24_300, "PE")!;
+  let t = emptyTick(incumbent.token); t.ltp = 60; t.oi = 10_000 + 5_000; ticks.apply(t);
+  let chain = builder.build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_1, 24_300);
+
+  // A neighbour's oi_change edges ahead by only 10% — not enough to take over.
+  const challenger = master.find("NIFTY", 24_350, "PE")!;
+  t = emptyTick(challenger.token); t.ltp = 55; t.oi = 10_000 + 5_500; ticks.apply(t);
+  chain = builder.build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_1, 24_300);
+
+  // The same neighbour keeps accumulating until it clears the margin —
+  // now it genuinely takes over.
+  t = emptyTick(challenger.token); t.ltp = 55; t.oi = 10_000 + 6_000; ticks.apply(t);
+  chain = builder.build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_1, 24_350);
+});
+
+test("oi_change below the floor is not a real candidate — falls back the same way as no delta at all", () => {
+  const master = makeMaster();
+  const ticks = fillTicks(master, new TickStore(), 24_500, { "24300PE": 900_000 });
+  const cfg = { ...DEFAULT_CONFIG, earlyOiChangeFloor: 5_000 };
+  const builder = new ChainBuilder("NIFTY", new RrgEngine(), cfg);
+  builder.build(master, ticks, 24_500); // COA 1.0 wall at 24_300 from raw OI
+
+  // A tiny, session-open-noise-scale oi_change on a neighbouring strike —
+  // well under the floor — must not be picked up as a COA 2.0 candidate.
+  // (24_450's own baseline is the fillTicks default of 10_000, not 24_300's 900_000.)
+  const inst = master.find("NIFTY", 24_450, "PE")!;
+  const t = emptyTick(inst.token); t.ltp = 60; t.oi = 10_000 + 200; ticks.apply(t);
+  const chain = builder.build(master, ticks, 24_500);
+  assert.equal(chain.levels.aegis_1, 24_300); // still the COA 1.0 fallback
+});
+
+test("effectiveConfig: per-index overrides layer on the shared base; portfolio knobs never vary by index", () => {
+  const nifty = effectiveConfig("NIFTY", DEFAULT_CONFIG);
+  assert.deepEqual(nifty, DEFAULT_CONFIG); // no overrides at all — the tuned baseline
+
+  const bankNifty = effectiveConfig("BANKNIFTY", DEFAULT_CONFIG);
+  assert.equal(bankNifty.invalidationPct, INDEX_UNIVERSE.BANKNIFTY.invalidationPct);
+  assert.ok(bankNifty.invalidationPct > DEFAULT_CONFIG.invalidationPct);
+  // Portfolio/capital-management fields stay identical across every index —
+  // only the noise-vs-signal surface varies.
+  assert.equal(bankNifty.riskPct, DEFAULT_CONFIG.riskPct);
+  assert.equal(bankNifty.maxPortfolioRiskPct, DEFAULT_CONFIG.maxPortfolioRiskPct);
+  assert.equal(bankNifty.stopPctByProtocol.ALPHA, DEFAULT_CONFIG.stopPctByProtocol.ALPHA);
+
+  // An underlying with no IndexSpec entry at all falls back to the base config untouched.
+  assert.deepEqual(effectiveConfig("NOT_A_REAL_INDEX", DEFAULT_CONFIG), DEFAULT_CONFIG);
 });
 
 test("selectItm honours depth and direction", () => {

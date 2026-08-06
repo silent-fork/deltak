@@ -64,6 +64,37 @@ export interface IndexSpec {
    * even once enough of it is real to read.
    */
   rrgReadyFraction?: number;
+
+  /**
+   * Per-index overrides for everything else in `EngineConfig` that's a
+   * genuine noise-vs-signal tradeoff rather than a portfolio/capital-
+   * management knob (those — `riskPct`, `maxConcurrentPositions`,
+   * `maxPositionCapitalPct`, `maxPortfolioRiskPct`, `pcrDivergencePct`,
+   * `stopPctByProtocol` — stay one shared number across every underlying on
+   * purpose: a single paper wallet's risk budget shouldn't read differently
+   * depending on which index it's deployed against). Every field here is
+   * `?? ` against the shared default in `effectiveConfig`, the same pattern
+   * `rrgWindow`/`rrgMomentumLookback`/`rrgMinSamples` above already use.
+   *
+   * The values set below are reasoned from each index's documented
+   * liquidity tier and roughly-known relative volatility (BANKNIFTY/BANKEX
+   * trade a noticeably larger typical daily range than NIFTY/SENSEX;
+   * FINNIFTY and BANKEX are the thinnest order books of the five, BANKEX
+   * more so — monthly-only expiry vs SENSEX's weekly, see the BANKEX/SENSEX
+   * comment above) — not fitted against real tick data, the same honestly-
+   * approximate posture `itmDeltaApprox` already documents elsewhere in
+   * this file. Phase 0's `signal_actionable_transition` analytics event
+   * (see `useEngine.ts`) is what should eventually confirm or correct them
+   * per index, rather than this comment's own reasoning.
+   */
+  invalidationPct?: number;
+  alphaEntryBandPct?: number;
+  microMoveMinPct?: number;
+  microMoveLookbackTicks?: number;
+  weakeningMinAdverseMovePct?: number;
+  shiftLookback?: number;
+  wallChallengeMarginPct?: number;
+  earlyOiChangeFloor?: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
@@ -82,6 +113,15 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     spotTokenFallback: "99926009",
     strikeStep: 100,
     lotSize: 15,
+    // Liquidity matches NIFTY (no window/RRG changes needed) but the sector
+    // concentration trades a noticeably wider typical daily range — bands
+    // and the micro-dip/rally floor scaled up roughly in proportion so a
+    // move that's genuinely noise on this index isn't read as signal just
+    // because it's larger in points than NIFTY's own thresholds expect.
+    invalidationPct: 0.5,
+    alphaEntryBandPct: 0.2,
+    microMoveMinPct: 0.07,
+    weakeningMinAdverseMovePct: 0.07,
   },
   FINNIFTY: {
     label: "FIN NIFTY",
@@ -116,6 +156,21 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     // never print at all, and holding the plot "maturing" until 90% of them
     // somehow do would mean it almost never clears.
     rrgReadyFraction: 0.25,
+    // Same thinness this file already treats via the RRG overrides above,
+    // applied to the rest of the noise-vs-signal surface: sparser genuine
+    // ticks need a longer window to read a real dip/rally/wall-shift
+    // against, and a lower OI floor since this instrument's absolute open
+    // interest runs smaller than NIFTY/BANKNIFTY's to begin with. Volatility
+    // itself is closer to NIFTY's than BANKNIFTY's, so bands widen only
+    // slightly, not in proportion to the window/floor changes.
+    invalidationPct: 0.4,
+    alphaEntryBandPct: 0.17,
+    microMoveMinPct: 0.06,
+    microMoveLookbackTicks: 30,
+    weakeningMinAdverseMovePct: 0.06,
+    shiftLookback: 30,
+    wallChallengeMarginPct: 20,
+    earlyOiChangeFloor: 400,
   },
   // BANKEX and SENSEX list on BSE's own cash/F&O segments, not NSE's — spot
   // tokens, strike step and lot size below were confirmed directly against a
@@ -135,6 +190,24 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     spotTokenFallback: "99919012",
     strikeStep: 100,
     lotSize: 30,
+    // The thinnest order book of the five (monthly-only expiry, see the
+    // comment above), compounded with a sector-concentration volatility
+    // similar to BANKNIFTY's — both effects widen here rather than one
+    // dominating. RRG treated the same way FINNIFTY already is, for the
+    // same reason: genuine price changes are sparse enough that the shared
+    // 8-sample/90-window default would rarely mature within a session.
+    rrgMinSamples: 4,
+    rrgWindow: 160,
+    rrgMomentumLookback: 28,
+    rrgReadyFraction: 0.25,
+    invalidationPct: 0.55,
+    alphaEntryBandPct: 0.23,
+    microMoveMinPct: 0.1,
+    microMoveLookbackTicks: 35,
+    weakeningMinAdverseMovePct: 0.08,
+    shiftLookback: 35,
+    wallChallengeMarginPct: 25,
+    earlyOiChangeFloor: 300,
   },
   SENSEX: {
     label: "SENSEX",
@@ -143,6 +216,23 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     spotTokenFallback: "99919000",
     strikeStep: 100,
     lotSize: 20,
+    // Weekly expiry keeps this meaningfully more liquid than BANKEX's
+    // monthly-only book, but still thinner than either NSE index — a
+    // lighter version of the same RRG/window/floor widening, and volatility
+    // close enough to NIFTY's (both track a similar large-cap universe)
+    // that bands widen only for the extra execution noise, not for range.
+    rrgMinSamples: 6,
+    rrgWindow: 110,
+    rrgMomentumLookback: 18,
+    rrgReadyFraction: 0.5,
+    invalidationPct: 0.4,
+    alphaEntryBandPct: 0.17,
+    microMoveMinPct: 0.06,
+    microMoveLookbackTicks: 24,
+    weakeningMinAdverseMovePct: 0.06,
+    shiftLookback: 24,
+    wallChallengeMarginPct: 20,
+    earlyOiChangeFloor: 500,
   },
 };
 
@@ -194,6 +284,26 @@ export interface EngineConfig {
    * aged out of relevance; this bounds the comparison to a recent window.
    */
   shiftLookback: number;
+  /**
+   * Phase 2 noise reduction — see `coa.ts`'s `challengeWall`. COA 2.0 picked
+   * whichever strike had the single highest `oi_change` every tick, with no
+   * regard for how close the runner-up was — two neighbouring strikes
+   * trading the "highest fresh OI" title back and forth on ordinary fills
+   * flipped the wall (and therefore the anchored stop/target and the entry
+   * proximity band) a full strike step with it. A challenger must now beat
+   * the incumbent wall's own current `oi_change` by this percentage margin
+   * before it takes over; ties and near-ties leave the standing wall alone.
+   */
+  wallChallengeMarginPct: number;
+  /**
+   * Minimum `oi_change` (raw contracts) for a strike to be considered a real
+   * COA 2.0 candidate at all — below this, `challengeWall` falls back to the
+   * COA 1.0 cumulative wall, same as having no positive `oi_change` anywhere
+   * yet. Early in a session (or on a thin instrument) every strike's
+   * `oi_change` sits near zero relative to the noise in a single print;
+   * picking an arg-max over near-zero values is close to picking at random.
+   */
+  earlyOiChangeFloor: number;
 
   riskPct: number;
   /**
@@ -321,6 +431,8 @@ export const DEFAULT_CONFIG: EngineConfig = {
   oiSeedSpan: 5,
   levelShiftTolerance: 1,
   shiftLookback: 20,
+  wallChallengeMarginPct: 15,
+  earlyOiChangeFloor: 1_000,
 
   /**
    * Sized for the 25,000 paper float: at 1% the risk budget (250) is smaller
@@ -353,6 +465,40 @@ export const DEFAULT_CONFIG: EngineConfig = {
   slippagePct: 0.0015,
   costPerOrder: 25,
 };
+
+/**
+ * The config a given underlying's own `ChainBuilder`/`SignalEngine`/
+ * `RrgEngine` should actually run against — `cfg` (the operator-tunable
+ * base, normally `DEFAULT_CONFIG` or `cfgRef.current`) with whatever that
+ * index's own `IndexSpec` overrides on top. One merge site rather than a
+ * scattered `INDEX_UNIVERSE[u].field ?? cfg.field` at every construction
+ * and read site — `useEngine.ts` used to do exactly that inline, but only
+ * for the four RRG fields; this covers the rest of the per-index surface
+ * `IndexSpec` now carries too.
+ *
+ * Call once per underlying (construction time for the engine instances;
+ * per-position/per-chain lookup for the risk guards, which run across the
+ * whole book rather than one underlying at a time) — cheap enough that
+ * memoizing it isn't worth the staleness risk if `cfg` itself is ever
+ * changed at runtime.
+ */
+export function effectiveConfig(underlying: string, cfg: EngineConfig): EngineConfig {
+  const spec = INDEX_UNIVERSE[underlying];
+  if (!spec) return cfg;
+  return {
+    ...cfg,
+    rrgWindow: spec.rrgWindow ?? cfg.rrgWindow,
+    rrgMomentumLookback: spec.rrgMomentumLookback ?? cfg.rrgMomentumLookback,
+    invalidationPct: spec.invalidationPct ?? cfg.invalidationPct,
+    alphaEntryBandPct: spec.alphaEntryBandPct ?? cfg.alphaEntryBandPct,
+    microMoveMinPct: spec.microMoveMinPct ?? cfg.microMoveMinPct,
+    microMoveLookbackTicks: spec.microMoveLookbackTicks ?? cfg.microMoveLookbackTicks,
+    weakeningMinAdverseMovePct: spec.weakeningMinAdverseMovePct ?? cfg.weakeningMinAdverseMovePct,
+    shiftLookback: spec.shiftLookback ?? cfg.shiftLookback,
+    wallChallengeMarginPct: spec.wallChallengeMarginPct ?? cfg.wallChallengeMarginPct,
+    earlyOiChangeFloor: spec.earlyOiChangeFloor ?? cfg.earlyOiChangeFloor,
+  };
+}
 
 /* ------------------------------------------------------------------ clock */
 

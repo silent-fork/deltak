@@ -27,6 +27,7 @@ import {
   EXCHANGE_NSE_FO,
   INDEX_UNIVERSE,
   UNDERLYINGS,
+  effectiveConfig,
   isMarketOpen,
   secondsToDaylightRest,
   secondsToNextOpen,
@@ -752,7 +753,7 @@ export function useEngine(simulate: boolean) {
         quadrant: rrgRef.current[pos.underlying]?.quadrant(pos.token) ?? null,
         vixRegime: vixRef.current,
         alreadyScaledIn: scaledInRef.current.has(pos.id),
-        cfg,
+        cfg: effectiveConfig(pos.underlying, cfg),
       });
       if (decision) scaleIn[pos.id] = decision;
     }
@@ -1020,16 +1021,21 @@ export function useEngine(simulate: boolean) {
   useEffect(() => {
     const cfg = cfgRef.current;
     for (const u of UNDERLYINGS) {
+      // Per-index tuned config (bands, dwell/micro-move thresholds, wall
+      // hysteresis, RRG window) — everything that's a genuine noise-vs-
+      // signal tradeoff rather than portfolio/capital management, which
+      // stays the one shared `cfg`. See `IndexSpec`'s own comment.
+      const indexCfg = effectiveConfig(u, cfg);
       const rrg = new RrgEngine(
-        INDEX_UNIVERSE[u].rrgWindow ?? cfg.rrgWindow,
-        INDEX_UNIVERSE[u].rrgMomentumLookback ?? cfg.rrgMomentumLookback,
+        indexCfg.rrgWindow,
+        indexCfg.rrgMomentumLookback,
         cfg.rrgTailLength,
         INDEX_UNIVERSE[u].rrgMinSamples,
       );
-      const builder = new ChainBuilder(u, rrg, cfg);
+      const builder = new ChainBuilder(u, rrg, indexCfg);
       rrgRef.current[u] = rrg;
       buildersRef.current[u] = builder;
-      signalEnginesRef.current[u] = new SignalEngine(u, builder, cfg);
+      signalEnginesRef.current[u] = new SignalEngine(u, builder, indexCfg);
     }
 
     let cancelled = false;
@@ -1764,7 +1770,7 @@ export function useEngine(simulate: boolean) {
         quadrant: rrgRef.current[pos.underlying]?.quadrant(pos.token) ?? null,
         vixRegime: vixRef.current,
         alreadyScaledIn: scaledInRef.current.has(pos.id),
-        cfg: cfgRef.current,
+        cfg: effectiveConfig(pos.underlying, cfgRef.current),
       });
       if (!decision) {
         throw new Error(`${pos.trading_symbol} is not eligible for a scale-in right now.`);
