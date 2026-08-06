@@ -267,6 +267,16 @@ export function useEngine(simulate: boolean) {
    */
   const marketRef = useRef<MarketData | null>(null);
   const eventsRef = useRef<RiskEvent[]>([]);
+  /**
+   * Phase 0 of the signal-noise investigation: the last `actionable` this
+   * tab observed per underlying, purely so the tick loop below can tell a
+   * genuine flip from a repeat and fire one analytics event per transition
+   * rather than one per second. Not rendered anywhere — the point is a
+   * queryable trail in the existing analytics pipeline (transition
+   * frequency, before/after a strategy change) instead of a new dashboard
+   * this diagnostic doesn't warrant yet.
+   */
+  const signalActionableRef = useRef<Record<string, boolean>>({});
   const scaledRef = useRef(new Set<string>());
   /**
    * Positions already given their one manually-triggered scale-in add —
@@ -819,7 +829,7 @@ export function useEngine(simulate: boolean) {
         const engine = signalEnginesRef.current[u];
         const chain = chainsRef.current[u];
         if (!engine || !chain) continue;
-        signalsRef.current[u] = engine.evaluate(chain, master, cap, free, {
+        const sig = engine.evaluate(chain, master, cap, free, {
           marketPcr: marketRef.current?.pcr[u] ?? null,
           buildupClass: marketRef.current?.buildup[u] ?? null,
           // `plan.guards` is exactly `planTick`'s own `marketOpen || simulated`
@@ -829,6 +839,22 @@ export function useEngine(simulate: boolean) {
           trading: plan.guards,
           vixRegime: vixRef.current,
         });
+        signalsRef.current[u] = sig;
+
+        // Phase 0 instrumentation — see `signalActionableRef`'s own comment.
+        // Fired on the edge only, not every tick: a signal sitting steadily
+        // actionable (or steadily blocked) for a whole minute is not what
+        // "noise" means here, only how often it flips.
+        const prevActionable = signalActionableRef.current[u];
+        if (prevActionable !== undefined && prevActionable !== sig.actionable) {
+          track("signal_actionable_transition", {
+            underlying: u,
+            protocol: sig.protocol,
+            actionable: sig.actionable,
+            blocked_reason: sig.blocked_reason,
+          });
+        }
+        signalActionableRef.current[u] = sig.actionable;
       }
 
       if (plan.guards) {

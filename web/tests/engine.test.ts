@@ -17,7 +17,14 @@ import {
 } from "../lib/engine/sizing";
 import { RrgEngine, classifyQuadrant, MIN_SAMPLES } from "../lib/engine/rrg";
 import { ChainBuilder, itmDepth, nearestStrike } from "../lib/engine/coa";
-import { buildupContradicts, classifyProtocol, SignalEngine } from "../lib/engine/dkms";
+import {
+  applyDwellLatch,
+  buildupContradicts,
+  classifyProtocol,
+  emptyDwellState,
+  rollingExtremeBreak,
+  SignalEngine,
+} from "../lib/engine/dkms";
 import { Ledger, applySlippage } from "../lib/engine/ledger";
 import {
   NSE_OPTIONS_RATES,
@@ -540,6 +547,12 @@ test("Delta regime mutes the auto-driver", () => {
 
 test("Gamma selects an ITM put", () => {
   const { master, ticks, builder, engine } = warmEngine(24_500);
+  // Gamma's micro-rally check (rollingExtremeBreak) needs a real rolling
+  // low to break from — warm the engine's own spot window with a rising
+  // sequence before the call this test actually inspects.
+  for (const s of [24_400, 24_430, 24_460]) {
+    engine.evaluate(builder.build(master, ticks, s), master, 1_000_000);
+  }
   const chain = builder.build(master, ticks, 24_500);
   chain.levels.aegis_shift = -3;
   chain.levels.zenith_shift = 0;
@@ -547,6 +560,167 @@ test("Gamma selects an ITM put", () => {
   assert.equal(sig.protocol, "GAMMA");
   assert.equal(sig.option_type, "PE");
   assert.ok(sig.strike! > chain.spot);
+});
+
+/* ---------------------------------------------------- Phase 1: noise reduction */
+
+test("rollingExtremeBreak: needs a real retracement from the rolling extreme, not just the last sample", () => {
+  // Fewer than 2 samples — nothing to break from, fails closed rather than
+  // needing a separate bootstrap case.
+  assert.equal(rollingExtremeBreak([], "dip", 0.05), false);
+  assert.equal(rollingExtremeBreak([24_500], "dip", 0.05), false);
+
+  // A dip: high of 24,500, min 0.05% retracement is 12.25 points.
+  assert.equal(rollingExtremeBreak([24_400, 24_460, 24_500, 24_487], "dip", 0.05), true); // 13pt off the high
+  assert.equal(rollingExtremeBreak([24_400, 24_460, 24_500, 24_495], "dip", 0.05), false); // only 5pt — not a real dip
+  // The old bug this replaces: a flat last tick used to count as "dipping"
+  // (`spot <= prevSpot` with `<=`). It no longer does.
+  assert.equal(rollingExtremeBreak([24_500, 24_500], "dip", 0.05), false);
+
+  // A rally: mirrors the dip case off the rolling low.
+  assert.equal(rollingExtremeBreak([24_600, 24_540, 24_500, 24_513], "rally", 0.05), true); // 13pt off the low
+  assert.equal(rollingExtremeBreak([24_600, 24_540, 24_500, 24_505], "rally", 0.05), false); // only 5pt
+});
+
+test("applyDwellLatch: arms after N consecutive qualifying ticks, tolerates M misses once armed, resets on a setup change", () => {
+  const dwellTicks = 3;
+  const latchTicks = 2;
+  let s = emptyDwellState();
+
+  // Ticks 1-2 of the same setup: not yet armed.
+  let r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, latchTicks);
+  assert.equal(r.actionable, false);
+  assert.equal(r.state.dwellTicks, 1);
+  s = r.state;
+
+  r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, latchTicks);
+  assert.equal(r.actionable, false);
+  assert.equal(r.state.dwellTicks, 2);
+  s = r.state;
+
+  // 3rd consecutive qualifying tick — armed.
+  r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, latchTicks);
+  assert.equal(r.actionable, true);
+  assert.equal(r.state.armed, true);
+  s = r.state;
+
+  // Raw condition drops for up to latchTicks ticks — stays actionable.
+  r = applyDwellLatch(s, false, null, dwellTicks, latchTicks);
+  assert.equal(r.actionable, true);
+  s = r.state;
+  r = applyDwellLatch(s, false, null, dwellTicks, latchTicks);
+  assert.equal(r.actionable, true);
+  s = r.state;
+
+  // A third consecutive miss exhausts the latch — disarms, full reset.
+  r = applyDwellLatch(s, false, null, dwellTicks, latchTicks);
+  assert.equal(r.actionable, false);
+  assert.equal(r.state.dwellTicks, 0);
+  s = r.state;
+
+  // Re-qualifying afterwards starts dwell over from 1, not from where it left off.
+  r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, latchTicks);
+  assert.equal(r.actionable, false);
+  assert.equal(r.state.dwellTicks, 1);
+});
+
+test("applyDwellLatch: a different setup qualifying resets dwell rather than inheriting progress", () => {
+  const dwellTicks = 3;
+  let s = emptyDwellState();
+  let r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, 2);
+  s = r.state;
+  r = applyDwellLatch(s, true, "ALPHA:CE:1001", dwellTicks, 2);
+  assert.equal(r.state.dwellTicks, 2);
+  s = r.state;
+
+  // Protocol/side/instrument changed underneath — a new setup, not a
+  // continuation of the old one's dwell count.
+  r = applyDwellLatch(s, true, "BETA:CE:1002", dwellTicks, 2);
+  assert.equal(r.actionable, false);
+  assert.equal(r.state.dwellTicks, 1);
+});
+
+test("Beta's old single-tick dip trigger no longer arms the entry — a real retracement is required", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_500);
+  // Two flat/rising ticks, then one tick barely lower than the last —
+  // exactly the pattern the old `spot <= prevSpot` comparison would have
+  // called a "dip." Rolling-window retracement from the high (24,520)
+  // rejects it: only ~4 points off the high, well under the 0.05% (~12pt) floor.
+  for (const s of [24_500, 24_520]) {
+    engine.evaluate(builder.build(master, ticks, s), master, 1_000_000);
+  }
+  const c = builder.build(master, ticks, 24_516);
+  c.levels.aegis_shift = 0;
+  c.levels.zenith_shift = 3;
+  const sig = engine.evaluate(c, master, 1_000_000);
+  assert.equal(sig.protocol, "BETA");
+  assert.equal(sig.blocked_reason, "AWAIT_DIP");
+  assert.equal(sig.option_type, null);
+});
+
+// RRG never matures in these synthetic fixtures (the same option token's
+// `ltp` never actually changes between calls, so it never earns a real
+// `samples` increment — see `RrgEngine.update`'s own comment), which
+// leaves `rs_momentum` sitting right at its damped, noise-sensitive
+// starting point near 100 — exactly the knife-edge this session's own
+// research flagged as unreliable. Forcing every row's quadrant to LEADING
+// isolates this test from that, the same way other tests already override
+// `chain.levels` directly rather than depend on delicate OI arithmetic.
+function forceLeadingQuadrant(chain: OptionChain): void {
+  for (const row of chain.rows) {
+    if (row.call) row.call.quadrant = "LEADING";
+    if (row.put) row.put.quadrant = "LEADING";
+  }
+}
+
+test("Beta arms on a genuine micro-dip and Gamma on a genuine micro-rally", () => {
+  const beta = warmEngine(24_500);
+  for (const s of [24_500, 24_540]) {
+    beta.engine.evaluate(beta.builder.build(beta.master, beta.ticks, s), beta.master, 1_000_000);
+  }
+  // 24,540 high -> 0.05% floor is ~12.3pt; 24,510 is 30pt off the high.
+  const betaChain = beta.builder.build(beta.master, beta.ticks, 24_510);
+  betaChain.levels.aegis_shift = 0;
+  betaChain.levels.zenith_shift = 3;
+  forceLeadingQuadrant(betaChain);
+  const betaSig = beta.engine.evaluate(betaChain, beta.master, 1_000_000);
+  assert.equal(betaSig.protocol, "BETA");
+  assert.notEqual(betaSig.blocked_reason, "AWAIT_DIP");
+  assert.equal(betaSig.option_type, "CE");
+
+  const gamma = warmEngine(24_500);
+  for (const s of [24_500, 24_460]) {
+    gamma.engine.evaluate(gamma.builder.build(gamma.master, gamma.ticks, s), gamma.master, 1_000_000);
+  }
+  const gammaChain = gamma.builder.build(gamma.master, gamma.ticks, 24_490);
+  gammaChain.levels.aegis_shift = -3;
+  gammaChain.levels.zenith_shift = 0;
+  forceLeadingQuadrant(gammaChain);
+  const gammaSig = gamma.engine.evaluate(gammaChain, gamma.master, 1_000_000);
+  assert.equal(gammaSig.protocol, "GAMMA");
+  assert.notEqual(gammaSig.blocked_reason, "AWAIT_RALLY");
+  assert.equal(gammaSig.option_type, "PE");
+});
+
+test("a qualifying setup is held for confirmation before it arms, then arms on the Nth consecutive tick", () => {
+  const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
+  const chain = builder.build(master, ticks, 24_300);
+
+  const first = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(first.actionable, false);
+  assert.equal(first.blocked_reason, "AWAITING_CONFIRMATION");
+
+  const second = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(second.actionable, false);
+  assert.equal(second.blocked_reason, "AWAITING_CONFIRMATION");
+
+  const third = engine.evaluate(chain, master, 1_000_000);
+  assert.equal(third.actionable, true);
+  assert.equal(third.blocked_reason, null);
+});
+
+test("Alpha's entry band is narrower than its own invalidation band", () => {
+  assert.ok(DEFAULT_CONFIG.alphaEntryBandPct < DEFAULT_CONFIG.invalidationPct);
 });
 
 test("signal geometry is internally consistent", () => {
@@ -619,8 +793,14 @@ test("a signal is held when window PCR diverges too far from the cumulative read
 test("agreeing PCR does not block an otherwise-qualifying signal", () => {
   const { master, ticks, builder, engine } = warmEngine(24_300, WALLS);
   const chain = builder.build(master, ticks, 24_300);
-  const sig = engine.evaluate(chain, master, 1_000_000, undefined, { marketPcr: chain.pcr });
-  assert.equal(sig.actionable, true);
+  // Dwell requires the same setup to qualify for signalDwellTicks
+  // consecutive evaluations before arming — the same setup here every
+  // call, so this reaches actionable on the last of the loop.
+  let sig;
+  for (let i = 0; i < DEFAULT_CONFIG.signalDwellTicks; i++) {
+    sig = engine.evaluate(chain, master, 1_000_000, undefined, { marketPcr: chain.pcr });
+  }
+  assert.equal(sig!.actionable, true);
 });
 
 test("futures OI buildup contradicting the thesis holds the signal", () => {

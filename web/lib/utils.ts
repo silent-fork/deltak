@@ -140,6 +140,7 @@ export const BLOCK_REASONS: Record<string, string> = {
   VOLATILITY_TRAP: "Protocol Delta — both bounds migrating.",
   MID_RANGE: "Spot is mid-range; Alpha engages only at a bound.",
   AWAIT_DIP: "Beta armed — waiting for a downward micro-dip.",
+  AWAIT_RALLY: "Gamma armed — waiting for an upward micro-rally.",
   NO_VALID_ITM: "No Zero-OTM compliant strike is tradable right now.",
   WEAKENING_NODE: "Node is in Weakening — scaling out, not adding.",
   LAGGING_NODE: "Lagging quadrant — long accumulation forbidden.",
@@ -150,4 +151,5 @@ export const BLOCK_REASONS: Record<string, string> = {
   ZERO_LOTS: "Sizing resolved to zero lots.",
   BUILDUP_MISMATCH: "Futures OI buildup contradicts this thesis.",
   PCR_DIVERGENCE: "Window PCR diverges too far from the cumulative reading.",
+  AWAITING_CONFIRMATION: "Setup qualifies — confirming it holds before arming.",
 };
