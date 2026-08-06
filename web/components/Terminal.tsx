@@ -344,6 +344,7 @@ export function Terminal() {
                 scaleIn={snapshot?.scale_in ?? {}}
                 onLedgerChanged={bumpRefresh}
                 clientCode={engine.session.clientCode}
+                walletResetAt={engine.walletResetAt}
               />
             </aside>
           </section>
