@@ -587,7 +587,22 @@ export function useEngine(simulate: boolean) {
           ? ltp
           : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const residual = ledgerRef.current.reduce(pos.id, lots, fill, "TP1");
-      if (residual) savePositions([residual]);
+      if (!residual) {
+        // The position is already gone from this ledger — closed by another
+        // tab/session sharing the same account, or already fully exited by a
+        // guard that beat this call to it. Persisting an "ACCEPTED" order and
+        // re-saving the wallet here would log a fill that never actually
+        // happened against this ledger, which is exactly what produced
+        // duplicate TP1 rows with no matching position for real accounts.
+        log(
+          "INFO",
+          `Scale-out on ${pos.trading_symbol} found nothing to reduce — already closed elsewhere.`,
+          pos.underlying,
+        );
+        return;
+      }
+
+      savePositions([residual]);
       saveWallet(ledgerRef.current);
       saveOrder(
         orderRow({
