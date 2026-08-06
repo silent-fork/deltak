@@ -17,6 +17,19 @@ export interface StoredContact {
   exchanges: string[] | null;
   products: string[] | null;
   broker_last_login: string | null;
+  /**
+   * The paper wallet's own checkpoint — never reported by `getProfile` (the
+   * broker has no concept of it), so unlike every other field above there is
+   * no "broker wins" case: `stored` is the only source there ever is. Left
+   * out of this merge, `broker`'s own `UserProfile` doesn't carry these keys
+   * at all, so a spread-then-override merge silently drops them — which is
+   * exactly what let `Ledger.restoreWallet`'s `!= null` gate in `useEngine.ts`
+   * always see `undefined` and skip the restore on every Angel One session
+   * check, regardless of what the checkpoint actually held.
+   */
+  paper_capital?: number | null;
+  paper_charges?: number | null;
+  paper_realised_pnl?: number | null;
 }
 
 /**
@@ -45,5 +58,8 @@ export function mergeProfile(
     exchanges: broker.exchanges.length ? broker.exchanges : (stored.exchanges ?? []),
     products: broker.products.length ? broker.products : (stored.products ?? []),
     broker_last_login: broker.broker_last_login ?? stored.broker_last_login,
+    paper_capital: stored.paper_capital ?? null,
+    paper_charges: stored.paper_charges ?? null,
+    paper_realised_pnl: stored.paper_realised_pnl ?? null,
   };
 }

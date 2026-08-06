@@ -92,13 +92,22 @@ export function BootScreen({
   const lines = stageCopy[stageIndex] ?? stageCopy[stageCopy.length - 1];
 
   const [lineIndex, setLineIndex] = useState(0);
-  useEffect(() => {
+  // Resets the cycle on a stage change — the React-documented "adjust state
+  // during render" pattern (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
+  // rather than a setState call inside the effect below, which would fire on
+  // every render of a mounted stage, not just the transition into a new one.
+  const [prevStageIndex, setPrevStageIndex] = useState(stageIndex);
+  if (stageIndex !== prevStageIndex) {
+    setPrevStageIndex(stageIndex);
     setLineIndex(0);
+  }
+
+  useEffect(() => {
     if (complete) return;
     const id = setInterval(() => setLineIndex((i) => (i + 1) % lines.length), LINE_MS);
     return () => clearInterval(id);
-    // Cycling resets on a stage change and stops once complete; the lines
-    // array is stable per stage index and doesn't need to retrigger it.
+    // Cycling stops once complete; the lines array is stable per stage index
+    // and doesn't need to retrigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageIndex, complete]);
 

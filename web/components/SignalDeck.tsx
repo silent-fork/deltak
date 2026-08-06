@@ -45,6 +45,7 @@ export const SignalDeck = memo(function SignalDeck({
   scaleIn,
   onLedgerChanged,
   clientCode,
+  walletResetAt,
 }: {
   signal: Signal | undefined;
   mode: ExecutionMode;
@@ -55,6 +56,8 @@ export const SignalDeck = memo(function SignalDeck({
   onLedgerChanged: () => void;
   /** Re-syncs the archive whenever the signed-in account changes — see `useTradeArchive`. */
   clientCode: string | null;
+  /** Re-syncs the archive after a paper-wallet reset — see `useTradeArchive`'s own comment. */
+  walletResetAt: number | null;
 }) {
   const [deck, setDeck] = useState<Deck>("signal");
   const meta = signal ? PROTOCOL_META[signal.protocol] : null;
@@ -66,7 +69,7 @@ export const SignalDeck = memo(function SignalDeck({
    * the operator clicked back into the book tab.
    */
   const { archive, loading: archiveLoading, error: archiveError, reload: reloadArchive } =
-    useTradeArchive(clientCode);
+    useTradeArchive(clientCode, walletResetAt);
   // `TradeBook` is memoized too; wrapping `reloadArchive` here rather than
   // inline in its JSX prop keeps that identity stable across renders that
   // don't touch the archive, instead of a fresh closure defeating the memo.

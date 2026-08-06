@@ -61,6 +61,10 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
   const [phase, setPhase] = useState<"verifying" | "authenticating" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const turnstile = useTurnstile();
+  // Destructured to a local binding: the compiler can trace a `ref={x}` prop
+  // back to its own `useRef()` call through a plain local variable, but not
+  // through a property access on an object returned by another hook.
+  const { containerRef: turnstileContainerRef } = turnstile;
 
   const valid =
     clientCode.trim().length >= 3 && pin.trim().length >= 4 && /^\d{6}$/.test(totp.trim());
@@ -214,7 +218,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             Where a challenge would appear, on the rare visit that needs one.
             `empty:hidden` keeps it from reserving a gap on every other visit.
           */}
-          <div ref={turnstile.containerRef} className="flex justify-center empty:hidden" />
+          <div ref={turnstileContainerRef} className="flex justify-center empty:hidden" />
 
           {/*
             A quiet button.

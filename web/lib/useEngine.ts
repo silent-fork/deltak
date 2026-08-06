@@ -189,6 +189,16 @@ export function useEngine(simulate: boolean) {
   const [demo, setDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /**
+   * Bumped by `resetPaper` below — the one signal `useTradeArchive` (owned by
+   * `SignalDeck`, a sibling of the `UserPill` that actually triggers a reset)
+   * has for "the DB history you fetched is gone, re-fetch it." Without this,
+   * a reset correctly clears the live ledger and Supabase, but the Trade
+   * Book's already-fetched archive keeps showing the deleted trades — and
+   * their booked P&L — until the next manual refresh, which is exactly what
+   * made Equity read "back to starting" while Booked still showed an old loss.
+   */
+  const [walletResetAt, setWalletResetAt] = useState<number | null>(null);
+  /**
    * The instrument the HUD is showing. It lives here rather than in the page
    * because the historical fetches are scoped to it — one underlying's intraday
    * detail at a time is what keeps the metered endpoints inside their limits.
@@ -1923,6 +1933,7 @@ export function useEngine(simulate: boolean) {
     // Otherwise the next login re-seeds the wallet from the pre-reset
     // checkpoint still sitting in Supabase, silently undoing the reset.
     saveWallet(ledgerRef.current);
+    setWalletResetAt(Date.now());
     log("INFO", "Paper wallet reset — history cleared, capital back to starting.");
     track("paper_wallet_reset");
   }, [log]);
@@ -1962,6 +1973,7 @@ export function useEngine(simulate: boolean) {
     scaleInPosition,
     panicFlatten,
     resetPaper,
+    walletResetAt,
     reloadMaster: loadMaster,
   };
 }

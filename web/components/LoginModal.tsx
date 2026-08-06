@@ -34,6 +34,11 @@ export function LoginModal({
   // The same gate as the sign-in screen: the server checks both paths, so both
   // paths have to be able to answer.
   const turnstile = useTurnstile();
+  // Destructured to a local binding: the compiler can trace a `ref={x}` prop
+  // back to its own `useRef()` call through a plain local variable, but not
+  // through a property access on an object returned by another hook — see
+  // the identical destructure in `LoginScreen.tsx`.
+  const { containerRef: turnstileContainerRef } = turnstile;
 
   const valid =
     clientCode.trim().length >= 3 &&
@@ -138,7 +143,7 @@ export function LoginModal({
         ) : null}
 
         {/* Only ever occupies space if a challenge actually has to be shown. */}
-        <div ref={turnstile.containerRef} className="flex justify-center empty:hidden" />
+        <div ref={turnstileContainerRef} className="flex justify-center empty:hidden" />
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[10px] leading-tight text-zinc-600">
