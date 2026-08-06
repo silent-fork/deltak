@@ -11,8 +11,8 @@ import type { Broker } from "@/lib/types";
 import { useTurnstile } from "@/lib/useTurnstile";
 
 const BROKERS: { id: Broker; label: string }[] = [
-  { id: "angelone", label: "Angel One" },
   { id: "dhan", label: "Dhan" },
+  { id: "angelone", label: "Angel One" },
 ];
 
 export function LoginModal({
@@ -24,7 +24,7 @@ export function LoginModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [broker, setBroker] = useState<Broker>("angelone");
+  const [broker, setBroker] = useState<Broker>("dhan");
   const [clientCode, setClientCode] = useState("");
   const [pin, setPin] = useState("");
   const [totp, setTotp] = useState("");

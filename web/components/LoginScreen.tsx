@@ -11,8 +11,8 @@ import type { Broker } from "@/lib/types";
 import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
 
 const BROKERS: { id: Broker; label: string; sub: string }[] = [
-  { id: "angelone", label: "Angel One", sub: "SmartAPI" },
   { id: "dhan", label: "Dhan", sub: "Data API" },
+  { id: "angelone", label: "Angel One", sub: "SmartAPI" },
 ];
 
 /**
@@ -47,7 +47,7 @@ function Field({
 
 export function LoginScreen({ simulate }: { simulate: boolean }) {
   const engine = useEngineContext();
-  const [broker, setBroker] = useState<Broker>("angelone");
+  const [broker, setBroker] = useState<Broker>("dhan");
   const [clientCode, setClientCode] = useState("");
   const [pin, setPin] = useState("");
   const [totp, setTotp] = useState("");
