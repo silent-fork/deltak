@@ -43,16 +43,21 @@ const CANDLE_LOOKBACK_DAYS = 5;
 /** How long per-contract results are pooled before one render. */
 const FLUSH_MS = 250;
 /**
- * Contracts per batch request — the route's own ceiling is 25 (`MAX_TOKENS`
- * in `/api/market/batch/route.ts`). A typical near-ATM seed window
+ * Contracts per batch request — Dhan's own ceiling in the route is
+ * unchanged (`DHAN_MAX_TOKENS = 25`). A typical near-ATM seed window
  * (`oiSeedSpan` strikes either side, two legs each) is comfortably under
  * that, so this stays one request short of the ceiling rather than forcing
- * a second chunk — and therefore a second round trip — for a ladder that
- * would otherwise fit in one. The route's own `POOL` still governs how fast
- * each chunk's tokens actually reach Angel One; this only changes how many
- * chunks the browser has to wait on.
+ * a second chunk for a ladder that would otherwise fit in one.
  */
-const BATCH_TOKENS = 24;
+const DHAN_BATCH_TOKENS = 24;
+/**
+ * Same idea, SmartAPI branch — matches the route's tighter
+ * `SMARTAPI_MAX_TOKENS` (12). A full near-ATM window now needs two chunks
+ * there instead of one; that's the point, not a compromise — see the pool
+ * comment in `/api/market/batch/route.ts` for why a single 22-token
+ * SmartAPI request was the thing timing out in production.
+ */
+const SMARTAPI_BATCH_TOKENS = 12;
 
 const POLL_OPEN = {
   candles: 60_000,
@@ -506,9 +511,10 @@ export function useMarketData(input: MarketDataInput): MarketData {
 
     // Chunked so one slow contract cannot hold the whole ladder, and so the
     // route stays inside its own per-request ceiling.
+    const batchTokens = broker === "dhan" ? DHAN_BATCH_TOKENS : SMARTAPI_BATCH_TOKENS;
     const chunks: string[][] = [];
-    for (let i = 0; i < tokens.length; i += BATCH_TOKENS) {
-      chunks.push(tokens.slice(i, i + BATCH_TOKENS));
+    for (let i = 0; i < tokens.length; i += batchTokens) {
+      chunks.push(tokens.slice(i, i + batchTokens));
     }
 
     void (async () => {
