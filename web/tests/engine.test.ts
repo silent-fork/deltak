@@ -28,9 +28,11 @@ import {
   breach,
   checkStops,
   checkTrailingStop,
+  checkWallTrail,
   checkWeakeningRotation,
   decideExit,
   decideTrail,
+  wallStopPoints,
   weakeningCorroborated,
 } from "../lib/engine/risk";
 import { planTick } from "../lib/engine/loop";
@@ -868,6 +870,89 @@ test("checkTrailingStop ratchets a favourable position's stop and leaves a flat 
   // A second pass at the same price proposes nothing new — already there.
   await checkTrailingStop(deps);
   assert.deepEqual(trailedStops, [100]);
+});
+
+test("wallStopPoints: anchors to the same line checkInvalidation would exit at, both sides", () => {
+  const invalidationPct = 0.5;
+  const itmDeltaApprox = 0.7;
+
+  // CE — Aegis-1 minus its own invalidation band, distance to spot × delta approx.
+  // band = 24000*0.5% = 120; invalidation line = 23880; distance = 620; ×0.7 = 434.
+  assert.equal(
+    wallStopPoints({
+      optionType: "CE", spot: 24_500, aegis1: 24_000, zenith1: null,
+      invalidationPct, itmDeltaApprox,
+    }),
+    434,
+  );
+
+  // PE — Zenith-1 plus its own band.
+  // band = 25000*0.5% = 125; invalidation line = 25125; distance = 625; ×0.7 = 437.5.
+  assert.equal(
+    wallStopPoints({
+      optionType: "PE", spot: 24_500, zenith1: 25_000, aegis1: null,
+      invalidationPct, itmDeltaApprox,
+    }),
+    437.5,
+  );
+
+  // No wall data on this option's own side — nothing to anchor to.
+  assert.equal(
+    wallStopPoints({
+      optionType: "CE", spot: 24_500, aegis1: null, zenith1: 25_000,
+      invalidationPct, itmDeltaApprox,
+    }),
+    null,
+  );
+
+  // Spot is already through the invalidation band — that exit belongs to
+  // `checkInvalidation`, not a stop/trail derived from this distance.
+  assert.equal(
+    wallStopPoints({
+      optionType: "CE", spot: 23_800, aegis1: 24_000, zenith1: null,
+      invalidationPct, itmDeltaApprox,
+    }),
+    null,
+  );
+});
+
+test("checkWallTrail tightens a CE long's stop toward Aegis-1 and is idempotent at the same price", async () => {
+  const cfg = { ...DEFAULT_CONFIG, invalidationPct: 0.2, itmDeltaApprox: 0.5 };
+  // band = 24500*0.2% = 49; invalidation line = 24451; distance = 49; ×0.5 = 24.5.
+  // candidate = ltp(130) - 24.5 = 105.5 — above the existing 60, an improvement.
+
+  const ledger = new Ledger(500_000, 0, 25);
+  ledger.open({
+    underlying: "NIFTY", token: "1001", tradingSymbol: "NIFTY23900CE",
+    quantity: 75, lots: 1, lotSize: 75, price: 100,
+    optionType: "CE", strike: 23_900, stopLoss: 60, target: 300, mode: "paper",
+  });
+
+  const trailedStops: number[] = [];
+  const deps = {
+    ledger,
+    chains: { NIFTY: { spot: 24_500, levels: { aegis_1: 24_500, zenith_1: null } } as unknown as OptionChain },
+    rrg: {},
+    cfg,
+    ltp: () => 130,
+    exit: async () => {},
+    scaleOut: async () => {},
+    trail: async (pos: { id: string }, newStop: number) => {
+      trailedStops.push(newStop);
+      ledger.tightenStop(pos.id, newStop);
+    },
+    log: () => {},
+    scaled: new Set<string>(),
+    daylightRestDone: true,
+    onDaylightRestDone: () => {},
+  };
+
+  await checkWallTrail(deps);
+  assert.deepEqual(trailedStops, [105.5]);
+
+  // Same price, same wall — nothing further to improve.
+  await checkWallTrail(deps);
+  assert.deepEqual(trailedStops, [105.5]);
 });
 
 test("decideExit prioritises stop and target over the daylight clock, for both sides", () => {

@@ -1,4 +1,4 @@
-import type { OptionChain, Position, RiskEvent, Side } from "@/lib/types";
+import type { OptionChain, OptionType, Position, RiskEvent, Side } from "@/lib/types";
 import type { Ledger } from "./ledger";
 import type { RrgEngine } from "./rrg";
 import type { EngineConfig } from "./config";
@@ -32,6 +32,42 @@ export function breach(
   if (!level || level <= 0 || spot <= 0) return false;
   const band = level * (invalidationPct / 100);
   return direction === "below" ? spot < level - band : spot > level + band;
+}
+
+/**
+ * Distance, in approximate *premium* points, from `spot` to the same level
+ * `checkInvalidation`/`breach` would fire this option side's exit at — the
+ * shared primitive behind both the entry-time wall-anchored stop
+ * (`SignalEngine.evaluate`, `lib/engine/dkms.ts`) and this file's own
+ * `checkWallTrail`. A CE long is anchored to Aegis-1 (support) minus its
+ * own invalidation band; a PE long to Zenith-1 (resistance) plus its band —
+ * exactly the pairing `checkInvalidation` uses. `itmDeltaApprox` translates
+ * the underlying-point distance into an approximate premium distance (see
+ * its own doc comment in `config.ts` — a stated approximation, not a real
+ * Greek).
+ *
+ * Returns `null` when there's no wall to anchor to yet, or spot is already
+ * through the invalidation band — that's `checkInvalidation`'s own exit to
+ * own, not a stop or trail derived from it.
+ */
+export function wallStopPoints(params: {
+  optionType: OptionType;
+  spot: number;
+  aegis1: number | null;
+  zenith1: number | null;
+  invalidationPct: number;
+  itmDeltaApprox: number;
+}): number | null {
+  const { optionType, spot, aegis1, zenith1, invalidationPct, itmDeltaApprox } = params;
+  const level = optionType === "CE" ? aegis1 : zenith1;
+  if (level === null || level <= 0 || spot <= 0) return null;
+
+  const band = level * (invalidationPct / 100);
+  const invalidationLevel = optionType === "CE" ? level - band : level + band;
+  const distance = optionType === "CE" ? spot - invalidationLevel : invalidationLevel - spot;
+  if (distance <= 0) return null;
+
+  return distance * itmDeltaApprox;
 }
 
 export type ExitReason = "STOP_LOSS" | "TARGET" | "DAYLIGHT_REST";
@@ -286,6 +322,60 @@ export async function checkTrailingStop(d: GuardDeps): Promise<void> {
   }
 }
 
+/**
+ * Trails the stop behind the COA wall itself as it migrates favourably
+ * intraday — a CE long's Aegis-1 climbing under a rising price, or a PE
+ * long's Zenith-1 sinking under a falling one — rather than only the flat
+ * R-multiple `checkTrailingStop` already provides.
+ *
+ * Recomputes the same wall-anchored stop `SignalEngine.evaluate` derives at
+ * entry (see its own comment), fresh every tick, against the position's
+ * *current* premium (`ltp`) rather than its entry price — so this both
+ * captures the wall moving and the option's own price moving. There is
+ * deliberately no "has the wall actually moved since entry" check: handing
+ * a freshly-computed candidate to `d.trail` every tick is enough, since
+ * `Ledger.tightenStop`'s own one-way guarantee already discards anything
+ * that isn't a genuine improvement — this needs no separate bookkeeping to
+ * avoid moving the stop backwards.
+ *
+ * Browser-only, same as `checkInvalidation`: both need a live COA chain
+ * (`d.chains`), which the server watchdog does not have — see its own
+ * module doc in `lib/server/watchdogGuards.ts`.
+ */
+export async function checkWallTrail(d: GuardDeps): Promise<void> {
+  for (const pos of d.ledger.openPositions) {
+    if (!pos.option_type) continue;
+    const chain = d.chains[pos.underlying];
+    if (!chain || chain.spot <= 0) continue;
+    const ltp = d.ltp(pos.token);
+    if (ltp <= 0) continue;
+
+    const points = wallStopPoints({
+      optionType: pos.option_type,
+      spot: chain.spot,
+      aegis1: chain.levels.aegis_1,
+      zenith1: chain.levels.zenith_1,
+      invalidationPct: d.cfg.invalidationPct,
+      itmDeltaApprox: d.cfg.itmDeltaApprox,
+    });
+    if (points === null) continue;
+
+    const candidate = Number((pos.side === "BUY" ? ltp - points : ltp + points).toFixed(2));
+    const improves =
+      pos.side === "BUY"
+        ? pos.stop_loss === null || candidate > pos.stop_loss
+        : pos.stop_loss === null || candidate < pos.stop_loss;
+    if (!improves) continue;
+
+    d.log(
+      "INFO",
+      `${pos.trading_symbol} wall-trailed — stop moved to ${candidate.toFixed(2)} tracking ${pos.option_type === "CE" ? "Aegis-1" : "Zenith-1"}.`,
+      pos.underlying,
+    );
+    await d.trail(pos, candidate);
+  }
+}
+
 /** 3:15 PM IST — flatten everything ahead of the 3:40 PM close. */
 export async function checkDaylightRest(d: GuardDeps): Promise<void> {
   if (d.daylightRestDone) return;
@@ -308,6 +398,7 @@ export async function runGuards(d: GuardDeps): Promise<void> {
   await checkStops(d);
   await checkInvalidation(d);
   await checkTrailingStop(d);
+  await checkWallTrail(d);
   await checkWeakeningRotation(d);
   await checkDaylightRest(d);
 }

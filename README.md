@@ -482,10 +482,14 @@ capability.
 Weakening-quadrant scale-out itself (needs live RRG rotation) both need market
 state that only exists inside a running browser tab's engine today. Closing
 that gap needs a server-side home for that state, which is future work, not a
-missing wire-up. The trailing stop is the one guard that *doesn't* need that
-state — it only reads a position's own `protocol`, `avg_price` and a live LTP
-(`decideTrail` in `lib/engine/risk.ts`), all of which this route already has,
-so it runs here too rather than being browser-only.
+missing wire-up. The wall-migration trail (`checkWallTrail`) needs that same
+chain state and stays browser-only for the same reason.
+
+The breakeven-then-trail stop is different: it only reads a position's own
+`protocol`, `avg_price` and a live LTP (`decideTrail` in `lib/engine/risk.ts`),
+all of which this route already has, so it runs here too rather than being
+browser-only — the one guard in this list that isn't gated on a running
+browser tab's own chain state.
 
 **Credentials.** The route needs a live price per open position, and every
 SmartAPI call — even a read — requires a session JWT. That JWT is stored

@@ -11,6 +11,7 @@ import type { OiBuildupType } from "@/lib/market/constants";
 import type { EngineConfig } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
+import { wallStopPoints } from "./risk";
 import { calculateSize } from "./sizing";
 
 /**
@@ -253,7 +254,32 @@ export class SignalEngine {
     // -- risk geometry --------------------------------------------------- //
     const r2 = (n: number) => Number(n.toFixed(2));
     const entry = leg.best_ask > 0 ? leg.best_ask : leg.ltp;
-    const stopPoints = r2(entry * this.cfg.stopPctByProtocol[protocol]);
+    let stopPoints = r2(entry * this.cfg.stopPctByProtocol[protocol]);
+
+    // Anchor the stop to the *same* wall `checkInvalidation` already
+    // watches for this option side (support/Aegis-1 under a CE long,
+    // resistance/Zenith-1 over a PE long — the exact pairing
+    // `checkInvalidation` uses, generalised across all three protocols
+    // rather than kept Alpha-specific), instead of leaving the two as
+    // independent, uncoordinated exit triggers that can fire in either
+    // order for no principled reason. A stop derived from the distance to
+    // the same line invalidation itself breaches at tends to resolve at
+    // roughly the same moment invalidation would have fired anyway.
+    // Clamped to [0.5x, 1.5x] of the percentage-based stop: wall data
+    // informs the number, but never swings it wildly outside the range
+    // this engine has actually been sized and tested against.
+    const wsp = wallStopPoints({
+      optionType,
+      spot,
+      aegis1: levels.aegis_1,
+      zenith1: levels.zenith_1,
+      invalidationPct: this.cfg.invalidationPct,
+      itmDeltaApprox: this.cfg.itmDeltaApprox,
+    });
+    if (wsp !== null) {
+      stopPoints = r2(Math.min(stopPoints * 1.5, Math.max(stopPoints * 0.5, wsp)));
+    }
+
     const stop = r2(Math.max(0.05, entry - stopPoints));
     let target1 = r2(entry + stopPoints * 1.5);
     const target2 = r2(entry + stopPoints * 3.0);
