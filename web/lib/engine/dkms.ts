@@ -10,6 +10,7 @@ import type {
 import type { OiBuildupType } from "@/lib/market/constants";
 import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import type { EngineConfig } from "./config";
+import { DAYLIGHT_REST_MIN, MARKET_OPEN_MIN } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
 import { wallStopPoints } from "./risk";
@@ -59,6 +60,24 @@ export function rollingExtremeBreak(
   }
   const low = Math.min(...history);
   return current >= low * (1 + minPct / 100);
+}
+
+/**
+ * Realised range over a rolling spot window, as a percent of its mean —
+ * `(max-min)/mean * 100`. Phase 3's chop gate for Beta/Gamma: both are
+ * momentum entries, and a window with next to no range is a flat tape
+ * regardless of what the OI walls or RRG quadrant say. Needs at least 2
+ * samples to mean anything; fewer reads as zero range (fails the gate
+ * closed rather than needing a separate bootstrap case, the same posture
+ * `rollingExtremeBreak` already takes).
+ */
+export function rollingRangePct(history: number[]): number {
+  if (history.length < 2) return 0;
+  const max = Math.max(...history);
+  const min = Math.min(...history);
+  const mean = history.reduce((a, b) => a + b, 0) / history.length;
+  if (mean <= 0) return 0;
+  return ((max - min) / mean) * 100;
 }
 
 /** Confirmation state `applyDwellLatch` carries across `evaluate()` calls — see its own doc comment. */
@@ -180,6 +199,16 @@ export interface EvaluateContext {
    * is active.
    */
   vixRegime?: VixRegime | null;
+  /**
+   * IST minutes-since-midnight at evaluation time — `useEngine`'s own
+   * `istMinutes()`, threaded through rather than read directly off the wall
+   * clock here so a caller with no notion of session time (chiefly the test
+   * suite) can leave it unset and get the pre-Phase-3 behaviour: no
+   * opening/closing quiet window. `null`/absent means "unknown," not
+   * "market open" or "market closed" — `trading` above is what answers
+   * that question; this only ever narrows a `trading: true` tick further.
+   */
+  sessionMinute?: number | null;
 }
 
 const emptyLevels = (): CoaLevels => ({
@@ -282,6 +311,26 @@ export class SignalEngine {
 
     if (spot <= 0 || !chain.rows.length) {
       return this.blocked(protocol, levels ?? emptyLevels(), "NO_DATA", "Awaiting live feed", rationale);
+    }
+
+    // Phase 3: no new entries in the opening's settling-in window, or once
+    // Daylight Rest is due — existing positions are untouched either way
+    // (this only gates fresh entries), and `sessionMinute` unset (the whole
+    // test suite, any caller with no notion of session time) skips both
+    // checks entirely rather than reading as either edge.
+    if (context.sessionMinute != null) {
+      if (context.sessionMinute < MARKET_OPEN_MIN + this.cfg.openingQuietMinutes) {
+        return this.blocked(protocol, levels, "OPENING_QUIET", "Opening — settling in", [
+          ...rationale,
+          `No new entries in the first ${this.cfg.openingQuietMinutes} minutes — spreads and walls haven't settled yet.`,
+        ]);
+      }
+      if (context.sessionMinute >= DAYLIGHT_REST_MIN) {
+        return this.blocked(protocol, levels, "CLOSING_QUIET", "Daylight Rest — no new entries", [
+          ...rationale,
+          "Past 3:15 PM IST: existing risk is being flattened, not added to.",
+        ]);
+      }
     }
 
     if (protocol === "DELTA") {
@@ -491,6 +540,29 @@ export class SignalEngine {
       );
     }
 
+    // -- Phase 3: execution-quality and momentum-regime filters ---------- //
+    const spreadPct =
+      leg.best_bid > 0 && leg.best_ask > 0
+        ? ((leg.best_ask - leg.best_bid) / ((leg.best_ask + leg.best_bid) / 2)) * 100
+        : null;
+    const spreadTooWide = spreadPct !== null && spreadPct > this.cfg.maxSpreadPct;
+    if (spreadTooWide) {
+      rationale.push(
+        `Bid-ask spread ${spreadPct!.toFixed(1)}% on ${inst!.symbol} exceeds the ${this.cfg.maxSpreadPct}% execution-quality ceiling.`,
+      );
+    }
+
+    // Alpha is deliberately exempt — a tight, low-range tape at a wall is
+    // the setup, not evidence there isn't one. Beta/Gamma need genuine
+    // movement to justify a momentum entry at all.
+    const chopRangePct = rollingRangePct(this.spotWindow);
+    const tooFlat = protocol !== "ALPHA" && chopRangePct < this.cfg.minChopRangePct;
+    if (tooFlat) {
+      rationale.push(
+        `Realised range ${chopRangePct.toFixed(2)}% over the rolling window is under the ${this.cfg.minChopRangePct}% floor — flat tape, no real momentum to trade.`,
+      );
+    }
+
     // Everything that reaches this point already cleared the protocol
     // trigger and Zero-OTM strike selection *this tick* (both return early
     // via `blocked()` otherwise) — the one flicker-prone check left is
@@ -529,6 +601,12 @@ export class SignalEngine {
     } else if (pcrDivergent) {
       actionable = false;
       blockedReason = "PCR_DIVERGENCE";
+    } else if (spreadTooWide) {
+      actionable = false;
+      blockedReason = "WIDE_SPREAD";
+    } else if (tooFlat) {
+      actionable = false;
+      blockedReason = "FLAT_TAPE";
     } else if (!confirmation.actionable) {
       blockedReason = "AWAITING_CONFIRMATION";
       rationale.push(

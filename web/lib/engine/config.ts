@@ -95,6 +95,8 @@ export interface IndexSpec {
   shiftLookback?: number;
   wallChallengeMarginPct?: number;
   earlyOiChangeFloor?: number;
+  maxSpreadPct?: number;
+  minChopRangePct?: number;
 }
 
 export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
@@ -122,6 +124,10 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     alphaEntryBandPct: 0.2,
     microMoveMinPct: 0.07,
     weakeningMinAdverseMovePct: 0.07,
+    // Spreads stay at the shared default — liquidity here really does
+    // match NIFTY's — but Beta/Gamma's chop floor scales with the same
+    // volatility multiplier as the bands above.
+    minChopRangePct: 0.14,
   },
   FINNIFTY: {
     label: "FIN NIFTY",
@@ -171,6 +177,11 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     shiftLookback: 30,
     wallChallengeMarginPct: 20,
     earlyOiChangeFloor: 400,
+    // Thinner book, wider natural quotes — the spread ceiling widens with
+    // it, or every setup on this instrument would veto on execution
+    // quality alone regardless of how sound the underlying thesis is.
+    maxSpreadPct: 6,
+    minChopRangePct: 0.12,
   },
   // BANKEX and SENSEX list on BSE's own cash/F&O segments, not NSE's — spot
   // tokens, strike step and lot size below were confirmed directly against a
@@ -208,6 +219,11 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     shiftLookback: 35,
     wallChallengeMarginPct: 25,
     earlyOiChangeFloor: 300,
+    // Thinnest book of the five, compounded with the same higher
+    // sector-concentration volatility as BANKNIFTY — widest allowance on
+    // both the spread ceiling and the chop floor.
+    maxSpreadPct: 8,
+    minChopRangePct: 0.16,
   },
   SENSEX: {
     label: "SENSEX",
@@ -233,6 +249,8 @@ export const INDEX_UNIVERSE: Record<string, IndexSpec> = {
     shiftLookback: 24,
     wallChallengeMarginPct: 20,
     earlyOiChangeFloor: 500,
+    maxSpreadPct: 6,
+    minChopRangePct: 0.12,
   },
 };
 
@@ -304,6 +322,43 @@ export interface EngineConfig {
    * picking an arg-max over near-zero values is close to picking at random.
    */
   earlyOiChangeFloor: number;
+
+  /**
+   * Phase 3 noise reduction — confirming filters off data the engine
+   * already reads but, before this, only used to price a fill (`best_bid`/
+   * `best_ask`) or not at all (the rolling spot window Beta/Gamma's
+   * micro-dip/rally already builds). Both are immediate, current-tick
+   * vetoes in `evaluate()`, the same posture `buildupMismatch`/
+   * `pcrDivergent` already have — not dwelled through, since a wide spread
+   * or a genuinely flat tape is a real fact about right now, not flicker.
+   */
+  /**
+   * Bid-ask spread ceiling on the chosen leg, percent of mid — `(ask-bid)/
+   * mid * 100`. A wide quote is a bad fill waiting to happen regardless of
+   * how sound the setup is; this rejects on execution quality directly
+   * rather than only ever reading `best_ask` and hoping it was tight.
+   */
+  maxSpreadPct: number;
+  /**
+   * Minimum realised range over the rolling spot window (`spotWindow`,
+   * `(max-min)/mean * 100`), required before Beta/Gamma will fire — a
+   * momentum entry needs the underlying to actually be moving. Alpha is
+   * deliberately exempt: it is a mean-reversion play at a wall, where a
+   * tight, low-range tape *is* the setup, not evidence there isn't one.
+   */
+  minChopRangePct: number;
+  /**
+   * Minutes after `MARKET_OPEN_MIN` during which no new entry fires —
+   * spreads are typically at their widest, COA walls have had the fewest
+   * samples to settle, and RRG nodes are furthest from maturity. Existing
+   * positions are untouched; this only gates fresh entries. Not per-index:
+   * the opening's own settling-in period is a market-structure effect, not
+   * a liquidity-tier one. The closing side reuses `DAYLIGHT_REST_MIN`
+   * directly rather than a separate constant — new entries stop exactly
+   * when existing risk starts getting flattened, closing what would
+   * otherwise be a 25-minute gap between the two.
+   */
+  openingQuietMinutes: number;
 
   riskPct: number;
   /**
@@ -434,6 +489,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
   wallChallengeMarginPct: 15,
   earlyOiChangeFloor: 1_000,
 
+  maxSpreadPct: 4,
+  minChopRangePct: 0.1,
+  openingQuietMinutes: 10,
+
   /**
    * Sized for the 25,000 paper float: at 1% the risk budget (250) is smaller
    * than a single NIFTY lot's stop distance, so every signal resolved to zero
@@ -497,6 +556,8 @@ export function effectiveConfig(underlying: string, cfg: EngineConfig): EngineCo
     shiftLookback: spec.shiftLookback ?? cfg.shiftLookback,
     wallChallengeMarginPct: spec.wallChallengeMarginPct ?? cfg.wallChallengeMarginPct,
     earlyOiChangeFloor: spec.earlyOiChangeFloor ?? cfg.earlyOiChangeFloor,
+    maxSpreadPct: spec.maxSpreadPct ?? cfg.maxSpreadPct,
+    minChopRangePct: spec.minChopRangePct ?? cfg.minChopRangePct,
   };
 }
 

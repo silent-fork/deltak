@@ -29,6 +29,7 @@ import {
   UNDERLYINGS,
   effectiveConfig,
   isMarketOpen,
+  istMinutes,
   secondsToDaylightRest,
   secondsToNextOpen,
   type EngineConfig,
@@ -839,6 +840,7 @@ export function useEngine(simulate: boolean) {
           // the signal engine never proposes a trade off replayed history.
           trading: plan.guards,
           vixRegime: vixRef.current,
+          sessionMinute: plan.guards ? istMinutes() : null,
         });
         signalsRef.current[u] = sig;
 
