@@ -96,11 +96,17 @@ function SpotTicker({
         off one glyph instead of two. A plain dot rather than a numbered
         badge: the count/P&L still ride the tooltip, but a wider glyph here
         sat over the ticker's own change/% text at this card's width.
+
+        Inset (bottom-0.5/right-0.5), not overflowing past the button's own
+        edge — the ticker rail is `overflow-x-auto`, and a browser forces
+        overflow-y to `auto` too the moment one axis isn't `visible`, so even
+        a couple of overflowing pixels here was enough to put a scrollbar (and
+        extra height) on the whole row.
       */}
       {activeTrade ? (
         <span
           title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
-          className="absolute -right-0.5 -bottom-0.5 flex h-2.5 w-2.5"
+          className="absolute bottom-0.5 right-0.5 flex h-2.5 w-2.5"
         >
           <span
             className={cn(
