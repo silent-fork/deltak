@@ -93,29 +93,29 @@ function SpotTicker({
         A trade sitting on this index, at a glance, without opening the book —
         a radar-style ping in the same emerald/rose the P&L itself uses, so
         "there's a live position here" and "it's up or down right now" read
-        off one glyph instead of two.
+        off one glyph instead of two. A plain dot rather than a numbered
+        badge: the count/P&L still ride the tooltip, but a wider glyph here
+        sat over the ticker's own change/% text at this card's width.
       */}
       {activeTrade ? (
         <span
           title={`${activeTrade.count} open position${activeTrade.count === 1 ? "" : "s"} on ${quote.label} · ${signedMoney(activeTrade.pnl, 0)} unrealised`}
-          className="absolute -right-1.5 top-0.5 flex h-4 min-w-4"
+          className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5"
         >
           <span
             className={cn(
-              "absolute inset-0 animate-ping rounded-full opacity-60",
+              "absolute inset-0 animate-ping rounded-full opacity-75",
               activeTrade.pnl >= 0 ? "bg-emerald-500" : "bg-rose-500",
             )}
           />
           <span
             className={cn(
-              "relative flex h-4 min-w-4 items-center justify-center rounded-full border px-1 font-mono text-[9px] font-bold leading-none text-zinc-950",
+              "relative h-2.5 w-2.5 rounded-full border",
               activeTrade.pnl >= 0
                 ? "border-emerald-300 bg-emerald-500"
                 : "border-rose-300 bg-rose-500",
             )}
-          >
-            {activeTrade.count}
-          </span>
+          />
         </span>
       ) : null}
       <span
