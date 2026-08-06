@@ -1,4 +1,4 @@
-import type { OptionChain, Position, RiskEvent, Side } from "@/lib/types";
+import type { OptionChain, OptionType, Position, RiskEvent, Side } from "@/lib/types";
 import type { Ledger } from "./ledger";
 import type { RrgEngine } from "./rrg";
 import type { EngineConfig } from "./config";
@@ -20,6 +20,8 @@ export type ExitFn = (
 
 export type ScaleFn = (position: Position, fraction: number) => Promise<void> | void;
 
+export type TrailFn = (position: Position, newStop: number) => Promise<void> | void;
+
 /** True when spot has breached *level* by more than the invalidation band. */
 export function breach(
   spot: number,
@@ -30,6 +32,42 @@ export function breach(
   if (!level || level <= 0 || spot <= 0) return false;
   const band = level * (invalidationPct / 100);
   return direction === "below" ? spot < level - band : spot > level + band;
+}
+
+/**
+ * Distance, in approximate *premium* points, from `spot` to the same level
+ * `checkInvalidation`/`breach` would fire this option side's exit at — the
+ * shared primitive behind both the entry-time wall-anchored stop
+ * (`SignalEngine.evaluate`, `lib/engine/dkms.ts`) and this file's own
+ * `checkWallTrail`. A CE long is anchored to Aegis-1 (support) minus its
+ * own invalidation band; a PE long to Zenith-1 (resistance) plus its band —
+ * exactly the pairing `checkInvalidation` uses. `itmDeltaApprox` translates
+ * the underlying-point distance into an approximate premium distance (see
+ * its own doc comment in `config.ts` — a stated approximation, not a real
+ * Greek).
+ *
+ * Returns `null` when there's no wall to anchor to yet, or spot is already
+ * through the invalidation band — that's `checkInvalidation`'s own exit to
+ * own, not a stop or trail derived from it.
+ */
+export function wallStopPoints(params: {
+  optionType: OptionType;
+  spot: number;
+  aegis1: number | null;
+  zenith1: number | null;
+  invalidationPct: number;
+  itmDeltaApprox: number;
+}): number | null {
+  const { optionType, spot, aegis1, zenith1, invalidationPct, itmDeltaApprox } = params;
+  const level = optionType === "CE" ? aegis1 : zenith1;
+  if (level === null || level <= 0 || spot <= 0) return null;
+
+  const band = level * (invalidationPct / 100);
+  const invalidationLevel = optionType === "CE" ? level - band : level + band;
+  const distance = optionType === "CE" ? spot - invalidationLevel : invalidationLevel - spot;
+  if (distance <= 0) return null;
+
+  return distance * itmDeltaApprox;
 }
 
 export type ExitReason = "STOP_LOSS" | "TARGET" | "DAYLIGHT_REST";
@@ -69,6 +107,51 @@ export function decideExit(params: {
   return { action: "HOLD" };
 }
 
+/**
+ * Breakeven-then-trail: once a position has moved favourably by at least
+ * one risk-multiple (R — the premium distance its stop originally sized
+ * against, reconstructed from its own `protocol`'s configured stop%, see
+ * `EngineConfig.stopPctByProtocol`), the stop ratchets to breakeven — the
+ * trade can no longer close at a loss. Past 2R it trails a further R
+ * behind the current price instead of sitting fixed at breakeven forever.
+ *
+ * Needs only a position's own numbers and a fresh price — same shape as
+ * `decideExit` and for the same reason: a background job can reach the
+ * identical verdict without a live COA chain or RRG window, so unlike
+ * invalidation and the Weakening scale-out, trailing can run in the
+ * server watchdog too.
+ *
+ * Returns the new stop only when it's an actual improvement (mirrors
+ * `Ledger.tightenStop`'s own one-way check) — `null` means nothing to do,
+ * so a caller can invoke this every tick with no extra bookkeeping.
+ */
+export function decideTrail(params: {
+  side: Side;
+  avgPrice: number;
+  stopLoss: number | null;
+  ltp: number;
+  /** The premium distance this position's stop was originally sized against — its "1R". */
+  riskPoints: number;
+}): number | null {
+  const { side, avgPrice, stopLoss, ltp, riskPoints } = params;
+  if (riskPoints <= 0 || ltp <= 0 || avgPrice <= 0) return null;
+
+  const long = side === "BUY";
+  const favourableMove = long ? ltp - avgPrice : avgPrice - ltp;
+  if (favourableMove < riskPoints) return null; // not yet breakeven-eligible
+
+  let candidate = avgPrice;
+  if (favourableMove >= riskPoints * 2) {
+    const trailing = long ? ltp - riskPoints : ltp + riskPoints;
+    candidate = long ? Math.max(candidate, trailing) : Math.min(candidate, trailing);
+  }
+
+  const improves = long
+    ? stopLoss === null || candidate > stopLoss
+    : stopLoss === null || candidate < stopLoss;
+  return improves ? Number(candidate.toFixed(2)) : null;
+}
+
 export interface GuardDeps {
   ledger: Ledger;
   chains: Record<string, OptionChain>;
@@ -77,6 +160,7 @@ export interface GuardDeps {
   ltp: (token: string) => number;
   exit: ExitFn;
   scaleOut: ScaleFn;
+  trail: TrailFn;
   log: (kind: RiskEvent["kind"], message: string, underlying?: string) => void;
   /** Position ids already scaled out once. */
   scaled: Set<string>;
@@ -162,10 +246,19 @@ export function weakeningCorroborated(
   return optionType === "PE" ? spot > entrySpot + band : spot < entrySpot - band;
 }
 
-/** Automated TP1 scale-out when a held node rotates into Weakening. */
+/**
+ * Automated TP1 scale-out when a held node rotates into Weakening.
+ *
+ * A 1-lot position can't be reduced (the exchange only trades whole lots),
+ * which used to mean the rotation was silently skipped — the position rode
+ * out unmodified whatever conviction triggered a scale-out on a 2+-lot
+ * position. It falls back to locking the stop to breakeven instead: it
+ * can't take money off the table, but it can guarantee the trade won't give
+ * back what it's already up.
+ */
 export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
   for (const pos of d.ledger.openPositions) {
-    if (d.scaled.has(pos.id) || pos.lots < 2) continue;
+    if (d.scaled.has(pos.id)) continue;
     if (d.rrg[pos.underlying]?.quadrant(pos.token) !== "WEAKENING") continue;
     if (pos.unrealised_pnl <= 0) continue; // only scale out of a winner
 
@@ -180,9 +273,106 @@ export async function checkWeakeningRotation(d: GuardDeps): Promise<void> {
       if (!corroborated) continue; // premium drifted, spot did not — theta, not rotation
     }
 
+    if (pos.lots < 2) {
+      d.log(
+        "TARGET",
+        `${pos.trading_symbol} rotated into Weakening at 1 lot — locking the stop to breakeven instead of scaling out.`,
+        pos.underlying,
+      );
+      await d.trail(pos, pos.avg_price);
+      d.scaled.add(pos.id);
+      continue;
+    }
+
     d.log("TARGET", `${pos.trading_symbol} rotated into Weakening — TP1 scale-out.`, pos.underlying);
     await d.scaleOut(pos, 0.5);
     d.scaled.add(pos.id);
+  }
+}
+
+/** Reconstructs a position's own "1R" from its stored protocol's configured stop%, since the original distance isn't persisted separately. */
+function riskPointsFor(pos: Position, cfg: EngineConfig): number | null {
+  if (!pos.protocol || pos.protocol === "DELTA") return null; // no live position is ever opened under Delta
+  return pos.avg_price * cfg.stopPctByProtocol[pos.protocol];
+}
+
+/** Breakeven-then-trail on every open position — see `decideTrail` for the rule itself. */
+export async function checkTrailingStop(d: GuardDeps): Promise<void> {
+  for (const pos of d.ledger.openPositions) {
+    const riskPoints = riskPointsFor(pos, d.cfg);
+    if (riskPoints === null || riskPoints <= 0) continue;
+    const ltp = d.ltp(pos.token);
+    if (ltp <= 0) continue;
+
+    const newStop = decideTrail({
+      side: pos.side,
+      avgPrice: pos.avg_price,
+      stopLoss: pos.stop_loss,
+      ltp,
+      riskPoints,
+    });
+    if (newStop === null) continue;
+
+    d.log(
+      "INFO",
+      `${pos.trading_symbol} trailed — stop moved to ${newStop.toFixed(2)}.`,
+      pos.underlying,
+    );
+    await d.trail(pos, newStop);
+  }
+}
+
+/**
+ * Trails the stop behind the COA wall itself as it migrates favourably
+ * intraday — a CE long's Aegis-1 climbing under a rising price, or a PE
+ * long's Zenith-1 sinking under a falling one — rather than only the flat
+ * R-multiple `checkTrailingStop` already provides.
+ *
+ * Recomputes the same wall-anchored stop `SignalEngine.evaluate` derives at
+ * entry (see its own comment), fresh every tick, against the position's
+ * *current* premium (`ltp`) rather than its entry price — so this both
+ * captures the wall moving and the option's own price moving. There is
+ * deliberately no "has the wall actually moved since entry" check: handing
+ * a freshly-computed candidate to `d.trail` every tick is enough, since
+ * `Ledger.tightenStop`'s own one-way guarantee already discards anything
+ * that isn't a genuine improvement — this needs no separate bookkeeping to
+ * avoid moving the stop backwards.
+ *
+ * Browser-only, same as `checkInvalidation`: both need a live COA chain
+ * (`d.chains`), which the server watchdog does not have — see its own
+ * module doc in `lib/server/watchdogGuards.ts`.
+ */
+export async function checkWallTrail(d: GuardDeps): Promise<void> {
+  for (const pos of d.ledger.openPositions) {
+    if (!pos.option_type) continue;
+    const chain = d.chains[pos.underlying];
+    if (!chain || chain.spot <= 0) continue;
+    const ltp = d.ltp(pos.token);
+    if (ltp <= 0) continue;
+
+    const points = wallStopPoints({
+      optionType: pos.option_type,
+      spot: chain.spot,
+      aegis1: chain.levels.aegis_1,
+      zenith1: chain.levels.zenith_1,
+      invalidationPct: d.cfg.invalidationPct,
+      itmDeltaApprox: d.cfg.itmDeltaApprox,
+    });
+    if (points === null) continue;
+
+    const candidate = Number((pos.side === "BUY" ? ltp - points : ltp + points).toFixed(2));
+    const improves =
+      pos.side === "BUY"
+        ? pos.stop_loss === null || candidate > pos.stop_loss
+        : pos.stop_loss === null || candidate < pos.stop_loss;
+    if (!improves) continue;
+
+    d.log(
+      "INFO",
+      `${pos.trading_symbol} wall-trailed — stop moved to ${candidate.toFixed(2)} tracking ${pos.option_type === "CE" ? "Aegis-1" : "Zenith-1"}.`,
+      pos.underlying,
+    );
+    await d.trail(pos, candidate);
   }
 }
 
@@ -207,6 +397,8 @@ export async function checkDaylightRest(d: GuardDeps): Promise<void> {
 export async function runGuards(d: GuardDeps): Promise<void> {
   await checkStops(d);
   await checkInvalidation(d);
+  await checkTrailingStop(d);
+  await checkWallTrail(d);
   await checkWeakeningRotation(d);
   await checkDaylightRest(d);
 }

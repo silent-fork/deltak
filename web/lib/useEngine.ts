@@ -45,6 +45,7 @@ import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
 import { DhanFeedClient } from "@/lib/stream/dhanfeed";
 import { SimulatedFeed } from "@/lib/stream/simFeed";
 import { useMarketData, type MarketData } from "@/lib/useMarketData";
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import { clearMarketCache } from "@/lib/market/client";
 import { api } from "@/lib/api";
 import { setAnalyticsContext, track } from "@/lib/analytics";
@@ -87,6 +88,14 @@ const SESSION_CHECK_MS = 15 * 60_000;
 const MOBILE_PUSH_MS = 5_000;
 /** Focus fires on every alt-tab; do not spend a profile call on each one. */
 const SESSION_FOCUS_MIN_MS = 5 * 60_000;
+/**
+ * How often the signal engine's own VIX regime read refreshes. The
+ * Volatility Desk route caches its NSE VIX read server-side for 30 minutes
+ * (`lib/tools/vix.ts`), so polling much faster than that would only ever
+ * see the same cached value — this just needs to notice a regime change
+ * reasonably soon after that cache actually rolls over.
+ */
+const VIX_POLL_MS = 10 * 60_000;
 /**
  * Autopilot-only: how long an underlying stays off-limits to Autopilot after
  * a TARGET or STOP_LOSS exit — long enough that a level the protocol just
@@ -505,6 +514,19 @@ export function useEngine(simulate: boolean) {
 
   const bookScaleOut = useCallback(
     async (pos: Position, fraction: number) => {
+      // A 1-lot position can't be *scaled* at all — the exchange only
+      // trades whole lots, so the fraction has nothing left to reduce.
+      // This used to fall through to `lots >= pos.lots` below and silently
+      // execute a full close instead, which reads as "scale out" doing
+      // something the caller didn't ask for. The trade book's own scale
+      // button is already disabled below 2 lots; this is the function
+      // itself refusing to guess for whatever calls it next.
+      if (pos.lots < 2) {
+        throw new Error(
+          `Cannot scale out ${pos.trading_symbol} — only 1 lot is open. Close the position instead.`,
+        );
+      }
+
       const lots = Math.max(1, Math.floor(pos.lots * fraction));
       if (lots >= pos.lots) {
         await bookExit(pos, "TP1");
@@ -574,6 +596,18 @@ export function useEngine(simulate: boolean) {
     },
     [bookExit, log],
   );
+
+  /**
+   * Ratchets a position's stop — the trailing-stop guard's own write path,
+   * same shape as `bookExit`/`bookScaleOut`: the guard in `risk.ts` only
+   * decides *what* the new stop should be, this is what actually mutates
+   * the ledger and persists it. No order is placed — a stop move is
+   * bookkeeping, not a fill.
+   */
+  const bookTrail = useCallback(async (pos: Position, newStop: number) => {
+    const updated = ledgerRef.current.tightenStop(pos.id, newStop);
+    if (updated) savePositions([updated]);
+  }, []);
 
   /* ---------------------------------------------------------- snapshot */
 
@@ -734,6 +768,7 @@ export function useEngine(simulate: boolean) {
           // one source of truth for "is there a real market right now" and
           // the signal engine never proposes a trade off replayed history.
           trading: plan.guards,
+          vixRegime: vixRef.current,
         });
       }
 
@@ -746,6 +781,7 @@ export function useEngine(simulate: boolean) {
           ltp: (token) => ticksRef.current.ltp(token),
           exit: bookExit,
           scaleOut: bookScaleOut,
+          trail: bookTrail,
           log,
           scaled: scaledRef.current,
           daylightRestDone: daylightDoneRef.current,
@@ -827,7 +863,7 @@ export function useEngine(simulate: boolean) {
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, buildSnapshot, feedLive, log, spotMap]);
+  }, [bookExit, bookScaleOut, bookTrail, buildSnapshot, feedLive, log, spotMap]);
 
   /**
    * Repaint the instant the tab comes back into view, rather than leaving it
@@ -1107,6 +1143,35 @@ export function useEngine(simulate: boolean) {
     onContractSession,
   });
   marketRef.current = market;
+
+  /**
+   * India VIX's regime, read into the signal engine's own `evaluate()`
+   * context (see the `tick` loop below). Independent of `session.authenticated`
+   * on purpose: the Volatility Desk route is public NSE data, unauthenticated
+   * and the same regardless of which broker session is active, so this polls
+   * on its own schedule rather than riding `useMarketData`'s broker-gated one.
+   * Best-effort — a failed read just leaves stop/risk sizing at their
+   * VIX-unaware baseline, same as before this existed.
+   */
+  const vixRef = useRef<VixRegime | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await api.tools.volatilityDesk();
+        if (!cancelled) vixRef.current = res.vix?.regime ?? null;
+      } catch {
+        // Leave whatever the last good read was rather than blanking it on
+        // one transient failure.
+      }
+    };
+    void poll();
+    const id = setInterval(() => void poll(), VIX_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   /**
    * The index itself, out of hours.

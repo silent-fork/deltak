@@ -13,6 +13,7 @@ import type {
   Signal,
   UserProfile,
 } from "./types";
+import type { VolatilityDeskResponse } from "./tools/volatilityDeskTypes";
 
 /**
  * Client for this app's own route handlers.
@@ -240,6 +241,11 @@ export const api = {
       }),
     /** NSE's own F&O holiday calendar — not Angel One, no JWT involved. */
     holidays: () => request<HolidayResponse>("/api/market/holidays"),
+  },
+
+  tools: {
+    /** OI buildup, per-index PCR/max pain, and India VIX — public NSE data, no broker session involved. */
+    volatilityDesk: () => request<VolatilityDeskResponse>("/api/tools/volatility-desk"),
   },
 
   history: (resource: string, params: Record<string, string> = {}) =>

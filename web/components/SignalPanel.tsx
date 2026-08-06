@@ -371,6 +371,14 @@ export function SignalPanel({
               <div className="mt-1 text-[9px] uppercase tracking-wider text-amber-400/80">
                 Capped ·{" "}
                 {BLOCK_REASONS[signal.sizing.capped_by] ?? signal.sizing.capped_by}
+                {signal.sizing.single_lot_constrained ? (
+                  <span
+                    className="mt-0.5 block normal-case tracking-normal text-zinc-500"
+                    title="A Weakening-quadrant rotation can't reduce a 1-lot position, so it locks the stop to breakeven instead of scaling out."
+                  >
+                    Locked at 1 lot — a Weakening rotation will lock the stop to breakeven instead of scaling out.
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -8,9 +8,11 @@ import type {
   Signal,
 } from "@/lib/types";
 import type { OiBuildupType } from "@/lib/market/constants";
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
 import type { EngineConfig } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
+import { wallStopPoints } from "./risk";
 import { calculateSize } from "./sizing";
 
 /**
@@ -78,6 +80,15 @@ export interface EvaluateContext {
    * real caller that ever passes `false`.
    */
   trading?: boolean;
+  /**
+   * India VIX's current regime (`lib/tools/vix.ts`), if the Volatility
+   * Desk's public NSE read has landed — `null`/absent leaves stop sizing
+   * and risk% exactly as they were before this existed. Same public,
+   * unauthenticated source regardless of broker, so this is the one piece
+   * of market-data context here that isn't gated on which broker session
+   * is active.
+   */
+  vixRegime?: VixRegime | null;
 }
 
 const emptyLevels = (): CoaLevels => ({
@@ -142,7 +153,7 @@ export class SignalEngine {
     maxDeployable?: number,
     context: EvaluateContext = {},
   ): Signal {
-    const { marketPcr = null, buildupClass = null, trading = true } = context;
+    const { marketPcr = null, buildupClass = null, trading = true, vixRegime = null } = context;
     const levels = chain.levels;
     const spot = chain.spot;
     const prevSpot = this.lastSpot;
@@ -253,16 +264,85 @@ export class SignalEngine {
     // -- risk geometry --------------------------------------------------- //
     const r2 = (n: number) => Number(n.toFixed(2));
     const entry = leg.best_ask > 0 ? leg.best_ask : leg.ltp;
-    const stopPoints = r2(entry * this.cfg.defaultStopPct);
+    let stopPoints = r2(entry * this.cfg.stopPctByProtocol[protocol]);
+
+    // Anchor the stop to the *same* wall `checkInvalidation` already
+    // watches for this option side (support/Aegis-1 under a CE long,
+    // resistance/Zenith-1 over a PE long — the exact pairing
+    // `checkInvalidation` uses, generalised across all three protocols
+    // rather than kept Alpha-specific), instead of leaving the two as
+    // independent, uncoordinated exit triggers that can fire in either
+    // order for no principled reason. A stop derived from the distance to
+    // the same line invalidation itself breaches at tends to resolve at
+    // roughly the same moment invalidation would have fired anyway.
+    // Clamped to [0.5x, 1.5x] of the percentage-based stop: wall data
+    // informs the number, but never swings it wildly outside the range
+    // this engine has actually been sized and tested against.
+    const wsp = wallStopPoints({
+      optionType,
+      spot,
+      aegis1: levels.aegis_1,
+      zenith1: levels.zenith_1,
+      invalidationPct: this.cfg.invalidationPct,
+      itmDeltaApprox: this.cfg.itmDeltaApprox,
+    });
+    if (wsp !== null) {
+      stopPoints = r2(Math.min(stopPoints * 1.5, Math.max(stopPoints * 0.5, wsp)));
+    }
+
+    // A genuinely riskier tape widens the stop on top of whatever the
+    // %/wall blend above already settled on — applied last, as a final
+    // regime-level adjustment rather than folded into the wall-anchor
+    // clamp, so the two stay independently reasoned about. Calm/Normal
+    // are 1x by default; see `vixStopMultiplier`'s own doc comment.
+    if (vixRegime) {
+      stopPoints = r2(stopPoints * this.cfg.vixStopMultiplier[vixRegime]);
+    }
+
     const stop = r2(Math.max(0.05, entry - stopPoints));
-    const target1 = r2(entry + stopPoints * 1.5);
+    let target1 = r2(entry + stopPoints * 1.5);
     const target2 = r2(entry + stopPoints * 3.0);
+
+    // Alpha buys near a wall expecting a move to the *opposite* one — anchor
+    // TP1 to that actual distance instead of a blind 1.5R wherever there's
+    // COA data to do it with. `itmDeltaApprox` translates the wall's
+    // distance in underlying points into an approximate premium distance
+    // (see its own doc comment — this is a stated approximation, not a real
+    // Greek). Clamped to [old 1.5R, 2.9R] either way: a wall right on top of
+    // entry must not produce a worse target than before, and a distant one
+    // must not reach all the way to `target2` (3R) — TP1 has to stay a real
+    // scale-out level strictly ahead of the final target, not collapse onto
+    // it.
+    if (protocol === "ALPHA") {
+      const wallDistance =
+        optionType === "CE"
+          ? levels.zenith_1 !== null
+            ? Math.max(0, levels.zenith_1 - spot)
+            : null
+          : levels.aegis_1 !== null
+            ? Math.max(0, spot - levels.aegis_1)
+            : null;
+      if (wallDistance !== null && wallDistance > 0) {
+        const wallImpliedTarget = r2(entry + wallDistance * this.cfg.itmDeltaApprox);
+        const ceiling = r2(entry + stopPoints * 2.9);
+        target1 = r2(Math.min(ceiling, Math.max(target1, wallImpliedTarget)));
+      }
+    }
+
+    // A wider stop (above) already shrinks lot count on its own —
+    // `riskPerLot` grows with it — but scaling `riskPct` down too in
+    // Elevated/Panic makes the size-down a deliberate, additional choice
+    // rather than an accident of the stop-distance formula. Calm/Normal
+    // are 1x by default; see `vixRiskPctMultiplier`'s own doc comment.
+    const effectiveRiskPct = vixRegime
+      ? r2(this.cfg.riskPct * this.cfg.vixRiskPctMultiplier[vixRegime])
+      : this.cfg.riskPct;
 
     const sizing = calculateSize({
       underlying: this.underlying,
       stopLossPoints: stopPoints,
       capital,
-      riskPct: this.cfg.riskPct,
+      riskPct: effectiveRiskPct,
       lotSize: inst!.lotSize || undefined,
       entryPrice: entry,
       maxDeployable,
@@ -276,6 +356,11 @@ export class SignalEngine {
     if (quadrant) {
       rationale.push(
         `RRG node ${quadrant} — RS-Ratio ${leg.rs_ratio?.toFixed(2)} / RS-Momentum ${leg.rs_momentum?.toFixed(2)}`,
+      );
+    }
+    if (vixRegime && vixRegime !== "Calm" && vixRegime !== "Normal") {
+      rationale.push(
+        `India VIX ${vixRegime} — stop widened ${this.cfg.vixStopMultiplier[vixRegime]}x, risk sized to ${effectiveRiskPct.toFixed(1)}% of ${this.cfg.riskPct}%.`,
       );
     }
 

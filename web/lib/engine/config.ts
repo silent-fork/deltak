@@ -1,3 +1,5 @@
+import type { VixRegime } from "@/lib/tools/volatilityDeskTypes";
+
 /**
  * DeltaK strategy configuration — the TypeScript twin of `backend/app/config.py`.
  *
@@ -194,8 +196,26 @@ export interface EngineConfig {
   shiftLookback: number;
 
   riskPct: number;
-  /** Stop distance as a fraction of option premium. */
-  defaultStopPct: number;
+  /**
+   * Stop distance as a fraction of option premium, per protocol — Alpha's
+   * range trade at a wall behaves differently from Beta/Gamma's momentum
+   * entries, so each gets its own knob rather than one number shared
+   * across all three. Protocol Delta never reaches this: it's blocked
+   * before any risk geometry is computed (see `SignalEngine.evaluate`).
+   * Also doubles as the "1R" reference for the trailing-stop guards
+   * (`decideTrail`) — a position's own stored `protocol` is enough to
+   * reconstruct roughly how far its stop started out, without needing a
+   * separately persisted risk-distance field.
+   */
+  stopPctByProtocol: Record<"ALPHA" | "BETA" | "GAMMA", number>;
+  /**
+   * Rough delta approximation for a 2nd/3rd-ITM long — the Zero-OTM rule's
+   * own strike band. Used only to translate a COA wall's distance in
+   * underlying points into an approximate option-premium distance for
+   * Alpha's wall-anchored target; this is an approximation; the engine has
+   * no live delta from either broker's option chain today.
+   */
+  itmDeltaApprox: number;
   maxConcurrentPositions: number;
   /** Index break invalidation threshold, percent. */
   invalidationPct: number;
@@ -228,6 +248,23 @@ export interface EngineConfig {
    */
   pcrDivergencePct: number;
 
+  /**
+   * Final multiplier on the stop distance per India VIX regime (Calm /
+   * Normal / Elevated / Panic — `lib/tools/vix.ts`'s own bands), applied
+   * after the per-protocol %/wall-anchor blend above. Elevated/Panic widen
+   * it so ordinary noise in a genuinely riskier tape doesn't stop a trade
+   * out prematurely; Calm/Normal are 1 (no change) by default.
+   */
+  vixStopMultiplier: Record<VixRegime, number>;
+  /**
+   * Multiplier on `riskPct` per the same VIX regime, applied independently
+   * of `vixStopMultiplier` — a wider stop already shrinks lot count on its
+   * own (`riskPerLot` grows), but sizing down the risk-money budget too in
+   * Elevated/Panic makes that a deliberate, additional choice rather than
+   * an accident of the stop-distance formula.
+   */
+  vixRiskPctMultiplier: Record<VixRegime, number>;
+
   paperCapital: number;
   slippagePct: number;
   costPerOrder: number;
@@ -257,13 +294,19 @@ export const DEFAULT_CONFIG: EngineConfig = {
    * `calculateSize` remains the real backstop.
    */
   riskPct: 30.0,
-  defaultStopPct: 0.25,
+  // Same 25% every protocol used before this was split out — no behaviour
+  // change until one of these is tuned independently.
+  stopPctByProtocol: { ALPHA: 0.25, BETA: 0.25, GAMMA: 0.25 },
+  itmDeltaApprox: 0.7,
   maxConcurrentPositions: 4,
   invalidationPct: 0.35,
   weakeningMinAdverseMovePct: 0.05,
   maxPositionCapitalPct: 40,
   maxPortfolioRiskPct: 60,
   pcrDivergencePct: 40,
+
+  vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
+  vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
 
   paperCapital: 25_000,
   slippagePct: 0.0015,

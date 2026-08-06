@@ -457,8 +457,9 @@ by itself, rather than muted the rest of the time.
 
 The trading loop above only runs in the browser: close the tab, and every
 guard in `lib/engine/risk.ts` stops with it. `/api/watchdog/tick` is a second,
-much narrower copy of two of those guards — stop/target and the 3:15 PM IST
-Daylight Rest flatten — invoked once a minute independently of any open tab.
+narrower copy of three of those guards — stop/target, the breakeven-then-trail
+stop, and the 3:15 PM IST Daylight Rest flatten — invoked once a minute
+independently of any open tab.
 
 The trigger is **Supabase's `pg_cron` + `pg_net`**, not Vercel Cron: Vercel's
 Hobby plan only allows once-a-day schedules (Pro allows once a minute), while
@@ -478,10 +479,17 @@ imports only Angel One's read endpoints (candles, OI, PCR, buildup, LTP), never
 capability.
 
 **Not covered yet:** Invalidation (needs the COA walls) and the
-Weakening-quadrant scale-out (needs live RRG rotation) both need market state
-that only exists inside a running browser tab's engine today. Closing that
-gap needs a server-side home for that state, which is future work, not a
-missing wire-up.
+Weakening-quadrant scale-out itself (needs live RRG rotation) both need market
+state that only exists inside a running browser tab's engine today. Closing
+that gap needs a server-side home for that state, which is future work, not a
+missing wire-up. The wall-migration trail (`checkWallTrail`) needs that same
+chain state and stays browser-only for the same reason.
+
+The breakeven-then-trail stop is different: it only reads a position's own
+`protocol`, `avg_price` and a live LTP (`decideTrail` in `lib/engine/risk.ts`),
+all of which this route already has, so it runs here too rather than being
+browser-only — the one guard in this list that isn't gated on a running
+browser tab's own chain state.
 
 **Credentials.** The route needs a live price per open position, and every
 SmartAPI call — even a read — requires a session JWT. That JWT is stored

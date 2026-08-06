@@ -59,6 +59,10 @@ export function calculateSize(params: {
   } else {
     lots = Math.floor(riskAmount / riskPerLot);
   }
+  // What the risk-% math alone would size this to, before the
+  // affordability clamp below can shrink it — the baseline
+  // `singleLotConstrained` compares the final lot count against.
+  const riskLots = lots;
 
   let entryCost = 0;
   if (entryPrice && entryPrice > 0 && lots > 0) {
@@ -81,6 +85,12 @@ export function calculateSize(params: {
   lots = Math.max(0, lots);
   if (lots === 0 && cappedBy === null) cappedBy = "RISK_BUDGET";
 
+  // The risk math wanted more than one lot, but capital/concentration
+  // clamped it down to exactly one — not "the risk math itself only ever
+  // wanted 1 lot," which needs no special handling downstream.
+  const singleLotConstrained =
+    lots === 1 && riskLots > 1 && (cappedBy === "CAPITAL" || cappedBy === "CONCENTRATION");
+
   const r2 = (n: number) => Number(n.toFixed(2));
   return {
     lots,
@@ -91,6 +101,7 @@ export function calculateSize(params: {
     entry_cost: r2(entryCost),
     capital: r2(capital),
     risk_pct: riskPct,
+    single_lot_constrained: singleLotConstrained,
     capped_by: cappedBy,
   };
 }
