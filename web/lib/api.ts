@@ -262,6 +262,8 @@ export interface PairedDevice {
 /** `GET /api/mobile/state` — the desktop's last pushed signal mirror, plus this account's positions. */
 export interface MobileStateResponse {
   client_code: string;
+  /** The operator's own name, same source as the desktop's `UserPill` — null for an account that never set one. */
+  name: string | null;
   signal: {
     ts: string;
     mode: ExecutionMode;

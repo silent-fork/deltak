@@ -21,60 +21,75 @@ const POLL_MS = 5_000;
 /** Same visual boot sequence as the desktop terminal, different narration — nothing here authenticates against any broker. */
 const BOOT_LINES = [["Reading the paired desktop…", "Syncing the live signal…", "Loading the trade book…"]];
 
+/**
+ * A bordered, P&L-tinted card — the same idiom the desktop's `PositionCard`
+ * (`TradeBook.tsx`) uses — rather than a flat divided list. The two HUDs
+ * showing the same book should look like the same product.
+ */
 function SignalRow({ underlying, signal }: { underlying: string; signal: MobileStateResponse["signal"] }) {
   const s = signal?.signals[underlying];
   const meta = s ? PROTOCOL_META[s.protocol] : null;
 
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-zinc-800/60 px-3 py-2 last:border-b-0">
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[11px] font-semibold text-zinc-200">{underlying}</span>
-          {meta ? (
-            <Badge className={cn("h-4.5 px-1", meta.tone)}>{meta.name}</Badge>
-          ) : null}
-          <QuadrantPill quadrant={s?.quadrant} compact />
+    <div className="rounded-md border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[11px] font-semibold text-zinc-200">{underlying}</span>
+            {meta ? (
+              <Badge className={cn("h-4.5 px-1", meta.tone)}>{meta.name}</Badge>
+            ) : null}
+            <QuadrantPill quadrant={s?.quadrant} compact />
+          </div>
+          <p className="mt-1 truncate text-[11px] leading-snug text-zinc-400">
+            {s?.headline ?? "Awaiting the live feed."}
+          </p>
         </div>
-        <p className="mt-1 truncate text-[11px] leading-snug text-zinc-400">
-          {s?.headline ?? "Awaiting the live feed."}
-        </p>
+        {s?.actionable ? (
+          <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+            <Radar className="h-2.5 w-2.5 animate-pulse-ring" />
+            Armed
+          </span>
+        ) : null}
       </div>
-      {s?.actionable ? (
-        <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-300">
-          <Radar className="h-2.5 w-2.5 animate-pulse-ring" />
-          Armed
-        </span>
-      ) : null}
     </div>
   );
 }
 
 function PositionRow({ position }: { position: Position }) {
   const pnl = position.status === "OPEN" ? position.unrealised_pnl : position.realised_pnl;
+  const closed = position.status === "CLOSED";
   const up = position.side === "BUY";
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-zinc-800/60 px-3 py-1.5 last:border-b-0">
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          {up ? (
-            <TrendingUp className="h-3 w-3 shrink-0 text-emerald-400" />
-          ) : (
-            <TrendingDown className="h-3 w-3 shrink-0 text-rose-400" />
-          )}
-          <span className="truncate font-mono text-[11px] text-zinc-200">
-            {position.trading_symbol}
-          </span>
+    <div
+      className={cn(
+        "rounded-md border bg-zinc-950/50 px-2.5 py-1.5",
+        closed ? "border-zinc-800/70" : pnl >= 0 ? "border-emerald-500/25" : "border-rose-500/25",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            {up ? (
+              <TrendingUp className="h-3 w-3 shrink-0 text-emerald-400" />
+            ) : (
+              <TrendingDown className="h-3 w-3 shrink-0 text-rose-400" />
+            )}
+            <span className="truncate font-mono text-[11px] text-zinc-200">
+              {position.trading_symbol}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[10px] text-zinc-500">
+            {position.lots}×{position.lot_size} @ {fmt(position.avg_price)}
+            {position.status === "CLOSED" && position.exit_price
+              ? ` → ${fmt(position.exit_price)}`
+              : ""}
+          </p>
         </div>
-        <p className="mt-0.5 text-[10px] text-zinc-500">
-          {position.lots}×{position.lot_size} @ {fmt(position.avg_price)}
-          {position.status === "CLOSED" && position.exit_price
-            ? ` → ${fmt(position.exit_price)}`
-            : ""}
-        </p>
+        <span className={cn("shrink-0 font-mono text-[11.5px] font-semibold", pnlTone(pnl))}>
+          {signedMoney(pnl)}
+        </span>
       </div>
-      <span className={cn("shrink-0 font-mono text-[11.5px] font-semibold", pnlTone(pnl))}>
-        {signedMoney(pnl)}
-      </span>
     </div>
   );
 }
@@ -187,6 +202,7 @@ export function MobileCompanion({
             </Badge>
             <MobileUserMenu
               clientCode={clientCode}
+              name={data?.name ?? null}
               mode={mode}
               wallet={ledger ?? null}
               onUnpair={() => void unpair()}
@@ -195,80 +211,89 @@ export function MobileCompanion({
           </div>
         </header>
 
-        <div className="dk-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto flex min-h-full max-w-md flex-col space-y-2.5 px-2.5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
-            {error ? (
-              <div className="shrink-0 rounded border border-rose-500/40 bg-rose-500/10 p-2.5 text-[11px] text-rose-300">
-                {error}
-              </div>
-            ) : null}
+        {/*
+          No page-level scroll: the outer column is a fixed height (`flex-1`
+          under the shrink-0 header, `overflow-hidden` here) and each card
+          below scrolls its own body — the same pattern the desktop terminal
+          uses for its own panels (see `TradeBook.tsx`'s `CardContent`, or
+          any board panel's `dk-scroll overflow-y-auto`), rather than one
+          long page the whole phone has to swipe through.
+        */}
+        <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col gap-2.5 overflow-hidden px-2.5 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
+          {error ? (
+            <div className="shrink-0 rounded border border-rose-500/40 bg-rose-500/10 p-2.5 text-[11px] text-rose-300">
+              {error}
+            </div>
+          ) : null}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Live Signal</CardTitle>
-                <span className="text-[9.5px] text-zinc-600">
-                  {data?.signal ? `desktop · ${timeAgo(data.signal_updated_at)}` : "waiting for desktop"}
-                </span>
-              </CardHeader>
-              <CardContent className="flex flex-col p-0">
-                {data?.signal && !data.signal.market_open ? (
-                  <p className="px-3 py-4 text-center text-[11px] leading-snug text-zinc-500">
-                    Market closed — waiting for the next session to open.
-                    <br />
-                    <span className="text-zinc-600">
-                      Nothing armed or muted, there&apos;s just no live tape to read yet.
-                    </span>
-                  </p>
-                ) : (
-                  UNDERLYINGS.map((u) => (
-                    <SignalRow key={u} underlying={u} signal={data?.signal ?? null} />
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Open Positions</CardTitle>
-                <Badge className="h-4.5">{open.length}</Badge>
-              </CardHeader>
-              <CardContent className="flex flex-col p-0">
-                {open.length ? (
-                  open.map((p) => <PositionRow key={p.id} position={p} />)
-                ) : (
-                  <p className="px-3 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Closed Trades</CardTitle>
-                <Badge className="h-4.5">{closed.length}</Badge>
-              </CardHeader>
-              <CardContent className="flex flex-col p-0">
-                {closed.length ? (
-                  closed.map((p) => <PositionRow key={p.id} position={p} />)
-                ) : (
-                  <p className="px-3 py-4 text-center text-[11px] text-zinc-600">No trades yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <p className="flex shrink-0 items-center justify-center gap-1.5 pt-1 text-zinc-700">
-              <span
-                aria-hidden
-                className="inline-flex h-2 w-3.5 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
-              >
-                <span className="h-1/3 w-full bg-[#FF9933]" />
-                <span className="h-1/3 w-full bg-white" />
-                <span className="h-1/3 w-full bg-[#138808]" />
+          {/* Fixed-list, capped rather than flex-1 — five underlyings never
+              need to fight Open/Closed for the rest of the screen, but the
+              cap plus internal scroll keeps it safe if that ever changes. */}
+          <Card className="max-h-[34%] shrink-0">
+            <CardHeader className="shrink-0">
+              <CardTitle>Live Signal</CardTitle>
+              <span className="text-[9.5px] text-zinc-600">
+                {data?.signal ? `desktop · ${timeAgo(data.signal_updated_at)}` : "waiting for desktop"}
               </span>
-              <span className="text-[9px]">
-                Made with <span className="text-rose-400">♥</span> in Bharat
-              </span>
-            </p>
-          </div>
+            </CardHeader>
+            <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
+              {data?.signal && !data.signal.market_open ? (
+                <p className="px-1 py-4 text-center text-[11px] leading-snug text-zinc-500">
+                  Market closed — waiting for the next session to open.
+                  <br />
+                  <span className="text-zinc-600">
+                    Nothing armed or muted, there&apos;s just no live tape to read yet.
+                  </span>
+                </p>
+              ) : (
+                UNDERLYINGS.map((u) => (
+                  <SignalRow key={u} underlying={u} signal={data?.signal ?? null} />
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="min-h-0 flex-1">
+            <CardHeader className="shrink-0">
+              <CardTitle>Open Positions</CardTitle>
+              <Badge className="h-4.5">{open.length}</Badge>
+            </CardHeader>
+            <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
+              {open.length ? (
+                open.map((p) => <PositionRow key={p.id} position={p} />)
+              ) : (
+                <p className="px-1 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="min-h-0 flex-1">
+            <CardHeader className="shrink-0">
+              <CardTitle>Closed Trades</CardTitle>
+              <Badge className="h-4.5">{closed.length}</Badge>
+            </CardHeader>
+            <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
+              {closed.length ? (
+                closed.map((p) => <PositionRow key={p.id} position={p} />)
+              ) : (
+                <p className="px-1 py-4 text-center text-[11px] text-zinc-600">No trades yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <p className="flex shrink-0 items-center justify-center gap-1.5 text-zinc-700">
+            <span
+              aria-hidden
+              className="inline-flex h-2 w-3.5 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
+            >
+              <span className="h-1/3 w-full bg-[#FF9933]" />
+              <span className="h-1/3 w-full bg-white" />
+              <span className="h-1/3 w-full bg-[#138808]" />
+            </span>
+            <span className="text-[9px]">
+              Made with <span className="text-rose-400">♥</span> in Bharat
+            </span>
+          </p>
         </div>
       </div>
     </main>

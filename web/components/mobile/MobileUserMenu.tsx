@@ -16,6 +16,14 @@ export interface MobileWallet {
   total_pnl: number;
 }
 
+/** Two letters that stand for the operator: initials, else the client code — same rule as the desktop's own `UserPill`. */
+function initials(name: string | null, clientCode: string): string {
+  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (clientCode || "DK").slice(0, 2).toUpperCase();
+}
+
 function WalletRow({
   icon: Icon,
   label,
@@ -46,12 +54,15 @@ function WalletRow({
  */
 export function MobileUserMenu({
   clientCode,
+  name,
   mode,
   wallet,
   onUnpair,
   unpairBusy,
 }: {
   clientCode: string;
+  /** The operator's own name, same source as the desktop's `UserPill` — null for an account that never set one. */
+  name: string | null;
   mode: ExecutionMode;
   wallet: MobileWallet | null;
   onUnpair: () => void;
@@ -94,19 +105,20 @@ export function MobileUserMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
+        title={`Signed in as ${name ?? clientCode} (${clientCode})`}
         className={cn(
-          "flex h-8 items-center gap-1.5 rounded-md border pl-1 pr-1.5 transition-colors",
+          "flex h-8 max-w-[180px] items-center gap-1.5 rounded-md border pl-1 pr-1.5 transition-colors",
           open ? "border-quantum/60 bg-quantum/10" : "border-emerald-500/40 bg-emerald-500/10",
         )}
       >
         <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gradient-to-br from-quantum/30 to-quantum/5 font-mono text-[9px] font-bold text-quantum ring-1 ring-quantum/40">
-          {clientCode.slice(0, 2).toUpperCase()}
+          {initials(name, clientCode)}
           <span className="absolute -bottom-px -right-px h-1.5 w-1.5 rounded-full bg-emerald-400 ring-1 ring-zinc-950 animate-pulse-ring" />
         </span>
-        <span className="font-mono text-[9.5px] uppercase tracking-wider text-emerald-400/90">
-          {clientCode}
+        <span className="min-w-0 flex-1 truncate text-left font-mono text-[9.5px] uppercase tracking-wider text-emerald-400/90">
+          {name ?? clientCode}
         </span>
-        <ChevronDown className={cn("h-3 w-3 text-zinc-500 transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("h-3 w-3 shrink-0 text-zinc-500 transition-transform", open && "rotate-180")} />
       </button>
 
       {open ? (
@@ -114,13 +126,21 @@ export function MobileUserMenu({
           role="menu"
           className="dk-scroll absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-[min(19rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-zinc-700 bg-[#0b0b0e] shadow-2xl shadow-black ring-1 ring-black/60"
         >
-          <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-emerald-400/90">
-              {clientCode}
+          <div className="flex items-center gap-2.5 px-3 py-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-quantum/30 to-quantum/5 font-mono text-[13px] font-bold text-quantum ring-1 ring-quantum/40">
+              {initials(name, clientCode)}
             </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] font-semibold text-zinc-100">
+                {name ?? clientCode}
+              </div>
+              <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-emerald-400/80">
+                {clientCode}
+              </div>
+            </div>
             <span
               className={cn(
-                "rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
+                "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
                 mode === "live"
                   ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
                   : "border-zinc-700 bg-zinc-900 text-zinc-400",

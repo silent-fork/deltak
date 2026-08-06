@@ -68,6 +68,7 @@ export async function GET() {
 
   return NextResponse.json({
     client_code: clientCode,
+    name: profile?.name ?? null,
     signal: signalRow?.snapshot ?? null,
     signal_updated_at: signalRow?.updated_at ?? null,
     positions,
