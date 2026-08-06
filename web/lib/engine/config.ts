@@ -249,6 +249,41 @@ export interface EngineConfig {
   pcrDivergencePct: number;
 
   /**
+   * Phase 1 noise reduction — see `dkms.ts`'s `applyDwellLatch` and
+   * `rollingExtremeBreak`. Every gate below `evaluate()` already had was a
+   * single-tick, instantaneous read with no persistence requirement; these
+   * knobs add the confirmation layer instead of changing any of the
+   * existing thresholds themselves.
+   */
+  /**
+   * Consecutive qualifying ticks (1 per second, the engine's own tick rate)
+   * a signal's full entry condition must hold before it first flips
+   * actionable. Converts a single noisy sample into N seconds of agreement.
+   */
+  signalDwellTicks: number;
+  /**
+   * Ticks an already-actionable signal tolerates its raw condition dropping
+   * before standing down — smooths a signal flapping actionable/blocked
+   * across a couple of borderline ticks instead of genuinely reversing.
+   */
+  signalLatchTicks: number;
+  /**
+   * Minimum retracement from the rolling high (Beta's micro-dip) or rally
+   * from the rolling low (Gamma's mirror), as a percent of that extreme —
+   * replaces the old single-tick `spot <= prevSpot` comparison, which was a
+   * coin flip on a random walk.
+   */
+  microMoveMinPct: number;
+  /** Ticks of rolling spot history Beta/Gamma's micro-dip/rally reads its high/low water mark from. */
+  microMoveLookbackTicks: number;
+  /**
+   * Alpha's actual entry proximity band, percent of the wall — deliberately
+   * narrower than `invalidationPct` so an entry never sits one tick from its
+   * own invalidation exit; the two used to share the same number.
+   */
+  alphaEntryBandPct: number;
+
+  /**
    * Final multiplier on the stop distance per India VIX regime (Calm /
    * Normal / Elevated / Panic — `lib/tools/vix.ts`'s own bands), applied
    * after the per-protocol %/wall-anchor blend above. Elevated/Panic widen
@@ -304,6 +339,12 @@ export const DEFAULT_CONFIG: EngineConfig = {
   maxPositionCapitalPct: 40,
   maxPortfolioRiskPct: 60,
   pcrDivergencePct: 40,
+
+  signalDwellTicks: 3,
+  signalLatchTicks: 3,
+  microMoveMinPct: 0.05,
+  microMoveLookbackTicks: 20,
+  alphaEntryBandPct: 0.15,
 
   vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
   vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },

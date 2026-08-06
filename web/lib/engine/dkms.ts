@@ -33,6 +33,97 @@ import { calculateSize } from "./sizing";
 /** RRG quadrants that permit opening a long option position. */
 const ENTRY_QUADRANTS: Quadrant[] = ["LEADING", "IMPROVING"];
 
+/**
+ * Beta's micro-dip and Gamma's micro-rally — replaces the old `spot <=
+ * prevSpot` single-tick comparison, which was a coin flip on any random
+ * walk (worse: `<=` also counts a flat tick as "dipping"). Requires a real
+ * retracement from the rolling extreme over `history`, not just "less than
+ * the immediately previous sample."
+ *
+ * `history` includes the current tick (the caller pushes before calling),
+ * so a single-sample history can never show a real break — the function
+ * fails closed on a cold start rather than needing a separate bootstrap
+ * case, which is the right default for a noise-reduction gate.
+ */
+export function rollingExtremeBreak(
+  history: number[],
+  direction: "dip" | "rally",
+  minPct: number,
+): boolean {
+  if (history.length < 2) return false;
+  const current = history[history.length - 1];
+  if (current <= 0) return false;
+  if (direction === "dip") {
+    const high = Math.max(...history);
+    return current <= high * (1 - minPct / 100);
+  }
+  const low = Math.min(...history);
+  return current >= low * (1 + minPct / 100);
+}
+
+/** Confirmation state `applyDwellLatch` carries across `evaluate()` calls — see its own doc comment. */
+export interface DwellState {
+  setupKey: string | null;
+  dwellTicks: number;
+  latchTicksLeft: number;
+  armed: boolean;
+}
+
+export const emptyDwellState = (): DwellState => ({
+  setupKey: null,
+  dwellTicks: 0,
+  latchTicksLeft: 0,
+  armed: false,
+});
+
+/**
+ * Confirm-over-N-ticks, then tolerate-M-ticks-of-drop before disarming —
+ * the one mechanism standing between every entry gate in `evaluate()` and
+ * `actionable` flipping on a single noisy tick. Every check upstream
+ * (protocol trigger, Zero-OTM strike, RRG quadrant, sizing, PCR/buildup
+ * agreement) is re-derived fresh from the current tick as it always was;
+ * this only decides whether that instantaneous verdict has held up long
+ * enough, and recently enough, to act on.
+ *
+ * `setupKey` identifies *which* setup is qualifying (protocol + side +
+ * instrument) — a change in what's qualifying resets dwell rather than
+ * inheriting ticks accumulated toward a different trade, and a genuinely
+ * new setup starting mid-latch correctly does not inherit the old one's
+ * grace window either.
+ *
+ * Pure and side-effect-free: takes the previous state, returns the next
+ * one and the verdict, rather than mutating anything — the same shape as
+ * `decideTrail`/`decideExit` in `risk.ts`, and independently testable the
+ * same way.
+ */
+export function applyDwellLatch(
+  prev: DwellState,
+  rawQualifies: boolean,
+  setupKey: string | null,
+  dwellTicks: number,
+  latchTicks: number,
+): { actionable: boolean; state: DwellState } {
+  if (rawQualifies && setupKey) {
+    const continuing = setupKey === prev.setupKey;
+    const nextDwellTicks = continuing ? prev.dwellTicks + 1 : 1;
+    const armed = nextDwellTicks >= dwellTicks;
+    return {
+      actionable: armed,
+      state: { setupKey, dwellTicks: nextDwellTicks, latchTicksLeft: latchTicks, armed },
+    };
+  }
+
+  // Raw condition failed this tick — stay actionable through the grace
+  // window if this setup was already armed, otherwise reset entirely.
+  if (prev.armed && prev.latchTicksLeft > 0) {
+    return {
+      actionable: true,
+      state: { ...prev, latchTicksLeft: prev.latchTicksLeft - 1 },
+    };
+  }
+  return { actionable: false, state: emptyDwellState() };
+}
+
 export function classifyProtocol(levels: CoaLevels, tolerance: number): Protocol {
   if (levels.aegis_1 === null || levels.zenith_1 === null) return "DELTA";
 
@@ -103,7 +194,10 @@ const emptyLevels = (): CoaLevels => ({
 });
 
 export class SignalEngine {
-  private lastSpot = 0;
+  /** Rolling spot history for Beta/Gamma's micro-dip/rally — see `rollingExtremeBreak`. */
+  private spotWindow: number[] = [];
+  /** Confirm-over-N-ticks state for the final `actionable` decision — see `applyDwellLatch`. */
+  private dwellState: DwellState = emptyDwellState();
 
   constructor(
     private underlying: string,
@@ -156,8 +250,10 @@ export class SignalEngine {
     const { marketPcr = null, buildupClass = null, trading = true, vixRegime = null } = context;
     const levels = chain.levels;
     const spot = chain.spot;
-    const prevSpot = this.lastSpot;
-    this.lastSpot = spot;
+    if (spot > 0) {
+      this.spotWindow.push(spot);
+      if (this.spotWindow.length > this.cfg.microMoveLookbackTicks) this.spotWindow.shift();
+    }
 
     const protocol = classifyProtocol(levels, this.cfg.levelShiftTolerance);
     const fmt = (n: number | null) => (n === null ? "—" : n.toLocaleString("en-IN"));
@@ -200,7 +296,11 @@ export class SignalEngine {
     let trigger = "";
 
     if (protocol === "ALPHA") {
-      const band = this.cfg.invalidationPct / 100;
+      // Deliberately narrower than `invalidationPct`: the two used to share
+      // one number, which meant an entry could sit one tick from its own
+      // invalidation exit. This band is entry-only; the exit side still
+      // watches the wider `invalidationPct` band exactly as before.
+      const band = this.cfg.alphaEntryBandPct / 100;
       const nearSupport =
         levels.aegis_1 !== null && Math.abs(spot - levels.aegis_1) <= levels.aegis_1 * band;
       const nearResistance =
@@ -220,7 +320,7 @@ export class SignalEngine {
       }
     } else if (protocol === "BETA") {
       optionType = "CE";
-      const dipping = prevSpot > 0 && spot <= prevSpot;
+      const dipping = rollingExtremeBreak(this.spotWindow, "dip", this.cfg.microMoveMinPct);
       if (!dipping) {
         return this.blocked(protocol, levels, "AWAIT_DIP", "Protocol Beta — awaiting downward micro-dip", [
           ...rationale,
@@ -231,6 +331,14 @@ export class SignalEngine {
       trigger = "Protocol Beta ascension — buying the micro-dip in ITM calls.";
     } else {
       optionType = "PE";
+      const rallying = rollingExtremeBreak(this.spotWindow, "rally", this.cfg.microMoveMinPct);
+      if (!rallying) {
+        return this.blocked(protocol, levels, "AWAIT_RALLY", "Protocol Gamma — awaiting upward micro-rally", [
+          ...rationale,
+          "Protocol Gamma cascade — put bias armed, awaiting micro-rally.",
+          "Call purchases are banned under Gamma.",
+        ]);
+      }
       trigger = "Protocol Gamma cascade — support migrating down, ITM puts armed.";
     }
 
@@ -383,7 +491,26 @@ export class SignalEngine {
       );
     }
 
-    let actionable = sizing.lots > 0 && (!quadrant || ENTRY_QUADRANTS.includes(quadrant));
+    // Everything that reaches this point already cleared the protocol
+    // trigger and Zero-OTM strike selection *this tick* (both return early
+    // via `blocked()` otherwise) — the one flicker-prone check left is
+    // whether the RRG quadrant currently permits an entry. `applyDwellLatch`
+    // requires that to hold for `signalDwellTicks` consecutive ticks before
+    // arming, and tolerates `signalLatchTicks` ticks of it dropping again
+    // before disarming — see its own doc comment for why this sits here
+    // rather than wrapping the hard vetoes below, which stay immediate.
+    const rawSetupQualifies = !quadrant || ENTRY_QUADRANTS.includes(quadrant);
+    const setupKey = rawSetupQualifies ? `${protocol}:${optionType}:${inst!.token}` : null;
+    const confirmation = applyDwellLatch(
+      this.dwellState,
+      rawSetupQualifies,
+      setupKey,
+      this.cfg.signalDwellTicks,
+      this.cfg.signalLatchTicks,
+    );
+    this.dwellState = confirmation.state;
+
+    let actionable = sizing.lots > 0 && confirmation.actionable;
     let blockedReason: string | null = null;
 
     if (sizing.lots === 0) {
@@ -402,6 +529,11 @@ export class SignalEngine {
     } else if (pcrDivergent) {
       actionable = false;
       blockedReason = "PCR_DIVERGENCE";
+    } else if (!confirmation.actionable) {
+      blockedReason = "AWAITING_CONFIRMATION";
+      rationale.push(
+        `Confirming — held ${this.dwellState.dwellTicks}/${this.cfg.signalDwellTicks} tick(s) so far.`,
+      );
     }
 
     const title = protocol.charAt(0) + protocol.slice(1).toLowerCase();
