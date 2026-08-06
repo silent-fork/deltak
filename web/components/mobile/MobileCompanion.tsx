@@ -112,7 +112,40 @@ export function MobileCompanion({
   const [data, setData] = useState<MobileStateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [book, setBook] = useState<"open" | "closed">("open");
   const viewTracked = useRef(false);
+
+  /**
+   * Locks the document itself, not just this component's own scroll
+   * containers. `<main>` below is already `h-dvh overflow-hidden` — fine
+   * for the layout, but iOS Safari still lets the *page* rubber-band on a
+   * drag that starts somewhere with no scrollable ancestor (the header, a
+   * card's empty state), because that bounce is `html`/`body`'s own
+   * behaviour, not something a child `overflow: hidden` can reach.
+   * Scoped to this component's lifetime and restored on unmount, so the
+   * marketing site and the desktop terminal — both real scrolling pages —
+   * are untouched.
+   */
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehaviorY,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehaviorY,
+    };
+    html.style.overflow = "hidden";
+    html.style.overscrollBehaviorY = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehaviorY = "none";
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehaviorY = prev.htmlOverscroll;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehaviorY = prev.bodyOverscroll;
+    };
+  }, []);
 
   /**
    * A self-scheduling poll rather than a fixed `setInterval`, for three
@@ -286,11 +319,11 @@ export function MobileCompanion({
           ) : null}
 
           {/* Fixed-list, not flex-1 — five underlyings render at their full
-              natural height rather than fighting Open/Closed for space or
+              natural height rather than fighting the trade book for space or
               scrolling internally; the internal `overflow-y-auto` on its
-              body stays only as a safety net if that list ever grows.
-              Open Positions and Closed Trades are the ones that absorb
-              whatever height this leaves, splitting it dynamically. */}
+              body stays only as a safety net if that list ever grows. The
+              Open/Closed book below is the one that absorbs whatever height
+              this leaves. */}
           <Card className="shrink-0">
             <CardHeader className="shrink-0">
               <CardTitle>Live Signal</CardTitle>
@@ -315,39 +348,67 @@ export function MobileCompanion({
             </CardContent>
           </Card>
 
+          {/*
+            One card, one tab strip — the same segmented-control idiom the
+            desktop's own Trade Book uses (`TradeBook.tsx`) — rather than
+            Open and Closed as two cards stacked on top of each other. Two
+            cards meant splitting the same leftover height between them
+            whether or not there was anything in one of them; a single card
+            gives whichever book is open the full remaining height.
+          */}
           <Card className="min-h-0 flex-1">
-            <CardHeader className="shrink-0">
-              <CardTitle>Open Positions</CardTitle>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="text-[9.5px] text-zinc-600"
-                  title={
-                    openIsLive
-                      ? "Live from the desktop's own push"
-                      : "Desktop hasn't pushed recently — reading the last saved checkpoint instead"
-                  }
-                >
-                  {openIsLive ? `live · ${timeAgo(data?.signal_updated_at)}` : "checkpoint"}
-                </span>
-                <Badge className="h-4.5">{open.length}</Badge>
-              </span>
+            <CardHeader className="shrink-0 gap-2">
+              <div className="flex flex-1 items-center gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-0.5">
+                {(
+                  [
+                    ["open", "Open", open.length],
+                    ["closed", "Closed", closed.length],
+                  ] as const
+                ).map(([key, label, count]) => (
+                  <button
+                    key={key}
+                    onClick={() => setBook(key)}
+                    aria-pressed={book === key}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                      book === key
+                        ? "bg-quantum/15 text-quantum shadow-[inset_0_0_0_1px_rgba(0,240,255,0.35)]"
+                        : "text-zinc-500 hover:text-zinc-300",
+                    )}
+                  >
+                    {label}
+                    <span
+                      className={cn(
+                        "rounded px-1 font-mono text-[9px]",
+                        book === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
-              {open.length ? (
-                open.map((p) => <PositionRow key={p.id} position={p} />)
-              ) : (
-                <p className="px-1 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="min-h-0 flex-1">
-            <CardHeader className="shrink-0">
-              <CardTitle>Closed Trades</CardTitle>
-              <Badge className="h-4.5">{closed.length}</Badge>
-            </CardHeader>
-            <CardContent className="dk-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-2">
-              {closed.length ? (
+              {book === "open" ? (
+                <>
+                  <div
+                    className="flex justify-end text-[9.5px] text-zinc-600"
+                    title={
+                      openIsLive
+                        ? "Live from the desktop's own push"
+                        : "Desktop hasn't pushed recently — reading the last saved checkpoint instead"
+                    }
+                  >
+                    {openIsLive ? `live · ${timeAgo(data?.signal_updated_at)}` : "checkpoint"}
+                  </div>
+                  {open.length ? (
+                    open.map((p) => <PositionRow key={p.id} position={p} />)
+                  ) : (
+                    <p className="px-1 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
+                  )}
+                </>
+              ) : closed.length ? (
                 closed.map((p) => <PositionRow key={p.id} position={p} />)
               ) : (
                 <p className="px-1 py-4 text-center text-[11px] text-zinc-600">No trades yet.</p>
