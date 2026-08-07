@@ -14,3 +14,8 @@ next-env.d.ts
 # OS / editor
 .DS_Store
 *.log
+
+# Backtest pipeline — regenerate locally, too large / credential-dependent to commit
+backtest/deep_data/
+backtest/rolling_data/
+backtest/*.pkl
