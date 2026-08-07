@@ -488,34 +488,37 @@ export const TradeBook = memo(function TradeBook({
               onClick={() => setTab(key)}
               aria-pressed={tab === key}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                "relative flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
                 tab === key
                   ? "bg-quantum/15 text-quantum shadow-[inset_0_0_0_1px_rgba(0,240,255,0.35)]"
                   : "text-zinc-500 hover:text-zinc-300",
               )}
             >
               {label}
-              {/* One pill, not two floating side by side — a resting order
-                  isn't a position (no fill, no P&L) so it isn't in `count`,
-                  but it still belongs inside the same badge as the open-
-                  position count rather than getting its own separate chip. */}
               <span
                 className={cn(
-                  "flex items-center gap-1 rounded px-1 font-mono text-[9px]",
+                  "rounded px-1 font-mono text-[9px] leading-none",
                   tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
                 )}
               >
-                <span>{count}</span>
-                {key === "open" && pendingEntries.length > 0 ? (
-                  <span
-                    title={`${pendingEntries.length} order(s) resting, not yet filled`}
-                    className="flex items-center gap-0.5 border-l border-current/30 pl-1 text-amber-300"
-                  >
-                    <Clock className="h-2.5 w-2.5" />
+                {count}
+              </span>
+              {/* A resting order isn't a position (no fill, no P&L) — it
+                  doesn't belong inside `count`. A notification-style corner
+                  badge (same pulse the header's index rail already uses for
+                  "something live") reads as its own distinct signal instead
+                  of a second number crammed into the position-count pill. */}
+              {key === "open" && pendingEntries.length > 0 ? (
+                <span
+                  title={`${pendingEntries.length} order(s) resting, not yet filled`}
+                  className="absolute -right-1 -top-1.5 flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full"
+                >
+                  <span className="absolute inset-0 animate-ping rounded-full bg-amber-500 opacity-70" />
+                  <span className="relative flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full border border-zinc-950 bg-amber-500 px-[3px] font-mono text-[8px] font-bold leading-none text-zinc-950">
                     {pendingEntries.length}
                   </span>
-                ) : null}
-              </span>
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
