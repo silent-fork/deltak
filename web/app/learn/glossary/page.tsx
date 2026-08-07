@@ -4,11 +4,17 @@ import Link from "next/link";
 import { LearnChrome } from "@/components/LearnChrome";
 import { GLOSSARY, GLOSSARY_CATEGORIES } from "@/lib/content/glossary";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 64
+// rendered and got truncated in search results.
+const TITLE = "Options & F&O Glossary — Terms & Greeks";
+const DESCRIPTION =
+  "Every term to trade Indian F&O — strikes, the Greeks, margin, OI reading, " +
+  "plus DeltaK's own Aegis, Zenith and Quantum Horizon defined.";
+
 export const metadata: Metadata = {
-  title: "Options & F&O Glossary — Terms, Greeks & Rules",
-  description:
-    "Every term to trade Indian F&O — strikes, the Greeks, margin, OI reading, " +
-    "plus DeltaK's own Aegis, Zenith and Quantum Horizon defined.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "options trading glossary india",
     "fno terms and definitions",
@@ -16,6 +22,22 @@ export const metadata: Metadata = {
     "options terminology explained",
   ],
   alternates: { canonical: "/learn/glossary" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/learn/glossary",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default function GlossaryHubPage() {

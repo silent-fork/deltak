@@ -6,17 +6,41 @@ import { LearnChrome } from "@/components/LearnChrome";
 import { TimeHorizonBar } from "@/components/TimeHorizonBar";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 63
+// rendered and got truncated in search results.
+const TITLE = "Intraday vs Swing vs Positional Options";
+const DESCRIPTION =
+  "Intraday, swing and positional options trading compared — time horizon, " +
+  "risk profile, and options buying vs. selling.";
+
 export const metadata: Metadata = {
-  title: "Options Styles — Intraday, Swing & Positional",
-  description:
-    "Intraday, swing and positional options trading compared — time horizon, " +
-    "risk profile, and options buying vs. selling.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "options trading styles india",
     "intraday vs swing vs positional trading",
     "options buying vs selling",
+    "best options trading style for beginners",
+    "options trading time horizon",
   ],
   alternates: { canonical: "/learn/trading-styles" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/learn/trading-styles",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default function TradingStylesHubPage() {

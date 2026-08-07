@@ -6,11 +6,17 @@ import { ComplexityBadge, LearnChrome } from "@/components/LearnChrome";
 import { PayoffChart } from "@/components/PayoffChart";
 import { STRATEGIES, STRATEGY_EXAMPLE, type StrategyCategory } from "@/lib/content/strategies";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 69
+// rendered and got truncated in search results.
+const TITLE = "Options Strategies — India F&O Payoffs";
+const DESCRIPTION =
+  "Twelve options strategies, long call to iron condors and the jade lizard — " +
+  "each with a payoff diagram, construction and common mistakes.";
+
 export const metadata: Metadata = {
-  title: "Options Strategies — Payoff Diagrams for Indian F&O",
-  description:
-    "Twelve options strategies, long call to iron condors and the jade lizard — " +
-    "each with a payoff diagram, construction and common mistakes.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "options trading strategies india",
     "advanced options strategies",
@@ -18,6 +24,22 @@ export const metadata: Metadata = {
     "options strategy payoff diagram",
   ],
   alternates: { canonical: "/learn/strategies" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/learn/strategies",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 const CATEGORIES: StrategyCategory[] = ["Bullish", "Bearish", "Volatility", "Neutral"];

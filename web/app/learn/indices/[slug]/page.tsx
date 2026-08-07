@@ -20,11 +20,29 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   // "Nifty Midcap Select (MIDCPNIFTY)" (32 chars) is the longest index name —
   // `— Lot Size` keeps every combination under 70 with the root layout's
   // " · Quantum Horizon" template suffix appended.
+  const title = `${idx.name} — Lot Size`;
+  const description = idx.metaDescription;
   return {
-    title: `${idx.name} — Lot Size`,
-    description: idx.metaDescription,
+    title,
+    description,
     keywords: idx.keywords,
     alternates: { canonical: `/learn/indices/${idx.slug}` },
+    // Without this every index page silently inherited the root layout's
+    // og:title/description/url (the homepage's) on every share — same bug
+    // found and fixed on /learn/backtest, now closed here too.
+    openGraph: {
+      type: "website",
+      url: `/learn/indices/${idx.slug}`,
+      siteName: "Quantum Horizon",
+      title,
+      description,
+      locale: "en_IN",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

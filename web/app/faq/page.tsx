@@ -7,18 +7,43 @@ import { LearnChrome } from "@/components/LearnChrome";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { FAQS } from "@/lib/content/faq";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 68
+// rendered and got truncated in search results.
+const TITLE = "FAQ — DKMS Strategy, Sizing & Brokers";
+const DESCRIPTION =
+  "Answers on DKMS — the wall-and-rotation strategy, limit entry and thesis " +
+  "tracking, position sizing, supported brokers, and the mobile companion.";
+
 export const metadata: Metadata = {
-  title: "FAQ — DeltaK Matrix Strategy, Paper Trading & More",
-  description:
-    "Answers on DKMS — the wall-and-rotation strategy, limit entry and thesis " +
-    "tracking, position sizing, supported brokers, and the mobile companion.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "deltak faq",
     "dkms strategy explained",
     "aegis zenith wall",
     "thesis exit options",
+    "options position sizing calculator",
+    "angel one dhan options trading",
+    "options trading mobile app india",
   ],
   alternates: { canonical: "/faq" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/faq",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 /**
