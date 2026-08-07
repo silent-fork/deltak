@@ -494,24 +494,28 @@ export const DEFAULT_CONFIG: EngineConfig = {
   openingQuietMinutes: 10,
 
   /**
-   * Cut from 30% after an 18-month walk-forward backtest (Aug 2026) showed
-   * the strategy losing money at a stable, sample-robust expectancy across
-   * every fold — at 30% risk a losing streak alone was enough to explain
-   * most of a real account's drawdown (28 trades took Rs 25,000 to Rs 9,008
-   * in the reference run). 30% was originally chosen to solve a real
-   * problem — 1% resolved every NIFTY signal to zero lots outright — but it
-   * solved it by sizing to the *most* capital-hungry index in the universe
-   * (BANKEX, whose own 1-lot stop distance alone needs ~30% just to clear
-   * the floor), which inflated real dollar risk on every cheaper index at
-   * the same time. This value clears the 1-lot floor for the three
-   * cheapest/most liquid indices (NIFTY, BANKNIFTY, SENSEX — roughly a
-   * 10-14% floor each at current lot sizes) and leaves FINNIFTY and
-   * especially BANKEX (~30% floor) resolving to zero lots most of the
-   * time on a Rs 25,000 float. That's intentional, not a regression — see
-   * `maxPositionCapitalPct` below for why BANKEX in particular is close to
-   * unaffordable outright, independent of this number.
+   * Cut again, from 15% to 6%, once limit-entry + thesis-exit gave a
+   * strategy actually worth sizing carefully rather than one that mostly
+   * needed to survive. A direct riskPct sweep against that combo (Aug 2026
+   * walk-forward backtest) found 6% is not a tradeoff against the 15% this
+   * replaces — it's strictly better on both axes: annualized Sharpe rose
+   * 2.53 -> 3.15, and max drawdown fell from -86.1% to -43.2%. Below ~5%
+   * both start reversing (some indexes stop clearing their own 1-lot risk
+   * floor and drop out of the mix entirely) — 6% sits right at the top of
+   * that curve, not just "lower is safer."
+   *
+   * The original 30% -> 15% cut (kept below for the reasoning, still
+   * correct) was solving a different, earlier problem: at the Rs 25,000
+   * paper float this shipped with, 1% resolved every NIFTY signal to zero
+   * lots outright, and 30% was sized to keep BANKEX — the single most
+   * capital-hungry index — affordable at all, which inflated real dollar
+   * risk on every cheaper index just to drag BANKEX over its own floor.
+   * `paperCapital` has since moved to Rs 1,00,000 (see below), which
+   * lowers every index's own 1-lot floor by the same 4x — at 6% on the
+   * current float, NIFTY/BANKNIFTY/SENSEX/FINNIFTY all clear it; BANKEX
+   * (~7.5% floor at this capital) still mostly doesn't, same as before.
    */
-  riskPct: 15.0,
+  riskPct: 6.0,
   // Same 25% every protocol used before this was split out — no behaviour
   // change until one of these is tuned independently.
   stopPctByProtocol: { ALPHA: 0.25, BETA: 0.25, GAMMA: 0.25 },
