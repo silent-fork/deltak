@@ -3,12 +3,11 @@ import { cn } from "@/lib/utils";
 /**
  * The DELTAK wordmark, one place — three components rendered it with
  * identical styling and would have drifted the moment one of them changed.
- * "Delta" is a real Option Greek, not just a name, so the "D" is the actual
- * Greek Δ rather than a Latin letter — both Δ and `K` carry the accent: the
- * same quantum-cyan glow the rest of the HUD marks its one live, active
- * thing with (the Quantum Horizon line, an armed band, a live tick). The
- * blinking cursor after it closes the mark like a live terminal prompt,
- * full cap-height so it reads as part of the same row as the letters.
+ * "DELTA" reads as one plain word; only `K` carries the accent — the same
+ * quantum-cyan glow the rest of the HUD marks its one live, active thing
+ * with (the Quantum Horizon line, an armed band, a live tick). The blinking
+ * cursor after it closes the mark like a live terminal prompt, full
+ * cap-height so it reads as part of the same row as the letters.
  *
  * `font-display` (Space Grotesk) rather than the body/mono faces, so the
  * mark reads as a logotype instead of bold body text.
@@ -37,10 +36,7 @@ export function Wordmark({
 
   return (
     <span className={cn("inline-flex items-baseline font-display font-bold text-zinc-100", className)}>
-      <span className={accent} style={{ marginRight: "-0.02em" }}>
-        Δ
-      </span>
-      ELTA
+      DELTA
       <span className={accent}>K</span>
       <span
         aria-hidden
