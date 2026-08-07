@@ -6,15 +6,14 @@ import { useTransitionLink } from "@/lib/useTransitionLink";
 
 /**
  * A plain internal nav link (brand mark, breadcrumb crumb) with the same
- * route-transition acknowledgement `CtaLink` gives the terminal/learn/discuss
+ * route-transition acknowledgement `CtaLink` gives the terminal/learn/faq
  * buttons — see `useTransitionLink`. No analytics event: unlike `CtaLink`
  * this covers wayfinding clicks, not calls to action.
  *
  * Unlike `CtaLink`, the content here never swaps out — the brand mark and
  * breadcrumb crumbs are identity, not a call to action, and hiding a logo
  * mid-navigation reads as the brand itself glitching, not a loading state.
- * A small ping badge (the same one the homepage's Discuss pill uses for
- * "someone's here") sits in the corner instead, acknowledging the click
+ * A small ping badge sits in the corner instead, acknowledging the click
  * without touching what's underneath it.
  */
 export function NavLink({
