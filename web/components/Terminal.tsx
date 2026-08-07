@@ -19,6 +19,7 @@ import {
 } from "@/lib/market/migration";
 import type { Underlying } from "@/lib/types";
 import { useEngine } from "@/lib/useEngine";
+import { useWakeLock } from "@/lib/useWakeLock";
 import { fmt } from "@/lib/utils";
 
 const SIMULATE = process.env.NEXT_PUBLIC_SIMULATE === "1";
@@ -38,6 +39,11 @@ export function Terminal() {
   const bumpRefresh = useCallback(() => forceRefresh((n) => n + 1), []);
 
   const { snapshot, streamStatus, simulated, demo, error, market } = engine;
+
+  // Screen only — see the hook's own comment for why a backgrounded tab's
+  // timers can't be kept at full rate from here, and what already covers
+  // position safety when one goes idle.
+  useWakeLock(engine.session.authenticated);
 
   const chain = snapshot?.chains[selected];
   const signal = snapshot?.signals[selected];
