@@ -283,7 +283,7 @@ export default function HomePage() {
         </div>
 
         <div className="mx-auto mt-9 flex max-w-lg flex-wrap items-center justify-center gap-2">
-          {["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "Paper mode"].map(
+          {["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX"].map(
             (chip) => (
               <span
                 key={chip}
