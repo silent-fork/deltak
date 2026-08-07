@@ -38,6 +38,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/learn/glossary`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/learn/trading-styles`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/learn/indices`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/learn/backtest`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
   ];
 

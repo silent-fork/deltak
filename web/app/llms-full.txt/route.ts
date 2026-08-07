@@ -89,6 +89,10 @@ ${styleList}
 
 ${indexList}
 
+### [Backtest Report](${SITE_URL}/learn/backtest)
+
+An 18-month walk-forward backtest of DKMS across NIFTY, BANKNIFTY, FINNIFTY, SENSEX and BANKEX (train/validate/test split, real statutory charges, a swept bid-ask spread assumption). The raw wall-shift signal alone has no edge; a 3% limit-entry discount and a thesis-exit rule are what turned it positive. Current shipped configuration: 3.30 Sharpe ratio, −43.6% max drawdown, 52.2% win rate across 2,072 trades, ₹1,00,000 → ₹28.37 lakh over 341 marked days. Full attribution by index, protocol and exit reason, plus a worked trade example and an explicit risks/limitations section.
+
 ## Notes
 
 Paper mode only in the terminal — every fill is simulated against live market data, no live order is ever placed. The /tools pages are read-only reference dashboards built on NSE's own public data, not a trading interface, and not a live real-time feed (most figures are end-of-day bhavcopy based, refreshed on the cadence each tool states). Nothing on this site is investment advice; options trading carries substantial risk of loss.

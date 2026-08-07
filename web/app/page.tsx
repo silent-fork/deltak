@@ -24,6 +24,7 @@ import {
 
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
+import { EquityCurveChart } from "@/components/BacktestCharts";
 
 /**
  * The homepage.
@@ -345,6 +346,77 @@ export default function HomePage() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/*
+        The receipts. Every section on this page up to here describes what
+        the engine does — this is the one that shows what happened when it
+        actually ran, against 18 months it never got to see coming. The
+        equity curve is the real one from /learn/backtest, not a stand-in
+        graphic, so a visitor who doesn't click through still sees the shape
+        of the result, not just a claim about it.
+      */}
+      <section className="relative mx-auto max-w-6xl px-5 py-10">
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-quantum/[0.08] blur-[110px]"
+          />
+          <div className="relative grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-quantum/40 bg-quantum/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-quantum">
+                <LineChart className="h-3 w-3" />
+                Backtesting &amp; Performance Report
+              </span>
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
+                Tested against 18 months it didn&apos;t get to see coming
+              </h2>
+              <p className="mt-3 max-w-lg text-balance text-[13.5px] leading-relaxed text-zinc-400">
+                The honest version first: the raw signal alone had no edge — a
+                −95.7% drawdown, priced at the live offer. A 3% limit-entry
+                discount and a thesis-exit rule are what turned it around, on
+                an 18-month walk-forward study with a strict train/validate/test
+                split no parameter was fit against.
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-2">
+                {[
+                  { label: "Sharpe ratio", value: "3.30", tone: "text-emerald-400" },
+                  { label: "Max drawdown", value: "−43.6%", tone: "text-rose-400" },
+                  { label: "Win rate", value: "52.2%", tone: "text-zinc-100" },
+                  { label: "Capital growth", value: "28.4×", tone: "text-emerald-400" },
+                ].map((k) => (
+                  <div key={k.label}>
+                    <div className={`font-mono text-[19px] font-semibold tabular-nums ${k.tone}`}>{k.value}</div>
+                    <div className="mt-0.5 text-[10.5px] uppercase tracking-wider text-zinc-600">{k.label}</div>
+                  </div>
+                ))}
+              </div>
+              <CtaLink
+                href="/learn/backtest"
+                location="hero-backtest-report"
+                className="mt-7 inline-flex items-center gap-1.5 rounded-md border border-quantum/50 bg-quantum/10 px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-quantum transition-colors hover:bg-quantum/20"
+              >
+                Read the full report
+                <ArrowRight className="h-3.5 w-3.5" />
+              </CtaLink>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Equity curve · log scale</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">₹1,00,000 → ₹28,37,362, 341 marked days</p>
+                </div>
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-400">
+                  +2,737%
+                </span>
+              </div>
+              <div className="mt-3">
+                <EquityCurveChart />
+              </div>
+            </div>
           </div>
         </div>
       </section>

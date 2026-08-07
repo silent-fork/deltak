@@ -42,6 +42,7 @@ Every candidate, regardless of protocol, still has to clear the Zero-OTM rule (l
   - [Glossary](${SITE_URL}/learn/glossary): Options and Indian F&O terminology, including DeltaK's own Aegis, Zenith, Quantum Horizon, COA Matrix and DKMS protocol terms.
   - [Trading styles](${SITE_URL}/learn/trading-styles): Intraday, swing and positional options trading compared, plus options buying vs. selling.
   - [Indices](${SITE_URL}/learn/indices): NIFTY, BANKNIFTY, FINNIFTY, SENSEX, BANKEX and every other major Indian index F&O contract — lot size, strike step, exchange.
+  - [Backtest Report](${SITE_URL}/learn/backtest): An 18-month walk-forward backtest of DKMS across all five indices — Sharpe ratio, max drawdown, win rate, per-index/protocol/exit-reason attribution and a worked trade, with full methodology.
 
 ## Notes
 
