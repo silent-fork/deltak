@@ -1781,6 +1781,7 @@ export function useEngine(simulate: boolean) {
         market_open: snapshot.market_open,
         signals: snapshot.signals,
         open_positions: snapshot.ledger.open_positions,
+        pending_entries: snapshot.pending_entries,
         ledger: {
           capital: snapshot.ledger.capital,
           equity: snapshot.ledger.equity,
