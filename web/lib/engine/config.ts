@@ -494,21 +494,60 @@ export const DEFAULT_CONFIG: EngineConfig = {
   openingQuietMinutes: 10,
 
   /**
-   * Sized for the 25,000 paper float: at 1% the risk budget (250) is smaller
-   * than a single NIFTY lot's stop distance, so every signal resolved to zero
-   * lots and nothing could ever be placed. The premium-affordability cap in
-   * `calculateSize` remains the real backstop.
+   * Cut from 30% after an 18-month walk-forward backtest (Aug 2026) showed
+   * the strategy losing money at a stable, sample-robust expectancy across
+   * every fold — at 30% risk a losing streak alone was enough to explain
+   * most of a real account's drawdown (28 trades took Rs 25,000 to Rs 9,008
+   * in the reference run). 30% was originally chosen to solve a real
+   * problem — 1% resolved every NIFTY signal to zero lots outright — but it
+   * solved it by sizing to the *most* capital-hungry index in the universe
+   * (BANKEX, whose own 1-lot stop distance alone needs ~30% just to clear
+   * the floor), which inflated real dollar risk on every cheaper index at
+   * the same time. This value clears the 1-lot floor for the three
+   * cheapest/most liquid indices (NIFTY, BANKNIFTY, SENSEX — roughly a
+   * 10-14% floor each at current lot sizes) and leaves FINNIFTY and
+   * especially BANKEX (~30% floor) resolving to zero lots most of the
+   * time on a Rs 25,000 float. That's intentional, not a regression — see
+   * `maxPositionCapitalPct` below for why BANKEX in particular is close to
+   * unaffordable outright, independent of this number.
    */
-  riskPct: 30.0,
+  riskPct: 15.0,
   // Same 25% every protocol used before this was split out — no behaviour
   // change until one of these is tuned independently.
   stopPctByProtocol: { ALPHA: 0.25, BETA: 0.25, GAMMA: 0.25 },
   itmDeltaApprox: 0.7,
-  maxConcurrentPositions: 4,
+  // Cut from 4: with `maxPortfolioRiskPct` now the tighter, real binding
+  // constraint (see below), a 4th concurrent slot was rarely reachable in
+  // practice anyway — this just makes that explicit rather than implicit.
+  maxConcurrentPositions: 3,
   invalidationPct: 0.35,
   weakeningMinAdverseMovePct: 0.05,
-  maxPositionCapitalPct: 40,
-  maxPortfolioRiskPct: 60,
+  /**
+   * Raised from 40% — not loosened for its own sake, but corrected against
+   * the same lot-size reality `riskPct` above is calibrated to. At current
+   * NSE/BSE lot sizes a *single* Zero-OTM (depth-2 ITM) lot already costs
+   * more than 40% of a Rs 25,000 float for four of the five indexes (NIFTY
+   * ~55%, BANKNIFTY ~56%, FINNIFTY ~72%, BANKEX ~120% — i.e. unaffordable
+   * outright even at 100% of capital) — so the old 40% ceiling blocked
+   * every one of them regardless of `riskPct`, not just the expensive ones.
+   * 60% clears NIFTY/BANKNIFTY/SENSEX's real 1-lot cost while still
+   * blocking FINNIFTY and BANKEX, the same three-index split `riskPct`
+   * above lands on independently. The real safety rail against this being
+   * a large number is `maxPortfolioRiskPct` below, cut hard specifically
+   * because a single position can now legitimately be more than half the
+   * account: the loss-at-stop ceiling is what has to stay tight, not the
+   * premium-spend ceiling a small account structurally can't satisfy at
+   * today's lot sizes.
+   */
+  maxPositionCapitalPct: 60,
+  /**
+   * Cut from 60% — this is now the primary defence against simultaneous
+   * exposure, precisely because `maxPositionCapitalPct` above had to move
+   * up to stay solvent at all. 20% means even two of the three affordable
+   * indexes stopping out back-to-back costs a bounded, survivable slice of
+   * the account rather than compounding toward ruin.
+   */
+  maxPortfolioRiskPct: 20,
   pcrDivergencePct: 40,
 
   signalDwellTicks: 3,
