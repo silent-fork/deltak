@@ -465,6 +465,47 @@ export interface EngineConfig {
    */
   vixRiskPctMultiplier: Record<VixRegime, number>;
 
+  /**
+   * Autopilot-only passive limit entry, percent below the signal's own
+   * reference price — quote there and wait, rather than paying the offer
+   * immediately. 0 disables it: Autopilot fires marketable, same as before
+   * this existed. Manual Execute clicks never read this at all — see
+   * `useEngine.ts`'s `placeLimitEntry`, called only from the Autopilot
+   * trigger effect.
+   *
+   * Validated together with `thesisExit` below in an 18-month walk-forward
+   * backtest (Aug 2026): the entry signal alone carries ~zero directional
+   * edge, but a consistently better fill price is a real, non-directional
+   * improvement regardless — 3.0% is the smallest discount that cleared
+   * positive out-of-sample expectancy at 95% confidence in that backtest,
+   * stress-tested against both an adverse spread assumption and a
+   * conservative "the market must trade meaningfully through the price,
+   * not just wick it" fill requirement.
+   */
+  limitEntryDiscountPct: number;
+  /**
+   * How long a placed limit order waits for `limitEntryDiscountPct`'s price
+   * before it's dropped unfilled — the backtest's own "3 bars of 5-minute
+   * data" (15 minutes), translated to wall-clock seconds for a tick-driven
+   * live engine that has no fixed bar size of its own.
+   */
+  limitEntryTimeoutSec: number;
+  /**
+   * Exit — or for a still-pending limit order, cancel — the instant the
+   * SAME classification that justified the entry stops holding: the
+   * protocol classification flipped away from what was bought, or (for
+   * Alpha specifically) spot is no longer near the wall the position was
+   * anchored to. This is a *tighter*, earlier-firing check than
+   * `invalidationPct`'s wider band, not a replacement for it — both stay
+   * active; see `thesisIntact`/`checkThesisBroken` in `risk.ts`. Targets
+   * the exact asymmetry the Aug 2026 backtest's own diagnosis found:
+   * winners resolved in a median of 1 bar, losers dragged for a median of
+   * 13 before the wide stop finally caught them. Applies to every open
+   * position regardless of how it was opened — manual or Autopilot, limit
+   * or marketable — since a broken thesis is a broken thesis either way.
+   */
+  thesisExit: boolean;
+
   paperCapital: number;
   slippagePct: number;
   costPerOrder: number;
@@ -562,6 +603,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
   vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
   vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
+
+  limitEntryDiscountPct: 3.0,
+  limitEntryTimeoutSec: 900,
+  thesisExit: true,
 
   // Raised from 25,000 — the sizing fix above (riskPct/maxPositionCapitalPct)
   // was corrected against real 1-lot economics at current NSE/BSE lot sizes,

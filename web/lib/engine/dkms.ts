@@ -13,8 +13,15 @@ import type { EngineConfig } from "./config";
 import { DAYLIGHT_REST_MIN, MARKET_OPEN_MIN } from "./config";
 import type { ChainBuilder } from "./coa";
 import type { ScripMaster } from "./scripMaster";
-import { wallStopPoints } from "./risk";
+import { classifyProtocol, wallStopPoints } from "./risk";
 import { calculateSize } from "./sizing";
+
+// Re-exported so existing `@/lib/engine/dkms` imports (protocol
+// classification's original home) keep working now that the definition
+// itself lives in `./risk`, which needs it too for `thesisIntact` — moving
+// it there instead of the other direction avoids a risk.ts <-> dkms.ts
+// import cycle (dkms.ts already needs `wallStopPoints` from risk.ts).
+export { classifyProtocol };
 
 /**
  * DeltaK Matrix Strategy signal engine — port of `backend/app/engine/dkms.py`.
@@ -141,20 +148,6 @@ export function applyDwellLatch(
     };
   }
   return { actionable: false, state: emptyDwellState() };
-}
-
-export function classifyProtocol(levels: CoaLevels, tolerance: number): Protocol {
-  if (levels.aegis_1 === null || levels.zenith_1 === null) return "DELTA";
-
-  const supportSolid = Math.abs(levels.aegis_shift) <= tolerance;
-  const resistanceSolid = Math.abs(levels.zenith_shift) <= tolerance;
-  const resistanceUp = levels.zenith_shift > tolerance;
-  const supportDown = levels.aegis_shift < -tolerance;
-
-  if (supportSolid && resistanceSolid) return "ALPHA";
-  if (supportSolid && resistanceUp) return "BETA";
-  if (resistanceSolid && supportDown) return "GAMMA";
-  return "DELTA";
 }
 
 /**
