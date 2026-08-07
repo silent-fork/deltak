@@ -121,13 +121,6 @@ const SECTIONS = [
     count: `${INDICES.length} contracts`,
     body: "NIFTY, BANKNIFTY, FINNIFTY and every other major Indian index F&O contract — lot size, strike step, exchange.",
   },
-  {
-    href: "/learn/backtest",
-    glyph: BacktestGlyph,
-    title: "Backtest Report",
-    count: "18 months",
-    body: "The full DKMS walk-forward backtest — Sharpe, drawdown, attribution and a worked trade, numbers included.",
-  },
 ] as const;
 
 export default function LearnHubPage() {
@@ -174,6 +167,64 @@ export default function LearnHubPage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      {/*
+        The other four cards are reference — browse N items. This one is
+        proof, not reference, so it doesn't get folded into the same grid as
+        a fifth tile with nothing to differentiate it: its own row, a
+        quantum-lit border, and the actual headline numbers up front rather
+        than a "Browse" link with no sense of what's behind it.
+      */}
+      <section className="relative mx-auto max-w-6xl px-5 pb-8">
+        <Link
+          href="/learn/backtest"
+          className="group relative flex flex-col gap-5 overflow-hidden rounded-lg border border-quantum/30 bg-quantum/[0.05] p-5 transition-colors hover:border-quantum/50 sm:flex-row sm:items-center sm:gap-6"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-quantum/[0.10] blur-[90px]"
+          />
+          <div className="relative flex gap-4 sm:flex-1">
+            <div className="h-16 w-16 shrink-0 rounded-lg border border-quantum/30 bg-zinc-950/60 p-2">
+              <BacktestGlyph />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-quantum">
+                  Backtesting &amp; performance report
+                </span>
+                <span className="rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-600">
+                  18 months
+                </span>
+              </div>
+              <h2 className="mt-1 text-[15px] font-semibold text-zinc-100">
+                Tested against 18 months it didn&apos;t get to see coming
+              </h2>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
+                The full DKMS walk-forward backtest — attribution by index and protocol, the risk-sizing
+                history and a worked trade, numbers included.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative flex shrink-0 items-center justify-between gap-5 border-t border-quantum/15 pt-4 sm:justify-start sm:gap-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+            {[
+              { label: "Sharpe", value: "3.30" },
+              { label: "Max DD", value: "−43.6%" },
+              { label: "Win rate", value: "52.2%" },
+            ].map((k) => (
+              <div key={k.label}>
+                <div className="font-mono text-[15px] font-semibold text-zinc-100">{k.value}</div>
+                <div className="mt-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-600">{k.label}</div>
+              </div>
+            ))}
+            <span className="flex items-center gap-1 font-mono text-[11px] font-semibold text-zinc-500 transition-colors group-hover:text-quantum">
+              Read
+              <ArrowRight className="h-3 w-3" />
+            </span>
+          </div>
+        </Link>
       </section>
 
       <section className="relative mx-auto max-w-6xl px-5 pb-8">
