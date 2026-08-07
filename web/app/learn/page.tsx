@@ -73,6 +73,25 @@ function IndexGlyph() {
   );
 }
 
+function BacktestGlyph() {
+  return (
+    <svg viewBox="0 0 92 60" className="h-full w-full">
+      <line x1="4" y1="14" x2="88" y2="14" stroke="#27272a" strokeWidth="1" />
+      <line x1="4" y1="30" x2="88" y2="30" stroke="#27272a" strokeWidth="1" />
+      <line x1="4" y1="46" x2="88" y2="46" stroke="#27272a" strokeWidth="1" />
+      <path
+        d="M4 44 L14 42 L24 38 L34 30 L44 24 L54 16 L64 14 L74 10 L88 6"
+        fill="none"
+        stroke="#00f0ff"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path d="M4 44 L14 42 L24 38 L34 30 L44 24 L54 16 L64 14 L74 10 L88 6 L88 54 L4 54 Z" fill="#00f0ff" fillOpacity="0.12" />
+    </svg>
+  );
+}
+
 const SECTIONS = [
   {
     href: "/learn/strategies",
@@ -101,6 +120,13 @@ const SECTIONS = [
     title: "Indices",
     count: `${INDICES.length} contracts`,
     body: "NIFTY, BANKNIFTY, FINNIFTY and every other major Indian index F&O contract — lot size, strike step, exchange.",
+  },
+  {
+    href: "/learn/backtest",
+    glyph: BacktestGlyph,
+    title: "Backtest Report",
+    count: "18 months",
+    body: "The full DKMS walk-forward backtest — Sharpe, drawdown, attribution and a worked trade, numbers included.",
   },
 ] as const;
 
