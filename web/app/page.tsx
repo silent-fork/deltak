@@ -361,7 +361,7 @@ export default function HomePage() {
         the real numbers from /learn/backtest, not stand-in graphics.
       */}
       <section className="relative mx-auto max-w-6xl px-5 py-10">
-        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-8">
           <div
             aria-hidden
             className="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-quantum/[0.08] blur-[110px]"
@@ -407,7 +407,7 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Complete analysis</p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">5 indices · 3 exit reasons · 3 walk-forward folds</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">5 indices · 3 exits · 3 folds</p>
                 </div>
                 <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-400">
                   692 trades
