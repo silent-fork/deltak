@@ -4,6 +4,12 @@ import Link from "next/link";
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 /**
  * Shared chrome for every `/tools/*` dashboard — the header (logo, title,
  * breadcrumb back to the `/tools` hub, Terminal CTA) and the full-height
@@ -32,8 +38,26 @@ export function ToolPageShell({
   viewEvent: string;
   children: React.ReactNode;
 }) {
+  // The visible "Tools > {title}" trail in the header below already existed —
+  // this is the structured-data twin of it. The last crumb deliberately has
+  // no `item` URL, per Google's own guidance: it's the current page, nothing
+  // above it in the breadcrumb needs to resolve anywhere new.
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Tools", item: `${SITE_URL}/tools` },
+      { "@type": "ListItem", position: 3, name: title },
+    ],
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950 lg:h-dvh lg:overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <AnalyticsBeacon event={viewEvent} />
       <header className="shrink-0 border-b border-zinc-800/70 bg-zinc-900/40 px-3 py-3 backdrop-blur-sm sm:px-6">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-1.5">

@@ -38,19 +38,48 @@ const SITE_URL =
 
 const PUBLISHED_DATE = "2026-08-07";
 
+const TITLE = "DKMS Backtesting & Performance Report";
+// Kept under 160 chars (Google's display budget — see layout.tsx's own
+// comment on this) so nothing truncates mid-sentence; the previous version
+// ran to 198 and got cut off before its strongest clause.
+const DESCRIPTION =
+  "An 18-month walk-forward backtest of the DeltaK Matrix Strategy across five Indian indices — " +
+  "Sharpe 6.06, max drawdown −11.2%, 71.8% win rate on 692 trades.";
+
 export const metadata: Metadata = {
-  title: "DKMS Backtesting & Performance Report",
-  description:
-    "An 18-month walk-forward backtest of the DeltaK Matrix Strategy across five Indian indices — " +
-    "Sharpe 6.06, max drawdown −11.2%, 71.8% win rate on 692 trades, with full methodology and a worked trade.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "dkms backtest",
     "deltak matrix strategy performance",
     "options strategy backtest india",
     "sharpe ratio options strategy",
     "walk forward backtest nifty",
+    "nifty backtest results",
+    "banknifty option strategy backtest",
+    "finnifty options backtest",
+    "sensex options backtest",
+    "bankex options backtest",
   ],
   alternates: { canonical: "/learn/backtest" },
+  // Without its own openGraph/twitter block this page silently inherited the
+  // root layout's — right image (file-convention opengraph-image.tsx still
+  // resolves independently), wrong title/description/url on every share.
+  openGraph: {
+    type: "article",
+    url: "/learn/backtest",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+    publishedTime: PUBLISHED_DATE,
+    modifiedTime: PUBLISHED_DATE,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 const CONFIG_ROWS = [
@@ -69,7 +98,7 @@ export default function BacktestReportPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline: "DKMS Backtesting & Performance Report",
+    headline: TITLE,
     description: metadata.description,
     image: `${pageUrl}/opengraph-image`,
     author: { "@type": "Organization", name: "Quantum Horizon" },
