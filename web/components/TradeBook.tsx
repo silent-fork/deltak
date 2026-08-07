@@ -501,7 +501,7 @@ export const TradeBook = memo(function TradeBook({
                   position count rather than getting its own separate chip. */}
               <span
                 className={cn(
-                  "flex items-center gap-1 rounded px-1 font-mono text-[9px]",
+                  "flex items-center gap-1 rounded px-1 font-mono text-[9px] leading-none",
                   tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
                 )}
               >
@@ -509,9 +509,9 @@ export const TradeBook = memo(function TradeBook({
                 {key === "open" && pendingEntries.length > 0 ? (
                   <span
                     title={`${pendingEntries.length} order(s) resting, not yet filled`}
-                    className="flex items-center gap-0.5 border-l border-current/30 pl-1 text-amber-300"
+                    className="flex items-center gap-1 text-amber-300"
                   >
-                    <Clock className="h-2.5 w-2.5" />
+                    <span className="h-1 w-1 rounded-full bg-amber-400" />
                     {pendingEntries.length}
                   </span>
                 ) : null}
