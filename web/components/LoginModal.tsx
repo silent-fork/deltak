@@ -7,6 +7,7 @@ import { useEngineContext } from "@/components/EngineProvider";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
+import { describeLoginError } from "@/lib/api";
 import type { Broker } from "@/lib/types";
 import { useTurnstile } from "@/lib/useTurnstile";
 
@@ -65,7 +66,7 @@ export function LoginModal({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(describeLoginError(err, broker));
       setTotp("");
     } finally {
       setBusy(false);
