@@ -6,10 +6,10 @@ import {
   Hand,
   Plug,
   Radar,
-  Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { BrandIcon } from "@/components/BrandIcon";
 import { EventLogMenu } from "@/components/EventLogMenu";
 import { HolidayMenu } from "@/components/HolidayMenu";
 import { LoginModal } from "@/components/LoginModal";
@@ -263,7 +263,7 @@ export function Header({
               className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10"
               style={{ boxShadow: "0 0 0 1px rgba(0,240,255,0.16), 0 0 12px rgba(0,240,255,0.06)" }}
             >
-              <Zap className="h-4 w-4 text-quantum/80" />
+              <BrandIcon size="md" />
             </div>
             <div className="leading-none">
               <Wordmark className="text-[13px] tracking-[0.16em]" />

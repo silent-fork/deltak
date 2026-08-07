@@ -1,8 +1,9 @@
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
+import { BrandIcon } from "@/components/BrandIcon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -161,7 +162,7 @@ export default function ToolsHubPage() {
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <Link href="/" className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-            <Zap className="h-4 w-4 text-quantum" />
+            <BrandIcon size="md" />
           </div>
           <Wordmark className="text-[15px] tracking-[0.18em]" />
         </Link>

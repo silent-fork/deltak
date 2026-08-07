@@ -3,6 +3,7 @@
 import { LockKeyhole, ShieldAlert, Zap } from "lucide-react";
 import { useState } from "react";
 
+import { BrandIcon } from "@/components/BrandIcon";
 import { useEngineContext } from "@/components/EngineProvider";
 import { Wordmark } from "@/components/Wordmark";
 import { Input } from "@/components/ui/input";
@@ -122,7 +123,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
         {/* Brand */}
         <div className="mb-7 flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-            <Zap className="h-4 w-4 text-quantum" />
+            <BrandIcon size="md" />
           </div>
           <div className="leading-none">
             <Wordmark className="text-[15px] font-semibold tracking-[0.18em]" />

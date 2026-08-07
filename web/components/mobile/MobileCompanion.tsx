@@ -1,9 +1,10 @@
 "use client";
 
-import { Activity, Clock, Radar, TrendingDown, TrendingUp, Zap } from "lucide-react";
+import { Activity, Clock, Radar, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
+import { BrandIcon } from "@/components/BrandIcon";
 import { QuadrantPill } from "@/components/QuadrantPill";
 import { MobileUserMenu } from "@/components/mobile/MobileUserMenu";
 import { Badge } from "@/components/ui/badge";
@@ -336,7 +337,7 @@ export function MobileCompanion({
         <header className="z-10 flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-              <Zap className="h-3.5 w-3.5 text-quantum" />
+              <BrandIcon size="sm" />
             </div>
             <Wordmark className="text-[13px] tracking-[0.16em]" />
           </div>

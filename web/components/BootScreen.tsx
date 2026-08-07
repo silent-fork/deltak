@@ -1,8 +1,8 @@
 "use client";
 
-import { Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { BrandIcon } from "@/components/BrandIcon";
 import { Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/utils";
 
@@ -152,7 +152,7 @@ export function BootScreen({
             boxShadow: "0 0 0 1px rgba(0,240,255,0.16), 0 0 12px rgba(0,240,255,0.06)",
           }}
         >
-          <Zap className="relative h-5 w-5 text-quantum/80" />
+          <BrandIcon size="lg" glow={false} />
         </div>
 
         <div
