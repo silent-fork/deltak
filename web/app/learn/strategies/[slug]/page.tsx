@@ -8,6 +8,15 @@ import { legStrikeLabel, PayoffChart } from "@/components/PayoffChart";
 import { computePayoff, tradeIdeaNarrative } from "@/lib/content/payoff";
 import { getStrategy, STRATEGIES, STRATEGY_EXAMPLE } from "@/lib/content/strategies";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
+/** When the strategy library shipped — there's no per-strategy authoring date to draw on. */
+const PUBLISHED_DATE = "2026-08-04";
+
 export const dynamic = "error";
 export const dynamicParams = false;
 
@@ -43,12 +52,17 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
   const tradeIdea = tradeIdeaNarrative(strategy.legs, STRATEGY_EXAMPLE);
   const others = STRATEGIES.filter((s) => s.slug !== strategy.slug && s.category === strategy.category).slice(0, 3);
 
+  const pageUrl = `${SITE_URL}/learn/strategies/${strategy.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: `${strategy.name} Options Strategy`,
     description: strategy.summary,
+    image: `${pageUrl}/opengraph-image`,
     author: { "@type": "Organization", name: "Quantum Horizon" },
+    datePublished: PUBLISHED_DATE,
+    dateModified: PUBLISHED_DATE,
+    mainEntityOfPage: { "@type": "WebPage", "@id": pageUrl },
   };
 
   return (
