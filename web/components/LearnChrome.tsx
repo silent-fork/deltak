@@ -5,6 +5,12 @@ import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 /** A miniature of the terminal's own RRG quadrant plot — not a stock icon. */
 function RotationGlyph() {
   const dots: [number, number, string][] = [
@@ -50,8 +56,26 @@ export function LearnChrome({
   viewEvent: string;
   viewData?: Record<string, unknown>;
 }) {
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [{ label: "Home", href: "/" }, ...crumbs].map((c, i, arr) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: c.label,
+      // The last crumb is the current page — Google's own guidance treats
+      // its `item` URL as optional, and `crumbs` never carries an `href`
+      // for it anyway (nothing above links to itself).
+      ...(i < arr.length - 1 && c.href ? { item: `${SITE_URL}${c.href}` } : {}),
+    })),
+  };
+
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <AnalyticsBeacon event={viewEvent} data={viewData} />
       <div
         aria-hidden

@@ -18,6 +18,24 @@ export const metadata: Metadata = {
   alternates: { canonical: "/faq" },
 };
 
+/**
+ * Google renders this as an expandable Q&A directly in search results —
+ * the accordion below is a straight serialization of the same `FAQS` array
+ * that drives it, not a second, separately-maintained copy of the content.
+ */
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: f.answer.join(" "),
+    },
+  })),
+};
+
 export default function FaqPage() {
   return (
     <LearnChrome
@@ -25,6 +43,10 @@ export default function FaqPage() {
       viewEvent="faq_view"
       crumbs={[{ label: "FAQ" }]}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <section className="relative mx-auto max-w-4xl px-5 pb-6 pt-4 text-center">
         <p className="dk-label text-[10.5px] text-quantum">Frequently asked questions</p>
         <h1 className="mt-1.5 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
