@@ -38,7 +38,12 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // 1 year (31536000s), not the 2-year max some guides suggest — matched to
+  // Cloudflare's HSTS panel (its dashboard caps at 12 months), which is the
+  // one that actually reaches the browser since Cloudflare is proxied in
+  // front of this origin. Still clears the ≥1-year floor hstspreload.org
+  // requires for submission.
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
   // Explicit-deny list, not a template default: only the browser features
   // this app actually has no use for. Wake Lock (used on /terminal) is
   // deliberately absent from this list so it stays available same-origin.
@@ -51,6 +56,10 @@ const SECURITY_HEADERS = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Next.js sends `X-Powered-By: Next.js` on every response by default —
+  // minor info disclosure (names the framework for anyone fingerprinting
+  // it) for zero benefit. Off at the source rather than stripped downstream.
+  poweredByHeader: false,
   // No external backend: every /api/* path is a route handler in this
   // deployment, and the market feed is a WebSocket opened by the browser.
   async headers() {
