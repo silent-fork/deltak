@@ -138,6 +138,23 @@ const structuredData = {
   },
 };
 
+/**
+ * Standalone `Organization` entity — currently only implied inline as the
+ * `author` on the Article schema blocks (strategy pages, backtest report).
+ * A top-level block is the standard Knowledge Panel eligibility signal, and
+ * is specifically called out in Google's guidance for financial-content
+ * sites. No `sameAs`: better to omit it than list a half-maintained social
+ * profile.
+ */
+const organizationData = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "QNTMHRZN",
+  alternateName: ["Quantum Horizon", "DeltaK"],
+  url: SITE_URL,
+  logo: `${SITE_URL}/icon`,
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -149,6 +166,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
         />
         {children}
         <SpeedInsights />

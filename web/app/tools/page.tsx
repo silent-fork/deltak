@@ -5,13 +5,37 @@ import Link from "next/link";
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_DK_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 export const metadata: Metadata = {
   title: "Tools — Free NSE F&O Market Utilities",
   description:
     "Quantum Horizon's free NSE F&O tools — sector rotation, a market scanner, an options volatility " +
     "desk, and a corporate calendar. All built on NSE's own public data.",
+  keywords: [
+    "free nse fno tools",
+    "options trading tools india",
+    "nse sector rotation tool",
+    "fno market scanner free",
+    "options volatility desk india",
+  ],
   alternates: { canonical: "/tools" },
   robots: { index: true, follow: true },
+};
+
+// The hub itself doesn't render `ToolPageShell` (only its four sub-tools
+// do), so it needs its own, one-level-shorter breadcrumb trail.
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+    { "@type": "ListItem", position: 2, name: "Tools" },
+  ],
 };
 
 /* ---------------------------------------------------------- preview glyphs */
@@ -126,6 +150,7 @@ const TOOLS = [
 export default function ToolsHubPage() {
   return (
     <main className="dk-grid-bg relative min-h-dvh overflow-hidden bg-zinc-950">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <AnalyticsBeacon event="tools_hub_view" />
       <div
         aria-hidden
