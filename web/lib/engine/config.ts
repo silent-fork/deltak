@@ -476,11 +476,18 @@ export interface EngineConfig {
    * Validated together with `thesisExit` below in an 18-month walk-forward
    * backtest (Aug 2026): the entry signal alone carries ~zero directional
    * edge, but a consistently better fill price is a real, non-directional
-   * improvement regardless — 3.0% is the smallest discount that cleared
-   * positive out-of-sample expectancy at 95% confidence in that backtest,
-   * stress-tested against both an adverse spread assumption and a
-   * conservative "the market must trade meaningfully through the price,
-   * not just wick it" fill requirement.
+   * improvement regardless. Originally shipped at 3.0% (the smallest
+   * discount that cleared positive out-of-sample expectancy at 95%
+   * confidence); a follow-up sweep (`backtest/discount_sweep.py`,
+   * `backtest/drawdown_robustness.py`) tested up to 20% and found
+   * expectancy and drawdown both improving well past 3%, but with fill
+   * rate collapsing from 60% to under 7% — a naive "pick the best point
+   * estimate" selection just walks to the edge of whatever range you test,
+   * on a TEST-fold sample that thins from 455 trades to 51. Raised to
+   * 12.0%: inside the range where every fold and every index still clears
+   * a trustworthy sample size (all 5 indexes n≥53, TEST n=144), it more
+   * than halves max drawdown (−43.6% → −11.2%) and lifts win rate to
+   * 71.8%, without pushing into the noisier, fill-starved tail past ~14%.
    */
   limitEntryDiscountPct: number;
   /**
@@ -604,7 +611,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
   vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
 
-  limitEntryDiscountPct: 3.0,
+  limitEntryDiscountPct: 12.0,
   limitEntryTimeoutSec: 900,
   thesisExit: true,
 

@@ -88,7 +88,12 @@ export function DrawdownChart() {
 export function SpreadSensitivityChart() {
   const W = 480, H = 210, ML = 42, MR = 14, MT = 14, MB = 26;
   const plotW = W - ML - MR, plotH = H - MT - MB;
-  const maxY = 0.1;
+  const dataMax = Math.max(...SPREAD_SENSITIVITY.map((d) => d.expectancy));
+  // Round up to a clean step so the top gridline isn't a jagged fraction —
+  // steps of 0.1R below 0.5R, 0.25R above, whichever the data actually needs.
+  const tickStep = dataMax <= 0.5 ? 0.1 : 0.25;
+  const maxY = Math.ceil((dataMax * 1.08) / tickStep) * tickStep;
+  const ticks = Array.from({ length: Math.round(maxY / tickStep) + 1 }, (_, i) => i * tickStep);
   const x = (v: number) => ML + (v / 3.0) * plotW;
   const y = (v: number) => MT + (1 - v / maxY) * plotH;
   const lineD = SPREAD_SENSITIVITY.map((d, i) => `${i === 0 ? "M" : "L"}${x(d.spread)},${y(d.expectancy)}`).join(" ");
@@ -96,7 +101,7 @@ export function SpreadSensitivityChart() {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Expectancy versus bid-ask spread, test fold, staying positive from 0 to 3 percent spread">
-      {[0, 0.025, 0.05, 0.075, 0.1].map((t) => (
+      {ticks.map((t) => (
         <g key={t}>
           <line x1={ML} x2={W - MR} y1={y(t)} y2={y(t)} stroke="#27272a" strokeWidth={1} />
           <text x={2} y={y(t) + 3.5} fontSize={9.5} fill="#71717a" fontFamily="ui-monospace, monospace">+{t.toFixed(2)}R</text>

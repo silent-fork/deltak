@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Sweep limit_discount_pct (currently shipped at 3.0%) up to 10% to see
+Sweep limit_discount_pct (originally shipped at 3.0%, since widened to the
+12.0% this sweep and drawdown_robustness.py's follow-up recommended) up to
+10% to see
 whether a deeper limit-entry discount reduces max drawdown — the obvious
 hypothesis being a wider discount only fills on a bigger pullback, which
 could mean better average entries but also fewer fills overall (missed

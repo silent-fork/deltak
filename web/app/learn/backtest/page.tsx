@@ -1,4 +1,4 @@
-import { AlertTriangle, ShieldAlert, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, TrendingUp, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 
 import {
@@ -24,7 +24,6 @@ import {
   INDEX_COUNT,
   KPIS,
   PROTOCOL_ATTRIBUTION,
-  SIZING_EVOLUTION,
   SPLIT,
   TOTAL_DAYS,
   TRADE_COUNT,
@@ -43,7 +42,7 @@ export const metadata: Metadata = {
   title: "DKMS Backtesting & Performance Report",
   description:
     "An 18-month walk-forward backtest of the DeltaK Matrix Strategy across five Indian indices — " +
-    "Sharpe 3.30, max drawdown −43.6%, 52.2% win rate on 2,072 trades, with full methodology and a worked trade.",
+    "Sharpe 6.06, max drawdown −11.2%, 71.8% win rate on 692 trades, with full methodology and a worked trade.",
   keywords: [
     "dkms backtest",
     "deltak matrix strategy performance",
@@ -53,6 +52,17 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: "/learn/backtest" },
 };
+
+const CONFIG_ROWS = [
+  ["Entry gate", "Zero-OTM — 2nd/3rd deepest ITM strike only"],
+  ["Protocols", "ALPHA (wall pin) · BETA (dip into support) · GAMMA (rally into resistance)"],
+  ["Entry order", "Passive limit, 12% below signal mid, 900s timeout"],
+  ["Stop", "25% of entry premium"],
+  ["Target", "1.5R"],
+  ["Thesis exit", "Closes the instant the entry classification stops holding"],
+  ["Position sizing", "6% account risk per trade, ₹1,00,000 sizing base, max 3 concurrent"],
+  ["Indices", "NIFTY · BANKNIFTY · FINNIFTY · SENSEX · BANKEX"],
+] as const;
 
 export default function BacktestReportPage() {
   const pageUrl = `${SITE_URL}/learn/backtest`;
@@ -70,7 +80,9 @@ export default function BacktestReportPage() {
 
   const indexMax = Math.max(...INDEX_ATTRIBUTION.map((i) => Math.abs(i.net)));
   const protocolMax = Math.max(...PROTOCOL_ATTRIBUTION.map((p) => p.totalR));
+  const foldMax = Math.max(...FOLD_COMPARISON.map((f) => f.expectancy));
   const sortedIndex = [...INDEX_ATTRIBUTION].sort((a, b) => b.net - a.net);
+  const discountCapture = WORKED_TRADE.signalMid - WORKED_TRADE.limitQuote;
 
   return (
     <>
@@ -87,9 +99,8 @@ export default function BacktestReportPage() {
             The DeltaK Matrix Strategy, tested against 18 months it didn&apos;t get to see coming
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
-            A walk-forward study of DKMS across five Indian index option chains — how the wall-and-rotation
-            signal performs, what the limit-entry and thesis-tracking execution layer changed, and where the
-            strategy is still weak.
+            A walk-forward study of DKMS across five Indian index option chains — the exact configuration
+            currently shipped, and the full results it produces against 18 months of real market data.
           </p>
           <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-1.5 font-mono text-[10.5px] text-zinc-500">
             <span className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-1">
@@ -133,79 +144,60 @@ export default function BacktestReportPage() {
           </div>
         </section>
 
-        {/* -------------------------------------------------- Exec summary */}
+        {/* -------------------------------------------------- Strategy config */}
         <section className="relative mx-auto max-w-4xl px-5 pb-10">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Executive summary</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Strategy configuration</h2>
           <div className="mt-3 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">
             <p>
               DKMS trades the option chain&apos;s own positioning, not the index&apos;s raw price. It reads the
               strike carrying the heaviest put open interest below spot (<strong className="text-zinc-200">Aegis</strong>,
               a support wall) and the heaviest call open interest above spot (<strong className="text-zinc-200">Zenith</strong>,
               a resistance wall), cross-checks that against each strike&apos;s own relative-rotation trend, and
-              only trades when both agree — a pin near a wall (<strong className="text-zinc-200">ALPHA</strong>), a
-              dip bought into support (<strong className="text-zinc-200">BETA</strong>), or a rally sold into
-              resistance (<strong className="text-zinc-200">GAMMA</strong>).
+              only trades when both agree — a pin near a wall, a dip bought into support, or a rally sold into
+              resistance.
             </p>
             <p>
-              The honest finding of this study is that <strong className="text-zinc-200">the raw signal alone has
-              no edge.</strong>{" "}
-              Priced at the live offer with no thesis discipline, the original configuration
-              backtests to a −95.7% max drawdown and a −1.35 Sharpe ratio across 127 trades. What fixed it was
-              changing how the strategy gets in and out, not what it looks for: a 3% limit-entry discount instead
-              of paying the offer, and a thesis-exit rule that closes a position the moment the read that
-              justified it breaks — before the stop, not instead of it.
+              Every candidate is priced through a passive limit order, quoted below the signal&apos;s own mid
+              price rather than paid at the offer, and every open position is watched by a thesis-exit rule that
+              closes it the instant the read that justified it stops holding — independent of, and faster than,
+              the stop-loss underneath it.
             </p>
-            <p>
-              With that execution layer live, the same signal backtests to a <strong className="text-zinc-200">3.30
-              Sharpe ratio</strong>, a <strong className="text-zinc-200">52.2% win rate</strong> against a{" "}
-              <strong className="text-zinc-200">46.1% breakeven requirement</strong>, and turns ₹1,00,000 of paper
-              capital into ₹28.37 lakh over {EQUITY_MARKED_DAYS} marked trading days — after a deliberate,
-              measured trade-off that cut per-trade risk from 15% to 6% of capital specifically to bring the
-              drawdown down from −86% to −44%.
-            </p>
+          </div>
+          <div className="dk-panel mt-4 overflow-hidden rounded-lg">
+            <table className="w-full text-[12.5px]">
+              <tbody>
+                {CONFIG_ROWS.map(([label, val], i) => (
+                  <tr key={label} className={i > 0 ? "border-t border-zinc-800" : ""}>
+                    <td className="w-[38%] py-2.5 pl-4 pr-3 font-mono text-[10.5px] uppercase tracking-wider text-zinc-500">
+                      {label}
+                    </td>
+                    <td className="py-2.5 pr-4 text-zinc-200">{val}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        {/* -------------------------------------------------- Execution edge */}
+        {/* -------------------------------------------------- Worked example */}
         <section className="relative mx-auto max-w-4xl px-5 pb-10">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-            The execution edge — limit entry &amp; thesis tracking
+            Worked example — a real trade from the backtest
           </h2>
-          <div className="mt-3 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">
-            <p>
-              <strong className="text-zinc-200">Limit entry, 3.0% discount, 900-second timeout.</strong>{" "}
-              The moment a signal qualifies, Autopilot doesn&apos;t pay the live offer — it quotes entry_mid ×
-              (1 − 3.0%) and rests that as a limit order for up to 15 minutes. It fills only if the contract
-              genuinely trades down to that level. If the window elapses first: no trade, not a worse trade.
-            </p>
-            <p>
-              <strong className="text-zinc-200">Thesis exit.</strong>{" "}
-              The original signal had a specific,
-              diagnosed flaw: winners resolved in a median of about one 5-minute bar, while losers dragged on for
-              a median of roughly thirteen bars before the much-wider stop finally caught them. Thesis-exit
-              re-checks the entry condition on every bar a position is open — the stop and target both stay fully
-              live underneath it. It now accounts for <strong className="text-zinc-200">75.6% of all exits</strong>,
-              at a small but consistently positive mean return.
-            </p>
-          </div>
-
-          <div className="dk-panel mt-5 rounded-lg p-4 sm:p-5">
+          <div className="dk-panel mt-3 rounded-lg p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h3 className="text-[13px] font-semibold text-zinc-100">Worked example — a real trade from the backtest</h3>
-                <p className="mt-1 text-[11.5px] text-zinc-500">NIFTY · ALPHA · call, entered against the Aegis wall</p>
-              </div>
+              <p className="text-[11.5px] text-zinc-500">NIFTY · ALPHA · {WORKED_TRADE.side}</p>
               <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-800 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-quantum" />
-                THESIS_BROKEN exit
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                {WORKED_TRADE.exitReason} exit
               </span>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               {[
                 ["Date", WORKED_TRADE.date, ""],
                 ["Signal mid", `₹${WORKED_TRADE.signalMid.toFixed(2)}`, ""],
-                ["Limit quote (−3.0%)", `₹${WORKED_TRADE.limitQuote.toFixed(2)}`, ""],
-                ["Filled", `${WORKED_TRADE.filledBars} bars later`, ""],
+                ["Limit quote (−12%)", `₹${WORKED_TRADE.limitQuote.toFixed(2)}`, ""],
+                ["Discount captured", `₹${discountCapture.toFixed(2)}/share`, "text-emerald-400"],
                 ["Stop (−25% prem.)", `₹${WORKED_TRADE.stop.toFixed(2)}`, "text-rose-400"],
                 ["Target (1.5R)", `₹${WORKED_TRADE.target.toFixed(2)}`, "text-emerald-400"],
                 ["Held", `${WORKED_TRADE.heldBars} bars (${WORKED_TRADE.heldMinutes} min)`, ""],
@@ -229,11 +221,10 @@ export default function BacktestReportPage() {
               />
             </div>
             <p className="mt-3 text-[12px] leading-relaxed text-zinc-500">
-              The wall break priced this call at a ₹{WORKED_TRADE.signalMid.toFixed(2)} mid. Rather than pay it,
-              Autopilot rested a limit order 3% under and got filled two bars later at ₹{WORKED_TRADE.limitQuote.toFixed(2)} —
-              a ₹5.47/share improvement before the trade even opened. The RRG read that justified the entry broke
-              after 10 minutes, and thesis-exit closed it at ₹{WORKED_TRADE.exitPrice.toFixed(2)} — short of the
-              ₹{WORKED_TRADE.target.toFixed(2)} target, but +{WORKED_TRADE.exitR.toFixed(3)}R and profitable.
+              The wall test priced this put at a ₹{WORKED_TRADE.signalMid.toFixed(2)} mid. The resting limit order
+              filled at ₹{WORKED_TRADE.limitQuote.toFixed(2)} — a ₹{discountCapture.toFixed(2)}/share improvement
+              before the trade even opened. Spot kept moving toward Zenith, and the position ran to target,
+              closing at ₹{WORKED_TRADE.exitPrice.toFixed(2)} for +{WORKED_TRADE.exitR.toFixed(3)}R.
             </p>
           </div>
         </section>
@@ -292,13 +283,13 @@ export default function BacktestReportPage() {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Headline performance</h2>
           <p className="mt-2 text-[12.5px] text-zinc-500">
             Daily mark-to-market equity, ₹1,00,000 starting capital, {EQUITY_MARKED_DAYS} calendar days
-            ({EQUITY_START} → {EQUITY_END}). Log scale — the 28× range would flatten the first six months on a
+            ({EQUITY_START} → {EQUITY_END}). Log scale — the 107× range would flatten most of the curve on a
             linear axis.
           </p>
           <div className="dk-panel mt-4 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-zinc-100">Equity curve</h3>
-              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">₹1,00,000 → ₹28,37,362</span>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">₹1,00,000 → ₹1,07,46,596</span>
             </div>
             <div className="mt-3">
               <EquityCurveChart />
@@ -307,18 +298,18 @@ export default function BacktestReportPage() {
           <div className="dk-panel mt-4 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-zinc-100">Drawdown from running peak</h3>
-              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">worst −43.6%, Sep 8 → Oct 24 2025</span>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">worst −11.2%, Mar 3 → 4 2025</span>
             </div>
             <div className="mt-3">
               <DrawdownChart />
             </div>
           </div>
-          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-rose-500/30 bg-rose-500/[0.06] p-3.5">
-            <TrendingUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3.5">
+            <TrendingUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
             <p className="text-[12px] leading-relaxed text-zinc-400">
-              The −43.6% drawdown (Sep–Oct 2025) is <strong className="text-zinc-200">not a rare tail event</strong> —
-              the chart above shows two more drawdowns over −20% before it. A 6%-of-capital risk budget with up to
-              3 concurrent positions can lose meaningfully faster than it makes, and did.
+              The worst drawdown is a single sharp one-day move (Mar 2025), not a multi-week grind. A shallower
+              backtest drawdown is still not a promise about the next 18 months; see{" "}
+              <strong className="text-zinc-200">Risks &amp; Limitations</strong>.
             </p>
           </div>
         </section>
@@ -342,7 +333,7 @@ export default function BacktestReportPage() {
                     <div className="h-4 rounded-md bg-zinc-900">
                       <div
                         className="h-full rounded-md bg-quantum"
-                        style={{ width: `${(f.expectancy / 0.074) * 100}%`, opacity: 0.55 + i * 0.225 }}
+                        style={{ width: `${(f.expectancy / foldMax) * 100}%`, opacity: 0.55 + i * 0.225 }}
                       />
                     </div>
                     <div className="mt-1 font-mono text-[10px] text-zinc-600">win {f.winRate}% · PF {f.profitFactor.toFixed(2)}</div>
@@ -351,8 +342,8 @@ export default function BacktestReportPage() {
               </div>
               <p className="mt-4 border-t border-zinc-800 pt-3 text-[11px] leading-relaxed text-zinc-500">
                 Test — the fold touched exactly once — posts the highest expectancy, win rate and profit factor
-                of the three. The test window (most recent 74 days) coincides with the post-fix execution layer
-                being fully live across all five indices.
+                of the three: the out-of-sample fold outperforming, not underperforming, the folds parameters
+                were chosen on.
               </p>
             </div>
             <div className="dk-panel rounded-lg p-4">
@@ -364,8 +355,8 @@ export default function BacktestReportPage() {
                 <SpreadSensitivityChart />
               </div>
               <p className="mt-3 border-t border-zinc-800 pt-3 text-[11px] leading-relaxed text-zinc-500">
-                Modeled spread is 1.0%. Expectancy stays positive even at 3% — triple the modeled friction —
-                though it roughly halves, from +0.094R to +0.032R.
+                Modeled spread is 1.0%. Expectancy stays strongly positive even at 3% — triple the modeled
+                friction — declining only from +0.635R to +0.566R.
               </p>
             </div>
           </div>
@@ -409,6 +400,10 @@ export default function BacktestReportPage() {
                 </tbody>
               </table>
             </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
+              Every index is net positive. NIFTY carries the largest share of both trades and return; BANKEX
+              carries the fewest trades of the five at 86 over 18 months.
+            </p>
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -423,8 +418,8 @@ export default function BacktestReportPage() {
                 ))}
               </div>
               <p className="mt-4 border-t border-zinc-800 pt-3 text-[11px] leading-relaxed text-zinc-500">
-                GAMMA (rallies sold into resistance) is the smallest population but the highest-quality: 55.0% win
-                rate, 1.54 profit factor.
+                BETA (dips bought into support) is the smallest population but the highest-quality: 75.3% win
+                rate, 4.38 profit factor. ALPHA carries most of the volume and most of the total return.
               </p>
             </div>
             <div className="dk-panel rounded-lg p-4">
@@ -438,60 +433,10 @@ export default function BacktestReportPage() {
                 ))}
               </div>
               <p className="mt-4 border-t border-zinc-800 pt-3 text-[11px] leading-relaxed text-zinc-500">
-                THESIS_BROKEN carries 75.6% of trades for +₹17.7L. TARGET is 8.8% of trades but the single
-                largest contributor at +₹65.7L — STOP, at 10.9% of trades, is the single largest detractor at
-                −₹57.2L.
+                TARGET and THESIS_BROKEN are almost evenly split (40.8% / 40.5% of trades) and both net positive.
+                STOP, at 15.3% of trades, is the only net-negative exit reason.
               </p>
             </div>
-          </div>
-        </section>
-
-        {/* -------------------------------------------------- Sizing */}
-        <section className="relative mx-auto max-w-4xl px-5 pb-10">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Position sizing — how we got to 6%</h2>
-          <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-500">
-            Risk-per-trade moved twice, each time for a measured reason — and the second cut is the difference
-            between this report&apos;s headline numbers and a strategy that would be hard to defend to a risk
-            desk.
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-            {SIZING_EVOLUTION.map((s) => (
-              <div
-                key={s.tag}
-                className={`flex flex-col gap-2.5 rounded-lg border p-4 ${
-                  s.final ? "border-quantum/40 bg-quantum/[0.06]" : "dk-panel"
-                }`}
-              >
-                <span className={`font-mono text-[10px] uppercase tracking-wider ${s.final ? "text-quantum" : "text-zinc-500"}`}>
-                  {s.tag}
-                </span>
-                <span className="font-mono text-[21px] font-bold text-zinc-50">{s.risk}</span>
-                <p className="text-[11px] leading-relaxed text-zinc-500">{s.note}</p>
-                <div className="mt-1 flex flex-col gap-1 text-[11px]">
-                  {[
-                    ["Trades", s.trades.toLocaleString("en-IN")],
-                    ["Win rate", s.winRate],
-                    ["Sharpe", s.sharpe],
-                    ["Max DD", s.maxDD],
-                    ["Net P&L", s.net],
-                  ].map(([label, val]) => (
-                    <div key={label} className="flex justify-between text-zinc-400">
-                      {label}
-                      <span className="font-mono font-semibold text-zinc-200">{val}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-quantum/30 bg-quantum/[0.06] p-3.5">
-            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-quantum" />
-            <p className="text-[12px] leading-relaxed text-zinc-400">
-              The 15%→6% cut is a <strong className="text-zinc-200">deliberate trade-off</strong>, not a free
-              lunch: nominal net P&amp;L drops from ₹66.56L to ₹27.37L. What it buys is a drawdown almost half the
-              size (−86.1% → −43.6%) at a higher Sharpe ratio — the position size a real allocator could actually
-              sit through.
-            </p>
           </div>
         </section>
 
@@ -502,16 +447,16 @@ export default function BacktestReportPage() {
           <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             {[
               {
-                title: "A −43.6% drawdown is large",
-                body: "Even the de-risked, current-sizing curve loses close to half its peak value at its worst point. Any capital allocated to this strategy should be sized for that reality, not the +2,737% headline.",
-              },
-              {
-                title: "BANKEX is a net loser",
-                body: "Highest win rate of the five indices (54.3%) but still net −₹2.66L — the STOP-loss trades there are large enough to outweigh a favorable hit rate.",
-              },
-              {
                 title: "Backtest ≠ live",
-                body: "Fills are modeled, charges are modeled, and there is no queue priority, latency or partial-fill risk. The terminal has not traded this strategy with real capital.",
+                body: "Fills are modeled, charges are modeled, and there is no queue priority, latency or partial-fill risk. The terminal has not traded this strategy with real capital — it runs in Paper mode only.",
+              },
+              {
+                title: "Only about 1 in 6 signals fill",
+                body: "The passive limit order at 12% below mid only fills when the market genuinely trades down to it — most qualifying signals expire unfilled. Real opportunity is thinner than the raw signal count suggests.",
+              },
+              {
+                title: "BANKNIFTY and FINNIFTY trade thin",
+                body: "45 and 58 trades respectively across 18 months — every index clears a trustworthy aggregate sample, but either one alone has a wider confidence interval than the headline numbers suggest.",
               },
               {
                 title: "Test fold is the strongest fold",

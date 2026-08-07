@@ -20,6 +20,10 @@ Same discipline as discount_sweep.py throughout: TEST is reported, never
 used to select. Everything else held at the shipped config (riskPct=6 for
 the Rs view, thesis_exit=True, limit_timeout_bars=3, spread_pct=1.0 unless
 being swept).
+
+Outcome: shipped at 12.0% — the sample-size-floored winner this script
+finds, not the naive point-estimate winner (20.0%, on a 51-trade TEST fold
+too thin to trust). See lib/engine/config.ts's limitEntryDiscountPct.
 """
 import os
 import statistics
