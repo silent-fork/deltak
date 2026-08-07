@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Broker } from "@/lib/types";
+import { decryptSecret, encryptSecret, encryptionConfigured } from "./crypto";
 
 /**
  * The browser-facing session cookie, shared across brokers.
@@ -10,7 +11,20 @@ import type { Broker } from "@/lib/types";
  * this module owns only the cookie envelope both write to and read from, so
  * `/api/auth/*` can branch on `broker` without duplicating the
  * encode/decode/cookie-options plumbing per broker.
+ *
+ * The envelope is AES-256-GCM-encrypted with `DK_SESSION_ENC_KEY` when that's
+ * configured — the same key and cipher `brokerSession.ts` already uses for
+ * the watchdog's copy of this token. httpOnly/secure keep page JS and casual
+ * network sniffing out, but neither stops a leaked cookie value (a request
+ * logger, an error-tracker breadcrumb, a proxy that logs headers) from
+ * handing over a live broker JWT — the cookie held the actual token in
+ * base64, which anyone can reverse in one line. Encrypted, a leaked cookie
+ * is ciphertext. Falls back to the old plain base64url encoding when the key
+ * isn't set, matching every other `DK_SESSION_ENC_KEY`-gated feature in this
+ * codebase (off by construction, not by a flag to remember).
  */
+
+const ENCRYPTED_PREFIX = "enc:";
 
 export const SESSION_COOKIE = "dk_session";
 
@@ -71,13 +85,28 @@ export const SESSION_COOKIE_OPTIONS = {
 } as const;
 
 export function encodeSession(s: ServerSession): string {
-  return Buffer.from(JSON.stringify(s), "utf8").toString("base64url");
+  const plaintext = JSON.stringify(s);
+  if (encryptionConfigured()) {
+    return ENCRYPTED_PREFIX + Buffer.from(JSON.stringify(encryptSecret(plaintext)), "utf8").toString("base64url");
+  }
+  return Buffer.from(plaintext, "utf8").toString("base64url");
 }
 
 export function decodeSession(raw: string | undefined): ServerSession | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    let plaintext: string;
+    if (raw.startsWith(ENCRYPTED_PREFIX)) {
+      // A cookie the current key can't open — a rotated DK_SESSION_ENC_KEY,
+      // or the key was unset when this cookie was written and has since been
+      // set — is the same as no session: sign in again, which overwrites it.
+      if (!encryptionConfigured()) return null;
+      const envelope = JSON.parse(Buffer.from(raw.slice(ENCRYPTED_PREFIX.length), "base64url").toString("utf8"));
+      plaintext = decryptSecret(envelope);
+    } else {
+      plaintext = Buffer.from(raw, "base64url").toString("utf8");
+    }
+    const parsed = JSON.parse(plaintext);
     if (typeof parsed?.clientCode !== "string") return null;
     if (parsed.broker === "dhan" && typeof parsed.accessToken === "string") {
       return parsed as ServerSession;
