@@ -2156,6 +2156,22 @@ export function useEngine(simulate: boolean) {
     }
   }, [bookExit, log]);
 
+  /** Operator-initiated withdrawal of a still-resting `PendingEntry` — the manual counterpart to the automatic thesis-broken/expired/filled paths in `processPendingEntries`. */
+  const cancelPendingEntry = useCallback(
+    (id: string) => {
+      const target = pendingEntriesRef.current.find((p) => p.id === id);
+      if (!target) return;
+      pendingEntriesRef.current = pendingEntriesRef.current.filter((p) => p.id !== id);
+      log("INFO", `Limit order on ${target.trading_symbol} cancelled by operator.`, target.underlying);
+      track("limit_entry_cancelled", {
+        underlying: target.underlying,
+        protocol: target.protocol,
+        reason: "manual",
+      });
+    },
+    [log],
+  );
+
   /**
    * Wipes the DB's paper history first — every paper position and order,
    * open or closed, for this account — and only resets the in-tab ledger
@@ -2209,6 +2225,7 @@ export function useEngine(simulate: boolean) {
     scaleOutPosition,
     scaleInPosition,
     panicFlatten,
+    cancelPendingEntry,
     resetPaper,
     walletResetAt,
     reloadMaster: loadMaster,

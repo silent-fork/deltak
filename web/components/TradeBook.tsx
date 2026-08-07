@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertOctagon, Layers, Loader2, RefreshCw, Scissors, X } from "lucide-react";
-import { memo, useState } from "react";
+import { AlertOctagon, Clock, Layers, Loader2, RefreshCw, Scissors, X } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { CardContent } from "@/components/ui/card";
 import { useEngineContext } from "@/components/EngineProvider";
 import { mergeBook } from "@/lib/engine/book";
 import { istParts } from "@/lib/engine/config";
-import type { LedgerSnapshot, Position, ScaleInDecision } from "@/lib/types";
+import type { LedgerSnapshot, PendingEntry, Position, ScaleInDecision } from "@/lib/types";
 import { cn, fmt, money, pnlTone, signedMoney } from "@/lib/utils";
 
 type Tab = "open" | "history";
@@ -264,6 +264,91 @@ function PositionCard({
 }
 
 /**
+ * A resting Autopilot limit order — not a `Position` yet (no fill, no avg
+ * price, no P&L), so it gets its own shell rather than a `PositionCard`
+ * pretending to have those. The countdown ticks off its own 1 Hz interval —
+ * same pattern as the mobile-pairing QR's expiry in `PairMobileSection` —
+ * rather than reading `Date.now()` at render time, which the render-purity
+ * lint rule (rightly) rejects.
+ */
+function PendingEntryCard({
+  entry: p,
+  onCancel,
+}: {
+  entry: PendingEntry;
+  onCancel: () => void;
+}) {
+  const expiresAtMs = useMemo(() => new Date(p.expires_at).getTime(), [p.expires_at]);
+  const [remainingSec, setRemainingSec] = useState(() =>
+    Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)),
+  );
+  // The lazy `useState` initializer above already covers this effect's own
+  // mount — re-running the same computation synchronously here would just
+  // be a redundant extra render, not a correction of anything stale.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRemainingSec(Math.max(0, Math.round((expiresAtMs - Date.now()) / 1000)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [expiresAtMs]);
+  const mm = Math.floor(remainingSec / 60);
+  const ss = remainingSec % 60;
+  const discountPct =
+    p.reference_price > 0 ? ((p.reference_price - p.limit_price) / p.reference_price) * 100 : 0;
+
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.04] px-2 py-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono text-[11px] font-semibold text-zinc-100">
+              {p.trading_symbol}
+            </span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            <span className="rounded border border-amber-500/40 px-1 text-amber-400">
+              Pending
+            </span>
+            <span className="rounded border border-zinc-800 px-1 text-zinc-400">
+              {p.protocol}
+            </span>
+            <span
+              title="Time left before this order expires unfilled"
+              className="flex items-center gap-0.5 text-zinc-500"
+            >
+              <Clock className="h-2.5 w-2.5" />
+              {mm}:{String(ss).padStart(2, "0")}
+            </span>
+          </div>
+        </div>
+
+        <button
+          title="Cancel this order"
+          aria-label={`Cancel ${p.trading_symbol}`}
+          onClick={onCancel}
+          className="shrink-0 rounded p-1 text-rose-400/80 transition-colors hover:bg-rose-500/15 hover:text-rose-300"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+
+      <div className="mt-1 grid grid-cols-2 gap-2 font-mono text-[10px]">
+        <div>
+          <span className="dk-label text-[8px]">Limit</span>{" "}
+          <span className="text-amber-300">{fmt(p.limit_price)}</span>
+        </div>
+        <div className="text-right">
+          <span className="dk-label text-[8px]">Ref</span>{" "}
+          <span className="text-zinc-400">
+            {fmt(p.reference_price)} (-{fmt(discountPct, 1)}%)
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Memoized: `ledger` is a fresh object only when the ledger's own revision
  * actually moved (a fill, an exit, a mark that changed), and `onChanged` /
  * `onRefreshArchive` are stabilized at their call sites — see `SignalDeck`
@@ -341,6 +426,7 @@ export const TradeBook = memo(function TradeBook({
   }
 
   const open = ledger.open_positions;
+  const pendingEntries = engine.snapshot?.pending_entries ?? [];
 
   /**
    * Both tabs merge the live engine with Supabase: the engine wins wherever it
@@ -417,6 +503,18 @@ export const TradeBook = memo(function TradeBook({
               >
                 {count}
               </span>
+              {/* A resting order isn't a position (no fill, no P&L) and so isn't
+                  in `count` above — its own amber badge on the Open tab keeps it
+                  from being silently absent from the one place it can be seen. */}
+              {key === "open" && pendingEntries.length > 0 ? (
+                <span
+                  title={`${pendingEntries.length} order(s) resting, not yet filled`}
+                  className="flex items-center gap-0.5 rounded bg-amber-500/20 px-1 font-mono text-[9px] text-amber-300"
+                >
+                  <Clock className="h-2.5 w-2.5" />
+                  {pendingEntries.length}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -441,10 +539,24 @@ export const TradeBook = memo(function TradeBook({
           </button>
         </div>
 
-        {rows.length === 0 ? (
-          <div className="py-5 text-center text-[11px] text-zinc-600">
-            {tab === "open" ? "No open positions." : "No closed trades yet."}
+        {tab === "open" && pendingEntries.length > 0 ? (
+          <div className="space-y-1">
+            {pendingEntries.map((p) => (
+              <PendingEntryCard
+                key={p.id}
+                entry={p}
+                onCancel={() => engine.cancelPendingEntry(p.id)}
+              />
+            ))}
           </div>
+        ) : null}
+
+        {rows.length === 0 ? (
+          tab === "open" && pendingEntries.length > 0 ? null : (
+            <div className="py-5 text-center text-[11px] text-zinc-600">
+              {tab === "open" ? "No open positions." : "No closed trades yet."}
+            </div>
+          )
         ) : (
           <div className="space-y-1">
             {rows.map(({ position: p, readOnly }) => (
