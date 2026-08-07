@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
+import { BrandIcon } from "@/components/BrandIcon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -29,7 +30,7 @@ export default function NotFound() {
 
       <div className="relative flex items-center gap-2.5">
         <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-          <Zap className="h-4 w-4 text-quantum" />
+          <BrandIcon size="md" />
         </div>
         <Wordmark className="text-[16px] tracking-[0.18em]" />
       </div>

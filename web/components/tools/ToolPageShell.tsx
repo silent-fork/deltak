@@ -2,6 +2,7 @@ import { ArrowRight, ChevronRight, Zap } from "lucide-react";
 import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
+import { BrandIcon } from "@/components/BrandIcon";
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -64,7 +65,7 @@ export function ToolPageShell({
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-3 gap-y-1.5">
           <Link href="/tools" className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10">
-              <Zap className="h-3.5 w-3.5 text-quantum" />
+              <BrandIcon size="sm" />
             </span>
             <Wordmark className="text-sm tracking-wider" />
           </Link>

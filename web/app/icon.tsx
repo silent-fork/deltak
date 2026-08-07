@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+import { BrandMark } from "@/lib/og/brandMark";
+
 /**
  * Favicon, generated rather than a checked-in binary — the same square mark
  * (`rounded-md`, same as the homepage nav badge) as `apple-icon.tsx`, same
@@ -37,9 +39,7 @@ export default function Icon() {
             background: "rgba(0,240,255,0.14)",
           }}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
-          </svg>
+          <BrandMark box={26} />
         </div>
       </div>
     ),

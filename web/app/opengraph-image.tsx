@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 
+import { BrandMark } from "@/lib/og/brandMark";
 import { WallDiagram } from "@/lib/og/wallDiagram";
 
 /**
@@ -62,9 +63,7 @@ export default function OpengraphImage() {
               background: "rgba(0,240,255,0.1)",
             }}
           >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
-            </svg>
+            <BrandMark box={48} />
           </div>
           <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#f4f4f5" }}>
             <span style={{ display: "flex" }}>DELTA</span>

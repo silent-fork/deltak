@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+import { BrandMark } from "@/lib/og/brandMark";
+
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
@@ -71,9 +73,7 @@ export default function BacktestOpengraphImage() {
               background: "rgba(0,240,255,0.1)",
             }}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="#00f0ff" />
-            </svg>
+            <BrandMark box={40} />
           </div>
           <div style={{ display: "flex", fontSize: 22, fontWeight: 700, color: "#f4f4f5" }}>
             <span style={{ display: "flex" }}>DELTA</span>
