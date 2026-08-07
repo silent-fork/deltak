@@ -361,7 +361,7 @@ export default function HomePage() {
         the real numbers from /learn/backtest, not stand-in graphics.
       */}
       <section className="relative mx-auto max-w-6xl px-5 py-10">
-        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
+        <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-8">
           <div
             aria-hidden
             className="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-quantum/[0.08] blur-[110px]"

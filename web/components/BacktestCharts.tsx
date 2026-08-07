@@ -162,7 +162,7 @@ export function LabeledBar({ label, value, max, color, valueLabel }: { label: st
   return (
     <div className="grid grid-cols-[minmax(0,72px)_minmax(0,1fr)_minmax(0,48px)] items-center gap-2 sm:grid-cols-[minmax(0,84px)_minmax(0,1fr)_minmax(0,74px)] sm:gap-2.5">
       <div className="truncate text-[10.5px] font-semibold text-zinc-300 sm:text-[12px]">{label}</div>
-      <div className="relative h-5 min-w-0 rounded-md bg-zinc-900">
+      <div className="relative h-4 min-w-0 rounded-md bg-zinc-900">
         <div className="absolute inset-y-[2px] left-[2px] rounded" style={{ width: `calc(${w}% - 4px)`, background: color }} />
       </div>
       <div className="truncate text-right font-mono text-[10.5px] tabular-nums text-zinc-100 sm:text-[11.5px]">{valueLabel}</div>
@@ -234,13 +234,13 @@ export function PerformanceMosaic() {
   const topExits = EXIT_ATTRIBUTION.slice(0, 3);
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4">
+    <div className="flex flex-col gap-3">
       <div>
-        <div className="mb-1.5 flex items-center justify-between sm:mb-2">
+        <div className="mb-1.5 flex items-center justify-between">
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Win rate by index</span>
           <span className="font-mono text-[10px] text-zinc-600">5 of 5 net positive</span>
         </div>
-        <div className="flex flex-col gap-1 sm:gap-1.5">
+        <div className="flex flex-col gap-1">
           {INDEX_ATTRIBUTION.map((idx, i) => (
             <div key={idx.label} className={i >= 3 ? "hidden sm:block" : undefined}>
               <LabeledBar
@@ -261,10 +261,10 @@ export function PerformanceMosaic() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 border-t border-zinc-800/70 pt-3 sm:grid-cols-2 sm:gap-4 sm:pt-4">
+      <div className="grid grid-cols-1 gap-3 border-t border-zinc-800/70 pt-3 sm:grid-cols-2">
         <div>
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">How trades exit</span>
-          <div className="mt-2 flex flex-col gap-2 sm:mt-2.5 sm:gap-2.5">
+          <div className="mt-2 flex flex-col gap-2">
             {topExits.map((e) => (
               <ExitReasonBar key={e.label} label={e.label} pct={e.pct} net={e.net} color={e.color} />
             ))}
@@ -273,14 +273,14 @@ export function PerformanceMosaic() {
 
         <div>
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Out-of-sample check</span>
-          <div className="mt-2 flex flex-col gap-2 sm:mt-2.5 sm:gap-2.5">
+          <div className="mt-2 flex flex-col gap-2">
             {FOLD_COMPARISON.map((f, i) => (
               <div key={f.label}>
                 <div className="mb-1 flex items-center justify-between">
                   <span className="font-mono text-[10.5px] text-zinc-400">{f.label}</span>
                   <span className="font-mono text-[10.5px] font-semibold text-emerald-400">+{f.expectancy.toFixed(2)}R</span>
                 </div>
-                <div className="h-2 rounded-md bg-zinc-900 sm:h-2.5">
+                <div className="h-2 rounded-md bg-zinc-900">
                   <div
                     className="h-full rounded-md bg-quantum"
                     style={{ width: `${(f.expectancy / foldMax) * 100}%`, opacity: 0.5 + i * 0.25 }}
