@@ -377,10 +377,15 @@ DEFAULT_CFG = {
 }
 
 
-def simulate_index(idx, cfg):
+def simulate_index(idx, cfg, stats=None):
     """Run one config over one index; returns a list of trades in R units.
     Position sizing is deliberately excluded here — R-space keeps the signal
-    question separate from the capital-allocation question."""
+    question separate from the capital-allocation question.
+
+    `stats`, if given a dict, gets "placed"/"filled"/"expired" counters
+    incremented in place — the fill-rate mechanism behind any
+    limit_discount_pct comparison (a deeper discount can only change results
+    by turning trades away, and this is where that shows up directly)."""
     if idx is None:
         return []
     bars = idx["bars"]
@@ -425,9 +430,13 @@ def simulate_index(idx, cfg):
                     "be_trigger": be_trigger, "be_armed": False,
                 }
                 pending = None
+                if stats is not None:
+                    stats["filled"] = stats.get("filled", 0) + 1
             elif expired:
                 pending = None
                 dwell_key, dwell_n = None, 0
+                if stats is not None:
+                    stats["expired"] = stats.get("expired", 0) + 1
 
         # ---------------- exit ---------------- #
         if pos is not None:
@@ -610,6 +619,8 @@ def simulate_index(idx, cfg):
                 "off": off, "strike": entry_strike, "side_key": side_key,
                 "limit_price": limit_price,
             }
+            if stats is not None:
+                stats["placed"] = stats.get("placed", 0) + 1
             continue
 
         # Buy at the offer, not the mid.
