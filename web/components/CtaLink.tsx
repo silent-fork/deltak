@@ -12,7 +12,7 @@ import { useTransitionLink } from "@/lib/useTransitionLink";
  * it), so the one thing on the page that needs an onClick handler is split
  * out here rather than making the entire page a client component for it.
  *
- * Also the one place every "Terminal"/"Learn"/"Discuss" click in the product
+ * Also the one place every "Terminal"/"Learn"/"FAQ" click in the product
  * passes through, so it's where a route transition's own pending state is
  * surfaced: /terminal's first paint is genuinely a beat away (client
  * bootstrap — scrip master, engine init), and a click with no acknowledgement
@@ -38,7 +38,7 @@ export function CtaLink({
    * Full className replacement for the pending state, not a merge — most
    * callers are plain text buttons where the default swap already lands
    * centered, but a pill sized and padded around a specific multi-part
-   * layout (see the homepage's hero Discuss pill) collapses off-center
+   * layout (see the homepage's hero FAQ pill) collapses off-center
    * around padding that was never meant to hold just the bolt alone.
    */
   pendingClassName?: string;

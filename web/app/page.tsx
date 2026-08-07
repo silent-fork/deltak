@@ -253,51 +253,30 @@ export default function HomePage() {
           </span>
 
           {/*
-            Not a third button in the Terminal/Learn pair — that would imply
-            it's a third way into the same gated app, when it's the one
-            surface on this whole site nobody has to sign in for at all,
-            reads without an account, and isn't the product talking at you. A
-            standalone banner earns that distinction, reskinned around
-            people rather than a dashboard: three overlapping initials
-            stand in for real threads across three of Discuss's own
-            categories (matching their own accent colors — see
-            lib/content/forumCategoryStyle.tsx) instead of one icon naming
-            a feature, and the ping sits on the frontmost avatar rather
-            than centered, so it reads as "someone's here" and not just
-            "this pill is decorative."
+            Same standalone-banner treatment the Discuss promo used to occupy
+            here — the one surface on this whole site nobody has to sign in
+            for, so it earns its own row rather than a third button in the
+            Terminal/Learn pair. A question-mark badge in place of the old
+            avatar stack, since there's no "someone's here" activity to show
+            for a static reference page — the honest hook here is depth of
+            answer, not social proof.
           */}
           <CtaLink
-            href="/discuss"
-            location="hero-discuss"
+            href="/faq"
+            location="hero-faq"
             className="group mt-2 inline-flex items-center gap-3 rounded-full border border-quantum/30 bg-quantum/[0.06] py-1.5 pl-1.5 pr-4 transition-colors hover:border-quantum/50 hover:bg-quantum/10"
             pendingClassName="mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-quantum/30 bg-quantum/[0.06]"
           >
-            <span className="flex shrink-0 items-center -space-x-2">
-              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-zenith/20 text-[9px] font-bold text-zenith">
-                G
-              </span>
-              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-aegis/20 text-[9px] font-bold text-aegis">
-                M
-              </span>
-              <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-zinc-950 bg-quantum/20 text-[9px] font-bold text-quantum">
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-ping rounded-full bg-quantum/70" />
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-quantum" />
-                S
-              </span>
+            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-zinc-950 bg-quantum/15 text-[12px] font-bold text-quantum">
+              ?
             </span>
-            {/*
-              Two copy lengths, not one wrapped one — a phone-width pill
-              wrapping this onto two lines broke the pill shape (confirmed
-              at 390px). `whitespace-nowrap` plus a shorter mobile string
-              keeps it one line everywhere instead.
-            */}
             <span className="whitespace-nowrap text-left text-[11px] leading-none text-zinc-300 sm:hidden">
-              <span className="font-semibold uppercase tracking-wider text-quantum">QntmHrzn</span>{" "}
-              — real traders, real threads
+              <span className="font-semibold uppercase tracking-wider text-quantum">FAQ</span>{" "}
+              — Quantum Horizon, decoded
             </span>
             <span className="hidden whitespace-nowrap text-left text-[11.5px] leading-tight text-zinc-300 sm:inline">
-              <span className="font-semibold uppercase tracking-wider text-quantum">Quantum Horizon</span>{" "}
-              — strategy, market talk &amp; more, from real traders, not us
+              <span className="font-semibold uppercase tracking-wider text-quantum">FAQ</span>{" "}
+              — confused by the walls? Quantum Horizon breaks them down
             </span>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-quantum transition-transform group-hover:translate-x-0.5" />
           </CtaLink>
@@ -528,8 +507,8 @@ export default function HomePage() {
           <CtaLink href="/learn" location="footer-learn" className="transition-colors hover:text-quantum">
             Learn
           </CtaLink>
-          <CtaLink href="/discuss" location="footer-discuss" className="transition-colors hover:text-quantum">
-            Discuss
+          <CtaLink href="/faq" location="footer-faq" className="transition-colors hover:text-quantum">
+            FAQ
           </CtaLink>
         </p>
         <p>
