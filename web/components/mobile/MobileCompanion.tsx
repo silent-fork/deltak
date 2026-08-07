@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Radar, TrendingDown, TrendingUp, Zap } from "lucide-react";
+import { Activity, Clock, Radar, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { BootScreen } from "@/components/BootScreen";
@@ -12,7 +12,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { setAnalyticsContext, track } from "@/lib/analytics";
 import { ApiError, api, type MobileStateResponse } from "@/lib/api";
 import { UNDERLYINGS } from "@/lib/engine/config";
-import type { Position } from "@/lib/types";
+import type { PendingEntry, Position } from "@/lib/types";
 import { PROTOCOL_META, cn, fmt, pnlTone, signedMoney, timeAgo } from "@/lib/utils";
 
 /** How often the phone re-polls its state, on a healthy connection. */
@@ -90,6 +90,38 @@ function PositionRow({ position }: { position: Position }) {
         </div>
         <span className={cn("shrink-0 font-mono text-[11.5px] font-semibold", pnlTone(pnl))}>
           {signedMoney(pnl)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A resting Autopilot limit order, mirrored from the desktop's own
+ * `PendingEntryCard` (`TradeBook.tsx`) — same amber "not a position yet"
+ * treatment, but read-only: this companion never places or cancels
+ * anything, it only ever watches the paired desktop.
+ */
+function PendingRow({ entry: p }: { entry: PendingEntry }) {
+  return (
+    <div className="rounded-md border border-amber-500/30 bg-amber-500/[0.04] px-2.5 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3 w-3 shrink-0 text-amber-400" />
+            <span className="truncate font-mono text-[11px] text-zinc-200">
+              {p.trading_symbol}
+            </span>
+          </div>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-zinc-500">
+            <span className="rounded border border-amber-500/40 px-1 text-amber-400">
+              Pending
+            </span>
+            <span>{p.protocol}</span>
+          </p>
+        </div>
+        <span className="shrink-0 font-mono text-[11.5px] font-semibold text-amber-300">
+          {fmt(p.limit_price)}
         </span>
       </div>
     </div>
@@ -252,6 +284,11 @@ export function MobileCompanion({
   // network), the exact case that checkpoint exists to cover.
   const open = data?.signal?.open_positions ?? data?.positions.filter((p) => p.status === "OPEN") ?? [];
   const closed = data?.positions.filter((p) => p.status === "CLOSED").slice(0, 20) ?? [];
+  // No DB fallback for this one — a resting order lives only in the
+  // desktop tab's own memory (see `pendingEntriesRef` in useEngine.ts), so
+  // a stale/absent push just means "nothing to show," same as it does on
+  // the desktop itself the instant that tab closes.
+  const pending = data?.signal?.pending_entries ?? [];
   // Whether `open` above actually came from the fresh desktop push or fell
   // back to the DB checkpoint — the one thing the Live Signal card's own
   // `desktop · Ns ago` label already tells you and Open Positions didn't,
@@ -394,7 +431,7 @@ export function MobileCompanion({
                     onClick={() => setBook(key)}
                     aria-pressed={book === key}
                     className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
+                      "relative flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] transition-colors",
                       book === key
                         ? "bg-quantum/15 text-quantum shadow-[inset_0_0_0_1px_rgba(0,240,255,0.35)]"
                         : "text-zinc-500 hover:text-zinc-300",
@@ -409,6 +446,20 @@ export function MobileCompanion({
                     >
                       {count}
                     </span>
+                    {/* Same notification-badge treatment as the desktop's
+                        Trade Book Open tab — a resting order isn't a
+                        position, so it doesn't belong in `count` above. */}
+                    {key === "open" && pending.length > 0 ? (
+                      <span
+                        title={`${pending.length} order(s) resting, not yet filled`}
+                        className="absolute -right-1 -top-1.5 flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full"
+                      >
+                        <span className="absolute inset-0 animate-ping rounded-full bg-amber-500 opacity-70" />
+                        <span className="relative flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full border border-zinc-950 bg-amber-500 px-[3px] font-mono text-[8px] font-bold leading-none text-zinc-950">
+                          {pending.length}
+                        </span>
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -426,9 +477,12 @@ export function MobileCompanion({
                   >
                     {openIsLive ? `live · ${timeAgo(data?.signal_updated_at)}` : "checkpoint"}
                   </div>
+                  {pending.map((p) => (
+                    <PendingRow key={p.id} entry={p} />
+                  ))}
                   {open.length ? (
                     open.map((p) => <PositionRow key={p.id} position={p} />)
-                  ) : (
+                  ) : pending.length ? null : (
                     <p className="px-1 py-4 text-center text-[11px] text-zinc-600">Nothing open.</p>
                   )}
                 </>

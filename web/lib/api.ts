@@ -8,6 +8,7 @@ import type {
   MarginResponse,
   OiResponse,
   PcrResponse,
+  PendingEntry,
   Position,
   RiskEvent,
   Signal,
@@ -332,6 +333,13 @@ export interface MobileStateResponse {
      * (read straight from the DB, checkpointed independently) is the fallback.
      */
     open_positions?: Position[];
+    /**
+     * Resting Autopilot limit orders, pushed on the same `MOBILE_PUSH_MS`
+     * throttle as everything else above. Absent on older cached snapshots
+     * (a phone paired before this shipped) — treat a missing field the same
+     * as an empty array, not as "the desktop has no pending orders."
+     */
+    pending_entries?: PendingEntry[];
     ledger: {
       capital: number;
       equity: number;
