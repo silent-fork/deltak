@@ -222,13 +222,20 @@ export function SignalPanel({
     return signal.option_type === "CE" ? (row?.call ?? null) : (row?.put ?? null);
   }, [chain, signal?.strike, signal?.option_type]);
 
+  // A day-granularity figure has no business re-deriving off `Date.now()` at
+  // render time (which the render-purity rule rightly rejects) — refreshed
+  // once a minute is more than enough, same idea as `TradeBook`'s own
+  // interval-driven countdown.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const daysToExpiry = useMemo(() => {
     if (!chain?.expiry) return null;
-    const days = Math.round(
-      (Date.parse(`${chain.expiry}T15:40:00+05:30`) - Date.now()) / 86_400_000,
-    );
+    const days = Math.round((Date.parse(`${chain.expiry}T15:40:00+05:30`) - now) / 86_400_000);
     return Number.isFinite(days) ? Math.max(0, days) : null;
-  }, [chain?.expiry]);
+  }, [chain?.expiry, now]);
 
   if (!signal) {
     return (

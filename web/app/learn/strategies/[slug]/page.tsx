@@ -53,7 +53,6 @@ export default async function StrategyPage({ params }: { params: Promise<{ slug:
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <LearnChrome
         ctaLocation={`learn-strategy-${strategy.slug}`}
