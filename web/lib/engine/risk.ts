@@ -1,7 +1,9 @@
 import type {
+  CoaLevels,
   OptionChain,
   OptionType,
   Position,
+  Protocol,
   Quadrant,
   RiskEvent,
   ScaleInDecision,
@@ -21,6 +23,27 @@ import { effectiveConfig, isWeekend, istMinutes, MARKET_CLOSE_MIN, secondsToDayl
  * process guarded positions around the clock; this build does not. Do not leave
  * positions open with the terminal closed.
  */
+
+/**
+ * COA 2.0 wall-shift regime classification — lives here (not `dkms.ts`,
+ * protocol classification's original home) because `thesisIntact` below
+ * needs it too, and `dkms.ts` already needs `wallStopPoints` from this
+ * file; the other direction would be a risk.ts <-> dkms.ts import cycle.
+ * Re-exported from `dkms.ts` so existing callers there are unaffected.
+ */
+export function classifyProtocol(levels: CoaLevels, tolerance: number): Protocol {
+  if (levels.aegis_1 === null || levels.zenith_1 === null) return "DELTA";
+
+  const supportSolid = Math.abs(levels.aegis_shift) <= tolerance;
+  const resistanceSolid = Math.abs(levels.zenith_shift) <= tolerance;
+  const resistanceUp = levels.zenith_shift > tolerance;
+  const supportDown = levels.aegis_shift < -tolerance;
+
+  if (supportSolid && resistanceSolid) return "ALPHA";
+  if (supportSolid && resistanceUp) return "BETA";
+  if (resistanceSolid && supportDown) return "GAMMA";
+  return "DELTA";
+}
 
 export type ExitFn = (
   position: Position,
@@ -324,6 +347,69 @@ export async function checkInvalidation(d: GuardDeps): Promise<void> {
 }
 
 /**
+ * True when the SAME classification a position (or a still-pending limit
+ * order) was opened under still holds, re-checked live against the current
+ * chain — the entry-time mirror of `classifyProtocol`'s own conditions for
+ * ALPHA's near-wall band, BETA and GAMMA. Deliberately tighter and faster
+ * to fire than `checkInvalidation`'s `invalidationPct` band: that one waits
+ * for spot to travel a real distance past the wall, this one fires the
+ * moment the *regime read itself* changes, which is usually well before
+ * price has moved that far. Both stay active side by side — see
+ * `EngineConfig.thesisExit`'s own doc comment for why neither replaces the
+ * other.
+ *
+ * `null`/no-data reads permissive (`true`), the same posture every other
+ * guard in this file takes when it can't tell — a missing chain is not
+ * evidence the thesis broke.
+ */
+export function thesisIntact(
+  underlying: string,
+  protocol: Protocol,
+  optionType: OptionType,
+  chain: OptionChain | null | undefined,
+  cfg: EngineConfig,
+): boolean {
+  if (!chain || chain.spot <= 0) return true;
+  const current = classifyProtocol(chain.levels, cfg.levelShiftTolerance);
+
+  if (protocol === "BETA") return current === "BETA";
+  if (protocol === "GAMMA") return current === "GAMMA";
+  if (protocol === "ALPHA") {
+    if (current !== "ALPHA") return false;
+    const band = effectiveConfig(underlying, cfg).alphaEntryBandPct / 100;
+    const { spot } = chain;
+    const { aegis_1, zenith_1 } = chain.levels;
+    return optionType === "CE"
+      ? aegis_1 !== null && Math.abs(spot - aegis_1) <= aegis_1 * band
+      : zenith_1 !== null && Math.abs(spot - zenith_1) <= zenith_1 * band;
+  }
+  return true; // DELTA never opens a position; an unrecognised protocol reads permissive
+}
+
+/**
+ * Live positions' own thesis-exit guard — see `thesisIntact` above and
+ * `EngineConfig.thesisExit`'s doc comment. The equivalent check for a
+ * still-*pending* limit order (cancel rather than exit) lives in
+ * `useEngine.ts`'s `processPendingEntries`, since a not-yet-open order has
+ * no `Ledger` position for this guard's `d.ledger.openPositions` to reach.
+ */
+export async function checkThesisBroken(d: GuardDeps): Promise<void> {
+  if (!d.cfg.thesisExit) return;
+  for (const pos of d.ledger.openPositions) {
+    if (!pos.protocol || pos.protocol === "DELTA" || !pos.option_type) continue;
+    const chain = d.chains[pos.underlying];
+    if (thesisIntact(pos.underlying, pos.protocol, pos.option_type, chain, d.cfg)) continue;
+
+    d.log(
+      "THESIS_BROKEN",
+      `${pos.trading_symbol} thesis broken — ${pos.protocol} no longer reads at ${pos.underlying} — liquidating.`,
+      pos.underlying,
+    );
+    await d.exit(pos, "THESIS_BROKEN");
+  }
+}
+
+/**
  * True when the underlying has actually moved against `optionType` since
  * entry, rather than the option's own premium simply having drifted.
  *
@@ -495,6 +581,7 @@ export async function checkDaylightRest(d: GuardDeps): Promise<void> {
 export async function runGuards(d: GuardDeps): Promise<void> {
   await checkStops(d);
   await checkInvalidation(d);
+  await checkThesisBroken(d);
   await checkTrailingStop(d);
   await checkWallTrail(d);
   await checkWeakeningRotation(d);

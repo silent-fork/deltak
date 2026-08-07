@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 const KIND_META: Record<RiskEvent["kind"], { icon: typeof Info; tone: string }> = {
   INVALIDATION: { icon: AlertTriangle, tone: "text-rose-400" },
+  THESIS_BROKEN: { icon: AlertTriangle, tone: "text-rose-400" },
   DAYLIGHT_REST: { icon: Moon, tone: "text-quantum" },
   STOP_LOSS: { icon: Octagon, tone: "text-rose-400" },
   TARGET: { icon: Target, tone: "text-emerald-400" },
@@ -24,7 +25,7 @@ const KIND_META: Record<RiskEvent["kind"], { icon: typeof Info; tone: string }> 
 };
 
 /** Kinds worth pulling the operator's eye to the button itself. */
-const CRITICAL: RiskEvent["kind"][] = ["INVALIDATION", "STOP_LOSS", "PANIC"];
+const CRITICAL: RiskEvent["kind"][] = ["INVALIDATION", "THESIS_BROKEN", "STOP_LOSS", "PANIC"];
 
 export function EventLogMenu({ events }: { events: RiskEvent[] }) {
   const [open, setOpen] = useState(false);

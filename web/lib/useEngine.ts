@@ -8,6 +8,7 @@ import type {
   EngineSnapshot,
   ExecutionMode,
   OptionChain,
+  PendingEntry,
   Position,
   RiskEvent,
   RrgNode,
@@ -41,8 +42,8 @@ import { Ledger, applySlippage } from "@/lib/engine/ledger";
 import { orderRow, positionRow, type OrderRow } from "@/lib/engine/persist";
 import { ScripMaster, type MasterPayload } from "@/lib/engine/scripMaster";
 import { planTick } from "@/lib/engine/loop";
-import { decideScaleIn, runGuards } from "@/lib/engine/risk";
-import { legRiskAtStop, portfolioRiskAtStop } from "@/lib/engine/sizing";
+import { decideScaleIn, runGuards, thesisIntact } from "@/lib/engine/risk";
+import { calculateSize, legRiskAtStop, portfolioRiskAtStop } from "@/lib/engine/sizing";
 import { TickStore, type Tick } from "@/lib/stream/ticks";
 import { SmartStreamClient, type StreamStatus } from "@/lib/stream/smartstream";
 import { DhanFeedClient } from "@/lib/stream/dhanfeed";
@@ -260,6 +261,15 @@ export function useEngine(simulate: boolean) {
   );
   const chainsRef = useRef<Record<string, OptionChain>>({});
   const signalsRef = useRef<Record<string, Signal>>({});
+  /**
+   * Autopilot limit orders placed but not yet filled, expired, or
+   * cancelled — see `PendingEntry`, `placeLimitEntry`,
+   * `processPendingEntries`. Plain array, not keyed: `maxConcurrentPositions`
+   * and the autopilot trigger's own "one open-or-pending attempt at a time
+   * across the whole book" gate keep this small in practice, and a linear
+   * scan every tick is cheap at that size.
+   */
+  const pendingEntriesRef = useRef<PendingEntry[]>([]);
   /**
    * `market` (from `useMarketData`, declared later in this hook) as a ref, so
    * the 1 Hz `tick()` closure below — memoized once, deliberately independent
@@ -593,6 +603,283 @@ export function useEngine(simulate: boolean) {
     if (updated) savePositions([updated]);
   }, []);
 
+  /**
+   * Autopilot's own alternative to firing `executeSignal` immediately — see
+   * `EngineConfig.limitEntryDiscountPct`'s doc comment for why this exists
+   * and what it's validated against. Never called for a manual Execute
+   * click, only from the Autopilot trigger effect below.
+   *
+   * Sizing is deliberately NOT computed here: a limit order's whole point
+   * is a better entry price than the reference it was quoted against, so
+   * lots are recomputed in `processPendingEntries` against the price the
+   * order actually fills at, not the price it was placed at — the same
+   * "never trust a stale number for a real fill" posture `executeSignal`
+   * itself takes.
+   */
+  const placeLimitEntry = useCallback(
+    async (underlying: string): Promise<{ ok: boolean; message: string }> => {
+      const signal = signalsRef.current[underlying];
+      if (
+        !signal?.token ||
+        !signal.trading_symbol ||
+        !signal.sizing ||
+        !signal.option_type ||
+        signal.strike == null ||
+        !signal.protocol ||
+        signal.stop_loss == null ||
+        signal.target_1 == null
+      ) {
+        throw new Error("Signal has no executable node.");
+      }
+
+      const ledger = ledgerRef.current;
+      if (ledger.openPositions.some((p) => p.token === signal.token)) {
+        throw new Error(
+          `Order rejected: a position is already open on ${signal.trading_symbol}.`,
+        );
+      }
+      const openCount = ledger.openPositions.length;
+      if (openCount >= cfgRef.current.maxConcurrentPositions) {
+        throw new Error(
+          `Order rejected: ${openCount} open positions already at the ${cfgRef.current.maxConcurrentPositions}-position ceiling.`,
+        );
+      }
+
+      const reference = ticksRef.current.ltp(signal.token, signal.entry_price ?? 0);
+      if (reference <= 0) throw new Error("Order rejected: no live price for this contract.");
+
+      const discount = cfgRef.current.limitEntryDiscountPct;
+      const limitPrice = Number((reference * (1 - discount / 100)).toFixed(2));
+      const timeoutSec = cfgRef.current.limitEntryTimeoutSec;
+      const placedAt = Date.now();
+
+      const pending: PendingEntry = {
+        id: `PEND-${placedAt}-${Math.round(Math.random() * 1000)}`,
+        underlying,
+        token: signal.token,
+        trading_symbol: signal.trading_symbol,
+        option_type: signal.option_type,
+        strike: signal.strike,
+        protocol: signal.protocol,
+        limit_price: limitPrice,
+        reference_price: reference,
+        lot_size: signal.sizing.lot_size,
+        stop_loss_pct: (reference - signal.stop_loss) / reference,
+        target_pct: (signal.target_1 - reference) / reference,
+        placed_at: new Date(placedAt).toISOString(),
+        expires_at: new Date(placedAt + timeoutSec * 1000).toISOString(),
+        entry_spot: chainsRef.current[underlying]?.spot ?? null,
+        mode: modeRef.current,
+        broker: sessionRef.current.broker,
+      };
+      pendingEntriesRef.current = [...pendingEntriesRef.current, pending];
+
+      log(
+        "INFO",
+        `AUTOPILOT LIMIT ${signal.trading_symbol} placed @ ${limitPrice.toFixed(2)} ` +
+          `(${discount}% below ${reference.toFixed(2)}) — waiting up to ${timeoutSec}s for a fill.`,
+        underlying,
+      );
+      track("limit_entry_placed", {
+        underlying,
+        protocol: signal.protocol,
+        discount_pct: discount,
+        reference_price: reference,
+        limit_price: limitPrice,
+        timeout_sec: timeoutSec,
+      });
+
+      return {
+        ok: true,
+        message: `Limit order placed @ ₹${limitPrice.toLocaleString("en-IN")}, waiting up to ${timeoutSec}s for a fill.`,
+      };
+    },
+    [log],
+  );
+
+  /**
+   * Fill/expire/cancel every pending limit order, once a tick — called
+   * alongside `runGuards` from the main loop below, same `plan.guards` gate.
+   *
+   * Cancellation on a broken thesis reuses `thesisIntact` — the exact check
+   * `checkThesisBroken` uses for an already-open position — so a setup that
+   * stops qualifying while its order is still resting gets dropped instead
+   * of filled into a thesis that no longer holds. Guards that could have
+   * changed during the wait (duplicate token, position-count ceiling,
+   * portfolio risk) are re-checked at fill time rather than trusted from
+   * placement, the same posture every other fill path in this file takes.
+   */
+  const processPendingEntries = useCallback(() => {
+    if (!pendingEntriesRef.current.length) return;
+
+    const ledger = ledgerRef.current;
+    const now = Date.now();
+    const stillPending: PendingEntry[] = [];
+    let changed = false;
+
+    for (const p of pendingEntriesRef.current) {
+      const chain = chainsRef.current[p.underlying];
+      const cfg = cfgRef.current;
+
+      if (!thesisIntact(p.underlying, p.protocol, p.option_type, chain, cfg)) {
+        changed = true;
+        log(
+          "INFO",
+          `Limit order on ${p.trading_symbol} cancelled — ${p.protocol} no longer holds before it filled.`,
+          p.underlying,
+        );
+        track("limit_entry_cancelled", {
+          underlying: p.underlying,
+          protocol: p.protocol,
+          reason: "thesis_broken",
+        });
+        continue;
+      }
+
+      if (now >= new Date(p.expires_at).getTime()) {
+        changed = true;
+        log(
+          "INFO",
+          `Limit order on ${p.trading_symbol} expired unfilled after ${cfgRef.current.limitEntryTimeoutSec}s.`,
+          p.underlying,
+        );
+        track("limit_entry_expired", { underlying: p.underlying, protocol: p.protocol });
+        continue;
+      }
+
+      const ltp = ticksRef.current.ltp(p.token, 0);
+      if (ltp <= 0 || ltp > p.limit_price) {
+        stillPending.push(p);
+        continue;
+      }
+
+      if (
+        ledger.openPositions.some((pos) => pos.token === p.token) ||
+        ledger.openPositions.length >= cfg.maxConcurrentPositions
+      ) {
+        changed = true;
+        log(
+          "INFO",
+          `Limit fill on ${p.trading_symbol} skipped — position slot no longer available.`,
+          p.underlying,
+        );
+        track("limit_entry_cancelled", {
+          underlying: p.underlying,
+          protocol: p.protocol,
+          reason: "slot_unavailable",
+        });
+        continue;
+      }
+
+      const fillPrice = p.limit_price;
+      const stopLoss = Number((fillPrice * (1 - p.stop_loss_pct)).toFixed(2));
+      const target = Number((fillPrice * (1 + p.target_pct)).toFixed(2));
+
+      const sizing = calculateSize({
+        underlying: p.underlying,
+        stopLossPoints: fillPrice - stopLoss,
+        capital: ledger.equity,
+        riskPct: cfg.riskPct,
+        lotSize: p.lot_size,
+        entryPrice: fillPrice,
+        maxDeployable: Math.max(0, ledger.equity - ledger.deployed),
+        maxPositionCapitalPct: cfg.maxPositionCapitalPct,
+      });
+      if (sizing.lots <= 0) {
+        changed = true;
+        log(
+          "INFO",
+          `Limit fill on ${p.trading_symbol} skipped — sizing resolved to zero lots at ${fillPrice.toFixed(2)}.`,
+          p.underlying,
+        );
+        track("limit_entry_cancelled", {
+          underlying: p.underlying,
+          protocol: p.protocol,
+          reason: "zero_lots",
+        });
+        continue;
+      }
+
+      const quantity = sizing.lots * sizing.lot_size;
+      const openRisk = portfolioRiskAtStop(ledger.openPositions);
+      const candidateRisk = legRiskAtStop({
+        side: "BUY",
+        avg_price: fillPrice,
+        stop_loss: stopLoss,
+        quantity,
+      });
+      const riskCeiling = ledger.equity * (cfg.maxPortfolioRiskPct / 100);
+      if (openRisk + candidateRisk > riskCeiling) {
+        changed = true;
+        log(
+          "INFO",
+          `Limit fill on ${p.trading_symbol} skipped — would exceed the ${cfg.maxPortfolioRiskPct}% portfolio risk ceiling.`,
+          p.underlying,
+        );
+        track("limit_entry_cancelled", {
+          underlying: p.underlying,
+          protocol: p.protocol,
+          reason: "risk_ceiling",
+        });
+        continue;
+      }
+
+      const pos = ledger.open({
+        underlying: p.underlying,
+        token: p.token,
+        tradingSymbol: p.trading_symbol,
+        quantity,
+        lots: sizing.lots,
+        lotSize: sizing.lot_size,
+        price: fillPrice,
+        optionType: p.option_type,
+        strike: p.strike,
+        stopLoss,
+        target,
+        protocol: p.protocol,
+        entrySpot: chain?.spot ?? p.entry_spot,
+        mode: p.mode,
+        automation: "auto",
+        broker: p.broker,
+      });
+
+      savePositions([pos]);
+      saveWallet(ledger);
+      saveOrder(
+        orderRow({
+          position: pos,
+          transactionType: "BUY",
+          quantity,
+          lots: sizing.lots,
+          fillPrice,
+          status: "ACCEPTED",
+          brokerOrderId: null,
+          message: `ENTRY ${p.protocol} (limit)`,
+        }),
+      );
+      log(
+        "INFO",
+        `AUTOPILOT LIMIT FILLED ${sizing.lots}×${sizing.lot_size} ${p.trading_symbol} @ ${fillPrice.toFixed(2)} ` +
+          `(${p.reference_price > 0 ? (((p.reference_price - fillPrice) / p.reference_price) * 100).toFixed(2) : "0.00"}% better than the reference).`,
+        p.underlying,
+      );
+      track("signal_executed", {
+        automation: "auto",
+        protocol: p.protocol,
+        underlying: p.underlying,
+        mode: p.mode,
+        lots: sizing.lots,
+        execution_style: "limit",
+        discount_pct: cfg.limitEntryDiscountPct,
+      });
+      changed = true;
+    }
+
+    if (changed) {
+      pendingEntriesRef.current = stillPending;
+    }
+  }, [log]);
+
   /* ---------------------------------------------------------- snapshot */
 
   const feedLive = useCallback(
@@ -712,6 +999,7 @@ export function useEngine(simulate: boolean) {
       ledger: ledgerRef.current.snapshot(modeRef.current),
       events: eventsRef.current.slice(0, 20),
       scale_in: scaleIn,
+      pending_entries: [...pendingEntriesRef.current],
     };
   }, [feedLive]);
 
@@ -815,6 +1103,7 @@ export function useEngine(simulate: boolean) {
             daylightDoneRef.current = true;
           },
         });
+        processPendingEntries();
       }
 
       /*
@@ -889,7 +1178,16 @@ export function useEngine(simulate: boolean) {
     } finally {
       busyRef.current = false;
     }
-  }, [bookExit, bookScaleOut, bookTrail, buildSnapshot, feedLive, log, spotMap]);
+  }, [
+    bookExit,
+    bookScaleOut,
+    bookTrail,
+    buildSnapshot,
+    feedLive,
+    log,
+    processPendingEntries,
+    spotMap,
+  ]);
 
   /**
    * Repaint the instant the tab comes back into view, rather than leaving it
@@ -1787,7 +2085,12 @@ export function useEngine(simulate: boolean) {
     // own doc comment above for why. A fill already in flight (about to
     // become an open position, but not yet in `snapshot.ledger` this tick)
     // holds this gate too, not just a settled one.
-    if (snapshot.ledger.open_positions.length > 0 || autoInFlightRef.current.size > 0) return;
+    if (
+      snapshot.ledger.open_positions.length > 0 ||
+      autoInFlightRef.current.size > 0 ||
+      pendingEntriesRef.current.length > 0
+    )
+      return;
 
     const now = Date.now();
     for (const u of UNDERLYINGS) {
@@ -1802,7 +2105,11 @@ export function useEngine(simulate: boolean) {
       if (cooldownUntil && now < cooldownUntil) continue;
 
       autoInFlightRef.current.add(u);
-      void executeSignal(u, undefined, "auto")
+      const fire =
+        cfgRef.current.limitEntryDiscountPct > 0
+          ? placeLimitEntry(u)
+          : executeSignal(u, undefined, "auto");
+      void fire
         .then((res) => {
           setAutoFills((prev) => ({
             ...prev,
@@ -1820,7 +2127,7 @@ export function useEngine(simulate: boolean) {
           autoInFlightRef.current.delete(u);
         });
     }
-  }, [snapshot, automation, simulated, executeSignal, log]);
+  }, [snapshot, automation, simulated, executeSignal, placeLimitEntry, log]);
 
   const exitPosition = useCallback(
     async (positionId: string, reason = "MANUAL") => {

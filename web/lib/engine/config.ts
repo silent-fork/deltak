@@ -465,6 +465,47 @@ export interface EngineConfig {
    */
   vixRiskPctMultiplier: Record<VixRegime, number>;
 
+  /**
+   * Autopilot-only passive limit entry, percent below the signal's own
+   * reference price — quote there and wait, rather than paying the offer
+   * immediately. 0 disables it: Autopilot fires marketable, same as before
+   * this existed. Manual Execute clicks never read this at all — see
+   * `useEngine.ts`'s `placeLimitEntry`, called only from the Autopilot
+   * trigger effect.
+   *
+   * Validated together with `thesisExit` below in an 18-month walk-forward
+   * backtest (Aug 2026): the entry signal alone carries ~zero directional
+   * edge, but a consistently better fill price is a real, non-directional
+   * improvement regardless — 3.0% is the smallest discount that cleared
+   * positive out-of-sample expectancy at 95% confidence in that backtest,
+   * stress-tested against both an adverse spread assumption and a
+   * conservative "the market must trade meaningfully through the price,
+   * not just wick it" fill requirement.
+   */
+  limitEntryDiscountPct: number;
+  /**
+   * How long a placed limit order waits for `limitEntryDiscountPct`'s price
+   * before it's dropped unfilled — the backtest's own "3 bars of 5-minute
+   * data" (15 minutes), translated to wall-clock seconds for a tick-driven
+   * live engine that has no fixed bar size of its own.
+   */
+  limitEntryTimeoutSec: number;
+  /**
+   * Exit — or for a still-pending limit order, cancel — the instant the
+   * SAME classification that justified the entry stops holding: the
+   * protocol classification flipped away from what was bought, or (for
+   * Alpha specifically) spot is no longer near the wall the position was
+   * anchored to. This is a *tighter*, earlier-firing check than
+   * `invalidationPct`'s wider band, not a replacement for it — both stay
+   * active; see `thesisIntact`/`checkThesisBroken` in `risk.ts`. Targets
+   * the exact asymmetry the Aug 2026 backtest's own diagnosis found:
+   * winners resolved in a median of 1 bar, losers dragged for a median of
+   * 13 before the wide stop finally caught them. Applies to every open
+   * position regardless of how it was opened — manual or Autopilot, limit
+   * or marketable — since a broken thesis is a broken thesis either way.
+   */
+  thesisExit: boolean;
+
   paperCapital: number;
   slippagePct: number;
   costPerOrder: number;
@@ -494,24 +535,28 @@ export const DEFAULT_CONFIG: EngineConfig = {
   openingQuietMinutes: 10,
 
   /**
-   * Cut from 30% after an 18-month walk-forward backtest (Aug 2026) showed
-   * the strategy losing money at a stable, sample-robust expectancy across
-   * every fold — at 30% risk a losing streak alone was enough to explain
-   * most of a real account's drawdown (28 trades took Rs 25,000 to Rs 9,008
-   * in the reference run). 30% was originally chosen to solve a real
-   * problem — 1% resolved every NIFTY signal to zero lots outright — but it
-   * solved it by sizing to the *most* capital-hungry index in the universe
-   * (BANKEX, whose own 1-lot stop distance alone needs ~30% just to clear
-   * the floor), which inflated real dollar risk on every cheaper index at
-   * the same time. This value clears the 1-lot floor for the three
-   * cheapest/most liquid indices (NIFTY, BANKNIFTY, SENSEX — roughly a
-   * 10-14% floor each at current lot sizes) and leaves FINNIFTY and
-   * especially BANKEX (~30% floor) resolving to zero lots most of the
-   * time on a Rs 25,000 float. That's intentional, not a regression — see
-   * `maxPositionCapitalPct` below for why BANKEX in particular is close to
-   * unaffordable outright, independent of this number.
+   * Cut again, from 15% to 6%, once limit-entry + thesis-exit gave a
+   * strategy actually worth sizing carefully rather than one that mostly
+   * needed to survive. A direct riskPct sweep against that combo (Aug 2026
+   * walk-forward backtest) found 6% is not a tradeoff against the 15% this
+   * replaces — it's strictly better on both axes: annualized Sharpe rose
+   * 2.53 -> 3.15, and max drawdown fell from -86.1% to -43.2%. Below ~5%
+   * both start reversing (some indexes stop clearing their own 1-lot risk
+   * floor and drop out of the mix entirely) — 6% sits right at the top of
+   * that curve, not just "lower is safer."
+   *
+   * The original 30% -> 15% cut (kept below for the reasoning, still
+   * correct) was solving a different, earlier problem: at the Rs 25,000
+   * paper float this shipped with, 1% resolved every NIFTY signal to zero
+   * lots outright, and 30% was sized to keep BANKEX — the single most
+   * capital-hungry index — affordable at all, which inflated real dollar
+   * risk on every cheaper index just to drag BANKEX over its own floor.
+   * `paperCapital` has since moved to Rs 1,00,000 (see below), which
+   * lowers every index's own 1-lot floor by the same 4x — at 6% on the
+   * current float, NIFTY/BANKNIFTY/SENSEX/FINNIFTY all clear it; BANKEX
+   * (~7.5% floor at this capital) still mostly doesn't, same as before.
    */
-  riskPct: 15.0,
+  riskPct: 6.0,
   // Same 25% every protocol used before this was split out — no behaviour
   // change until one of these is tuned independently.
   stopPctByProtocol: { ALPHA: 0.25, BETA: 0.25, GAMMA: 0.25 },
@@ -558,6 +603,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
 
   vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
   vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
+
+  limitEntryDiscountPct: 3.0,
+  limitEntryTimeoutSec: 900,
+  thesisExit: true,
 
   // Raised from 25,000 — the sizing fix above (riskPct/maxPositionCapitalPct)
   // was corrected against real 1-lot economics at current NSE/BSE lot sizes,

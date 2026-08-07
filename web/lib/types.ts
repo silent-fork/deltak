@@ -165,6 +165,37 @@ export interface Position {
   broker: Broker | null;
 }
 
+/**
+ * A limit order Autopilot has placed but that hasn't filled yet — see
+ * `EngineConfig.limitEntryDiscountPct`. Quoted below the signal's own
+ * reference price rather than paying it immediately; becomes a `Position`
+ * on fill, or is dropped unfilled once `expires_at` passes or the
+ * classification that justified it stops holding (see `thesisIntact` in
+ * `lib/engine/risk.ts` — the same check a live position's own thesis-exit
+ * guard uses). Manual Execute clicks never go through this path — only
+ * Autopilot does, see `useEngine.ts`'s `placeLimitEntry`.
+ */
+export interface PendingEntry {
+  id: string;
+  underlying: string;
+  token: string;
+  trading_symbol: string;
+  option_type: OptionType;
+  strike: number;
+  protocol: Protocol;
+  limit_price: number;
+  reference_price: number;
+  lot_size: number;
+  /** Stop distance and target, as a fraction of the reference price at placement — rebased onto the actual fill price, see `processPendingEntries`. */
+  stop_loss_pct: number;
+  target_pct: number;
+  placed_at: string;
+  expires_at: string;
+  entry_spot: number | null;
+  mode: ExecutionMode;
+  broker: Broker | null;
+}
+
 export interface LedgerSnapshot {
   mode: ExecutionMode;
   capital: number;
@@ -182,6 +213,7 @@ export interface RiskEvent {
   ts: string;
   kind:
     | "INVALIDATION"
+    | "THESIS_BROKEN"
     | "DAYLIGHT_REST"
     | "STOP_LOSS"
     | "TARGET"
@@ -227,6 +259,8 @@ export interface EngineSnapshot {
   events: RiskEvent[];
   /** Open position ids currently eligible for a scale-in add — empty when none are. */
   scale_in: Record<string, ScaleInDecision>;
+  /** Autopilot limit orders placed but not yet filled, expired, or cancelled. */
+  pending_entries: PendingEntry[];
 }
 
 /**
