@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useEngineContext } from "@/components/EngineProvider";
 import { Wordmark } from "@/components/Wordmark";
 import { Input } from "@/components/ui/input";
+import { describeLoginError } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import type { Broker } from "@/lib/types";
 import { turnstileActive, useTurnstile } from "@/lib/useTurnstile";
@@ -97,7 +98,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
       // session already carries the ID Amplitude identifies the user by.
       track("login_success", { broker, client_code: clientCode.trim() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      setError(describeLoginError(err, broker));
       setTotp("");
       // No error detail here — a login failure reason is exactly the kind of
       // thing that shouldn't ride along into a third-party analytics event.

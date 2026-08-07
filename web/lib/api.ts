@@ -68,19 +68,23 @@ async function request<T>(
 
   const text = await res.text();
   let body: unknown = null;
+  // A non-JSON body past this point is never our own route's own output —
+  // every handler in this app answers in JSON, so anything else is a proxy
+  // or gateway in front of it (Cloudflare's own HTML error pages have shown
+  // up here on a 502) talking past the app entirely. That text is never fit
+  // to show a user or throw as an `Error` message: unbounded, unstyled
+  // upstream markup, not a description of what actually went wrong.
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
-    body = text;
+    body = null;
   }
 
   if (!res.ok) {
     const detail =
       body && typeof body === "object" && "detail" in body
         ? String((body as { detail: unknown }).detail)
-        : typeof body === "string" && body
-          ? body
-          : `Request failed (${res.status})`;
+        : `Request failed (${res.status})`;
     throw new ApiError(detail, res.status);
   }
   return body as T;
@@ -114,6 +118,36 @@ export interface LoginResponse {
   login_time: string;
   /** Null when the profile call failed — a login is not held up for it. */
   profile: UserProfile | null;
+}
+
+/**
+ * A failed sign-in, in the operator's language rather than the broker's.
+ *
+ * `/api/auth/login` classifies a rejected TOTP/PIN/client code as 400/401/403
+ * (see `statusForErrorCode` in `lib/server/dhan.ts` and the 401/403 branch in
+ * `lib/server/smartapi.ts`'s `smartApiCall`) — that's the one case with a
+ * specific, actionable message. Everything else (a timed-out upstream, a
+ * gateway 502, a bare network failure, Turnstile rejecting the attempt as
+ * non-human) is not a credentials problem and must not be reported as one:
+ * telling someone to re-check a PIN that was never wrong sends them
+ * troubleshooting the wrong thing. None of these branches ever surface
+ * `err.message` itself — that string is whatever the broker or a proxy in
+ * front of it happened to say, unbounded and never meant for a screen.
+ */
+export function describeLoginError(err: unknown, broker: Broker): string {
+  const brokerName = broker === "dhan" ? "Dhan" : "Angel One";
+  if (err instanceof ApiError) {
+    if ([400, 401, 403].includes(err.status)) {
+      return "Invalid credentials. Check your Client ID, PIN and TOTP, then try again.";
+    }
+    if (err.status === 429) {
+      return "Too many attempts — please wait a moment and try again.";
+    }
+    if (err.status === 0) {
+      return "Timed out reaching the server. Check your connection and try again.";
+    }
+  }
+  return `Couldn't reach ${brokerName} right now. Please try again in a moment.`;
 }
 
 export const api = {
