@@ -165,22 +165,6 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  rms: () =>
-    request<{ net: number; available_cash: number; utilised_debits: number }>("/api/rms"),
-
-  placeOrder: (payload: {
-    trading_symbol: string;
-    symbol_token: string;
-    transaction_type: "BUY" | "SELL";
-    quantity: number;
-    order_type?: "MARKET" | "LIMIT";
-    price?: number;
-  }) =>
-    request<{ ok: boolean; order_id: string | null; quantity: number }>("/api/order", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-
   /**
    * Best-effort append; callers must not await this on a trading path.
    *

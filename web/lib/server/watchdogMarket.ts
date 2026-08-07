@@ -16,12 +16,10 @@ import {
  *
  * Read-only by construction, not just by convention: this module imports
  * `CANDLE_URL` / `OI_DATA_URL` / `PCR_URL` / `OI_BUILDUP_URL` / `LTP_URL` and
- * nothing else from `smartapi.ts` — in particular never `PLACE_ORDER_URL`. A
- * background job authenticating with a token nobody is watching should not be
- * able to reach the one endpoint that moves real money, no matter what a
- * future change to this file adds. If a watchdog ever needs to place an
- * order, that call belongs in its own module, reviewed as the deliberate,
- * separate capability it is — not folded into this one.
+ * nothing else from `smartapi.ts`. This app places no live orders at all —
+ * see `useEngine.ts`'s entry/exit paths, all paper-only — so there is no
+ * order-placement endpoint left anywhere in this codebase for a background
+ * job to reach in the first place.
  */
 
 export class NoBrokerSessionError extends Error {

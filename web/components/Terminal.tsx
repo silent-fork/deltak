@@ -407,7 +407,7 @@ export function Terminal() {
             ) : null}
             <span>Risk {engine.riskPct}%</span>
             {/* The clock lives in the header, in IST — one authoritative time. */}
-            <span>{snapshot?.mode === "live" ? "Live routing" : "Paper ledger"}</span>
+            <span>Paper ledger</span>
           </span>
         </footer>
       </div>

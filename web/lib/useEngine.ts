@@ -470,43 +470,9 @@ export function useEngine(simulate: boolean) {
     async (pos: Position, reason: string) => {
       const exitSide = pos.side === "BUY" ? "SELL" : "BUY";
       const ltp = ticksRef.current.ltp(pos.token, pos.ltp || pos.avg_price);
+      const brokerOrderId: string | null = null;
 
-      let brokerOrderId: string | null = null;
-
-      if (pos.mode === "live" && sessionRef.current.authenticated) {
-        try {
-          const res = await api.placeOrder({
-            trading_symbol: pos.trading_symbol,
-            symbol_token: pos.token,
-            transaction_type: exitSide,
-            quantity: pos.quantity,
-            order_type: "MARKET",
-          });
-          brokerOrderId = res.order_id ?? null;
-        } catch (err) {
-          const detail = err instanceof Error ? err.message : "unknown";
-          // A rejected exit leaves a live position the book thinks it wanted
-          // closed. That divergence is the single most important thing in the
-          // record, so it is written even though nothing was filled.
-          saveOrder(
-            orderRow({
-              position: pos,
-              transactionType: exitSide,
-              quantity: pos.quantity,
-              lots: pos.lots,
-              status: "REJECTED",
-              message: `${reason}: ${detail}`,
-            }),
-          );
-          log("INFO", `Exit order rejected: ${detail}`, pos.underlying);
-          return;
-        }
-      }
-
-      const fill =
-        pos.mode === "live"
-          ? ltp
-          : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
+      const fill = applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const closed = ledgerRef.current.close(pos.id, fill, reason);
       if (closed) {
         savePositions([closed]);
@@ -567,37 +533,9 @@ export function useEngine(simulate: boolean) {
       const exitSide = pos.side === "BUY" ? "SELL" : "BUY";
       const ltp = ticksRef.current.ltp(pos.token, pos.ltp || pos.avg_price);
       const quantity = lots * pos.lot_size;
-      let brokerOrderId: string | null = null;
+      const brokerOrderId: string | null = null;
 
-      if (pos.mode === "live" && sessionRef.current.authenticated) {
-        try {
-          const res = await api.placeOrder({
-            trading_symbol: pos.trading_symbol,
-            symbol_token: pos.token,
-            transaction_type: exitSide,
-            quantity,
-            order_type: "MARKET",
-          });
-          brokerOrderId = res.order_id ?? null;
-        } catch (err) {
-          saveOrder(
-            orderRow({
-              position: pos,
-              transactionType: exitSide,
-              quantity,
-              lots,
-              status: "REJECTED",
-              message: `TP1: ${err instanceof Error ? err.message : "unknown"}`,
-            }),
-          );
-          return;
-        }
-      }
-
-      const fill =
-        pos.mode === "live"
-          ? ltp
-          : applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
+      const fill = applySlippage(ltp, exitSide, cfgRef.current.slippagePct);
       const residual = ledgerRef.current.reduce(pos.id, lots, fill, "TP1");
       if (!residual) {
         // The position is already gone from this ledger — closed by another
@@ -1081,11 +1019,13 @@ export function useEngine(simulate: boolean) {
       startFeed(restored.authenticated ? restored : sessionRef.current);
 
       /**
-       * Re-admit whatever this account still had open at last checkpoint —
-       * mode always starts back at "paper" on a fresh load (see `switchMode`),
-       * so a stored live position has no local counterpart to reconcile
-       * against yet and is left for the broker's own book, not silently
-       * adopted here. Each restored position also needs its own option token
+       * Re-admit whatever this account still had open at last checkpoint.
+       * This app places no live orders at all (see `useEngine.ts`'s
+       * paper-only entry/exit paths), so `mode` is always `"paper"` — the
+       * filter below stays as a defensive no-op rather than an assumption,
+       * so any pre-existing `"live"`-tagged row from before that was true
+       * is left alone rather than silently adopted into the paper ledger.
+       * Each restored position also needs its own option token
        * force-subscribed: the band-based subscription in `startFeed` only
        * covers strikes near today's ATM, and a position opened a session ago
        * may since have drifted outside it.
@@ -1435,8 +1375,6 @@ export function useEngine(simulate: boolean) {
     setDemo(false);
     setSession(NO_SESSION);
     sessionRef.current = NO_SESSION;
-    setMode("paper");
-    modeRef.current = "paper";
     log("INFO", "SmartAPI session terminated.");
     startFeed(NO_SESSION);
     track("sign_out");
@@ -1471,8 +1409,6 @@ export function useEngine(simulate: boolean) {
         clearMarketCache();
         setSession(NO_SESSION);
         sessionRef.current = NO_SESSION;
-        setMode("paper");
-        modeRef.current = "paper";
         log(
           "INFO",
           res.reason === "superseded"
@@ -1561,29 +1497,6 @@ export function useEngine(simulate: boolean) {
       .catch(() => undefined);
   }, [snapshot, session.authenticated]);
 
-  const switchMode = useCallback(
-    (next: ExecutionMode) => {
-      if (next === "live") {
-        if (!sessionRef.current.authenticated) {
-          throw new Error("Live mode requires a SmartAPI session.");
-        }
-        if (sessionRef.current.broker !== "angelone") {
-          throw new Error(
-            "Live order routing is only available for Angel One sessions — Dhan is wired for data only.",
-          );
-        }
-        if (!ticksRef.current.updates) {
-          throw new Error("Refusing Live mode without a live market feed.");
-        }
-      }
-      setMode(next);
-      modeRef.current = next;
-      log("INFO", `Execution mode switched to ${next.toUpperCase()}.`);
-      track("mode_switch", { mode: next });
-    },
-    [log],
-  );
-
   const setAutomation = useCallback(
     (next: Automation) => {
       setAutomationState(next);
@@ -1653,22 +1566,8 @@ export function useEngine(simulate: boolean) {
       }
 
       const currentMode = modeRef.current;
-
-      let fill = reference;
-      let brokerOrderId: string | null = null;
-
-      if (currentMode === "live") {
-        const res = await api.placeOrder({
-          trading_symbol: signal.trading_symbol,
-          symbol_token: signal.token,
-          transaction_type: "BUY",
-          quantity,
-          order_type: "MARKET",
-        });
-        brokerOrderId = res.order_id ?? null;
-      } else {
-        fill = applySlippage(reference, "BUY", cfgRef.current.slippagePct);
-      }
+      const brokerOrderId: string | null = null;
+      const fill = applySlippage(reference, "BUY", cfgRef.current.slippagePct);
 
       const pos = ledger.open({
         underlying,
@@ -1705,8 +1604,7 @@ export function useEngine(simulate: boolean) {
       );
       log(
         "INFO",
-        `${automation === "auto" ? "AUTOPILOT " : ""}${currentMode.toUpperCase()} BUY ${useLots}×${lotSize} ${signal.trading_symbol} @ ${fill.toFixed(2)}` +
-          (brokerOrderId ? ` — order ${brokerOrderId}` : ""),
+        `${automation === "auto" ? "AUTOPILOT " : ""}PAPER BUY ${useLots}×${lotSize} ${signal.trading_symbol} @ ${fill.toFixed(2)}`,
         underlying,
       );
       // A fill taken against a settled board is real in the ledger and frozen
@@ -1730,10 +1628,7 @@ export function useEngine(simulate: boolean) {
 
       return {
         ok: true,
-        message:
-          currentMode === "live"
-            ? `Order ${brokerOrderId} accepted by NSE for ${quantity} qty.`
-            : `Simulated fill ${useLots} lot(s) @ ₹${fill.toLocaleString("en-IN")} (slippage applied).`,
+        message: `Simulated fill ${useLots} lot(s) @ ₹${fill.toLocaleString("en-IN")} (slippage applied).`,
       };
     },
     [log],
@@ -1811,21 +1706,8 @@ export function useEngine(simulate: boolean) {
       }
 
       const currentMode = modeRef.current;
-      let fill = ltp;
-      let brokerOrderId: string | null = null;
-
-      if (currentMode === "live") {
-        const res = await api.placeOrder({
-          trading_symbol: pos.trading_symbol,
-          symbol_token: pos.token,
-          transaction_type: pos.side,
-          quantity: addQty,
-          order_type: "MARKET",
-        });
-        brokerOrderId = res.order_id ?? null;
-      } else {
-        fill = applySlippage(ltp, pos.side, cfgRef.current.slippagePct);
-      }
+      const brokerOrderId: string | null = null;
+      const fill = applySlippage(ltp, pos.side, cfgRef.current.slippagePct);
 
       const updated = ledger.addToPosition(pos.id, decision.addLots, fill, decision.newStop, decision.newTarget);
       if (!updated) throw new Error("Scale-in failed to apply.");
@@ -2014,7 +1896,6 @@ export function useEngine(simulate: boolean) {
     refreshProfile,
     setProfile,
     enterDemo,
-    switchMode,
     executeSignal,
     autoFills,
     exitPosition,
