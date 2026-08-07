@@ -42,11 +42,29 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   // `${entry.term} — F&O` keeps the longest real term (43 chars — "Securities
   // Transaction Tax (STT) on Options") under 70 once " · Quantum Horizon" is
   // appended by the root layout's title template.
+  const title = `${entry.term} — F&O`;
+  const description = entry.shortDef;
   return {
-    title: `${entry.term} — F&O`,
-    description: entry.shortDef,
+    title,
+    description,
     keywords: entry.keywords,
     alternates: { canonical: `/learn/glossary/${entry.slug}` },
+    // Without this every glossary page silently inherited the root layout's
+    // og:title/description/url (the homepage's) on every share — same bug
+    // found and fixed on /learn/backtest, now closed here too.
+    openGraph: {
+      type: "website",
+      url: `/learn/glossary/${entry.slug}`,
+      siteName: "Quantum Horizon",
+      title,
+      description,
+      locale: "en_IN",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

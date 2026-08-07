@@ -38,6 +38,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     keywords: strategy.keywords,
     alternates: { canonical: `/learn/strategies/${strategy.slug}` },
+    // Without this every strategy page silently inherited the root layout's
+    // og:title/description/url (the homepage's) on every share — same bug
+    // found and fixed on /learn/backtest, now closed here too. `type:
+    // "article"` matches the Article JSON-LD rendered below.
+    openGraph: {
+      type: "article",
+      url: `/learn/strategies/${strategy.slug}`,
+      siteName: "Quantum Horizon",
+      title,
+      description,
+      locale: "en_IN",
+      publishedTime: PUBLISHED_DATE,
+      modifiedTime: PUBLISHED_DATE,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

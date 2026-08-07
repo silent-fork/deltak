@@ -6,17 +6,41 @@ import { LearnChrome } from "@/components/LearnChrome";
 import { LotSizeBars } from "@/components/LotSizeBars";
 import { INDICES } from "@/lib/content/indices";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 64
+// rendered and got truncated in search results.
+const TITLE = "Indian F&O Indices — NIFTY & BANKNIFTY";
+const DESCRIPTION =
+  "Every major Indian index F&O contract compared — NIFTY, Bank Nifty, Sensex, " +
+  "Bankex — lot size, strike step and exchange.";
+
 export const metadata: Metadata = {
-  title: "Indian F&O Indices — NIFTY, BANKNIFTY & Sensex",
-  description:
-    "Every major Indian index F&O contract compared — NIFTY, Bank Nifty, Sensex, " +
-    "Bankex — lot size, strike step and exchange.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "indian fno indices",
     "nifty banknifty finnifty lot size",
     "nse bse index options list",
+    "nifty lot size 2026",
+    "index options expiry day india",
   ],
   alternates: { canonical: "/learn/indices" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/learn/indices",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 export default function IndicesHubPage() {

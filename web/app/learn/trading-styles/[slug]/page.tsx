@@ -22,11 +22,29 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   // "Options Buying vs. Options Selling" (34 chars) is the longest style
   // name — `— How It Works` keeps every combination under 70 with the
   // root layout's " · Quantum Horizon" template suffix appended.
+  const title = `${style.name} — How It Works`;
+  const description = style.summary;
   return {
-    title: `${style.name} — How It Works`,
-    description: style.summary,
+    title,
+    description,
     keywords: style.keywords,
     alternates: { canonical: `/learn/trading-styles/${style.slug}` },
+    // Without this every trading-style page silently inherited the root
+    // layout's og:title/description/url (the homepage's) on every share —
+    // same bug found and fixed on /learn/backtest, now closed here too.
+    openGraph: {
+      type: "website",
+      url: `/learn/trading-styles/${style.slug}`,
+      siteName: "Quantum Horizon",
+      title,
+      description,
+      locale: "en_IN",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

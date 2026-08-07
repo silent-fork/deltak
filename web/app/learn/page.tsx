@@ -8,11 +8,17 @@ import { INDICES } from "@/lib/content/indices";
 import { STRATEGIES } from "@/lib/content/strategies";
 import { TRADING_STYLES } from "@/lib/content/tradingStyles";
 
+// Kept under 60 rendered chars (raw + the root layout's 18-char
+// " · Quantum Horizon" template suffix) — the previous title ran to 85
+// rendered and got truncated hard in search results.
+const TITLE = "Options Trading Wiki — F&O Reference";
+const DESCRIPTION =
+  "The Quantum Horizon Wiki — a free options trading reference: strategy payoff diagrams, " +
+  "a full F&O glossary, trading styles and Indian index reference.";
+
 export const metadata: Metadata = {
-  title: "Quantum Horizon Wiki — Options Strategies, Glossary & F&O Reference",
-  description:
-    "The Quantum Horizon Wiki — a free options trading reference: strategy payoff diagrams, " +
-    "a full F&O glossary, trading styles and Indian index reference.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "options trading wiki india",
     "learn options trading nifty banknifty",
@@ -20,6 +26,22 @@ export const metadata: Metadata = {
     "indian fno education",
   ],
   alternates: { canonical: "/learn" },
+  // Without this the page silently inherited the root layout's og:title/
+  // description/url (the homepage's) on every share — same bug found and
+  // fixed on /learn/backtest, now closed here too.
+  openGraph: {
+    type: "website",
+    url: "/learn",
+    siteName: "Quantum Horizon",
+    title: TITLE,
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
 };
 
 /* ---------------------------------------------------------- preview glyphs */
