@@ -371,7 +371,7 @@ export default function HomePage() {
                 Backtesting &amp; Performance Report
               </span>
               <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
-                Tested against 18 months it didn&apos;t get to see coming
+                18 months, run past its own Quantum Horizon
               </h2>
               <p className="mt-3 max-w-lg text-balance text-[13.5px] leading-relaxed text-zinc-400">
                 An 18-month walk-forward study, five indexes, a strict train/validate/test split no

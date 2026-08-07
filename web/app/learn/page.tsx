@@ -199,7 +199,7 @@ export default function LearnHubPage() {
                 </span>
               </div>
               <h2 className="mt-1 text-[15px] font-semibold text-zinc-100">
-                Tested against 18 months it didn&apos;t get to see coming
+                18 months, run past its own Quantum Horizon
               </h2>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
                 The full DKMS walk-forward backtest — strategy configuration, attribution by index and

@@ -139,7 +139,7 @@ export default function BacktestOpengraphImage() {
               <span style={{ display: "flex" }}>Strategy</span>
             </div>
             <div style={{ display: "flex", marginTop: 14, fontSize: 19, color: "#71717a", lineHeight: 1.5 }}>
-              Tested against 18 months it didn&apos;t get to see coming.
+              Run 18 months past its own Quantum Horizon.
             </div>
 
             <div style={{ display: "flex", gap: 22, marginTop: 34 }}>
