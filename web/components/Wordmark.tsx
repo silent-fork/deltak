@@ -3,33 +3,50 @@ import { cn } from "@/lib/utils";
 /**
  * The DELTAK wordmark, one place — three components rendered it with
  * identical styling and would have drifted the moment one of them changed.
- * `K` carries the accent: the same quantum-cyan glow the rest of the HUD
- * marks its one live, active thing with (the Quantum Horizon line, an armed
- * band, a live tick).
+ * "Delta" is a real Option Greek, not just a name, so the "D" is the actual
+ * Greek Δ rather than a Latin letter — both Δ and `K` carry the accent: the
+ * same quantum-cyan glow the rest of the HUD marks its one live, active
+ * thing with (the Quantum Horizon line, an armed band, a live tick). The
+ * blinking cursor after it closes the mark like a live terminal prompt,
+ * full cap-height so it reads as part of the same row as the letters.
+ *
+ * `font-display` (Space Grotesk) rather than the body/mono faces, so the
+ * mark reads as a logotype instead of bold body text.
  *
  * Sizing is the caller's: pass the same text-size/tracking classes each
- * component already used its own wordmark with.
+ * component already used its own wordmark with. The cursor scales in `em`
+ * off that size.
  */
+// Same intensity as `.text-glow-quantum` (0.55 opacity, 12px blur) — the
+// established glow used everywhere else on the mark — applied as a
+// box-shadow for the cursor, which isn't text.
+const CURSOR_GLOW = { boxShadow: "0 0 12px rgba(0,240,255,0.55)" };
+
 export function Wordmark({
   className,
   glow = true,
 }: {
   className?: string;
-  /** Drop the "K"'s text-shadow — a quieter mark for a screen with its own ambient glow already going on. */
+  /** Drop the glow/blink — a quieter mark for a screen with its own ambient glow already going on. */
   glow?: boolean;
 }) {
+  // Not `cn()` for `text-quantum` + `text-glow-quantum`: tailwind-merge's
+  // heuristic treats them as the same class group (both start `text-`) and
+  // drops the color, same reasoning as this component always documented.
+  const accent = `text-quantum${glow ? " text-glow-quantum" : ""}`;
+
   return (
-    <span className={cn("font-mono font-bold text-zinc-100", className)}>
-      {/*
-        Not `cn()` here: `text-quantum` (colour) and `text-glow-quantum` (a
-        text-shadow utility, not a colour at all) look like the same
-        Tailwind class group to tailwind-merge's heuristic, which silently
-        drops `text-quantum` and leaves the "K" the same colour as "DELTA"
-        with nothing but a shadow around it. Neither sets a property the
-        other touches, so there's nothing to actually merge — this just
-        applies both.
-      */}
-      DELTA<span className={`text-quantum${glow ? " text-glow-quantum" : ""}`}>K</span>
+    <span className={cn("inline-flex items-baseline font-display font-bold text-zinc-100", className)}>
+      <span className={accent} style={{ marginRight: "-0.02em" }}>
+        Δ
+      </span>
+      ELTA
+      <span className={accent}>K</span>
+      <span
+        aria-hidden
+        className={cn("ml-[0.22em] inline-block self-center bg-quantum", glow && "animate-pulse-ring")}
+        style={{ width: "0.4em", height: "0.98em", ...(glow ? CURSOR_GLOW : null) }}
+      />
     </span>
   );
 }
