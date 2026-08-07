@@ -5,8 +5,10 @@ import os from "node:os";
 import { NSEClient } from "nse-bse-api";
 
 import { DHAN_SPOT_SEGMENT } from "@/lib/market/dhanRequest";
+import { loadAngelVixSpot } from "@/lib/server/angelMaster";
 import { dhanQuote } from "@/lib/server/dhan";
 import { loadDhanMaster } from "@/lib/server/dhanMaster";
+import { LTP_URL, smartApiCall } from "@/lib/server/smartapi";
 
 import type { VixReading, VixRegime } from "./volatilityDeskTypes";
 
@@ -93,6 +95,36 @@ export async function getDhanVix(creds: {
 
     const value = leg.last_price;
     const prevClose = leg.ohlc?.close;
+    const changePct = prevClose ? Number((((value - prevClose) / prevClose) * 100).toFixed(2)) : 0;
+    return { value, changePct, asOf: new Date().toISOString(), regime: vixRegime(value) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Angel-One-session VIX — same idea as `getDhanVix` (a live quote, never
+ * cached, for the session-gated route), but off SmartAPI's `getLtpData`
+ * rather than a Dhan-style market-feed quote. India VIX has its own row in
+ * Angel One's scrip master (`loadAngelVixSpot`) despite not being a
+ * tradeable instrument — `getLtpData` is a generic quote endpoint, not
+ * restricted to order-placeable symbols, and this is the same request shape
+ * already proven against real NFO contracts by `watchdogLtp`.
+ */
+export async function getAngelVix(jwt: string): Promise<VixReading | null> {
+  const spot = await loadAngelVixSpot();
+  if (!spot) return null;
+
+  try {
+    const data = (await smartApiCall(LTP_URL, {
+      method: "POST",
+      body: { exchange: "NSE", tradingsymbol: spot.tradingsymbol, symboltoken: spot.token },
+      jwt,
+    })) as { ltp?: number; close?: number };
+
+    const value = data.ltp;
+    if (!value) return null;
+    const prevClose = data.close;
     const changePct = prevClose ? Number((((value - prevClose) / prevClose) * 100).toFixed(2)) : 0;
     return { value, changePct, asOf: new Date().toISOString(), regime: vixRegime(value) };
   } catch {
