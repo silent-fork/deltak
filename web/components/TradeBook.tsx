@@ -495,26 +495,27 @@ export const TradeBook = memo(function TradeBook({
               )}
             >
               {label}
+              {/* One pill, not two floating side by side — a resting order
+                  isn't a position (no fill, no P&L) so it isn't in `count`,
+                  but it still belongs inside the same badge as the open-
+                  position count rather than getting its own separate chip. */}
               <span
                 className={cn(
-                  "rounded px-1 font-mono text-[9px]",
+                  "flex items-center gap-1 rounded px-1 font-mono text-[9px]",
                   tab === key ? "bg-quantum/20" : "bg-zinc-800/80 text-zinc-500",
                 )}
               >
-                {count}
+                <span>{count}</span>
+                {key === "open" && pendingEntries.length > 0 ? (
+                  <span
+                    title={`${pendingEntries.length} order(s) resting, not yet filled`}
+                    className="flex items-center gap-0.5 border-l border-current/30 pl-1 text-amber-300"
+                  >
+                    <Clock className="h-2.5 w-2.5" />
+                    {pendingEntries.length}
+                  </span>
+                ) : null}
               </span>
-              {/* A resting order isn't a position (no fill, no P&L) and so isn't
-                  in `count` above — its own amber badge on the Open tab keeps it
-                  from being silently absent from the one place it can be seen. */}
-              {key === "open" && pendingEntries.length > 0 ? (
-                <span
-                  title={`${pendingEntries.length} order(s) resting, not yet filled`}
-                  className="flex items-center gap-0.5 rounded bg-amber-500/20 px-1 font-mono text-[9px] text-amber-300"
-                >
-                  <Clock className="h-2.5 w-2.5" />
-                  {pendingEntries.length}
-                </span>
-              ) : null}
             </button>
           ))}
         </div>
