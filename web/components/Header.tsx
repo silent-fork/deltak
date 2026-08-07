@@ -311,13 +311,12 @@ export function Header({
           </span>
 
           {/*
-            Paper vs Live used to live here; Live has no server-side home yet
-            (see the Watchdog section of the README), so surfacing a toggle
-            for a mode that isn't really available was its own kind of
-            misleading. This slot is Autopilot vs Manual instead — who fires
-            an actionable signal, the one choice that's actually live today.
-            Purely local UI state: unlike a broker mode switch, this never
-            touches Angel One and can never be rejected.
+            Paper vs Live used to live here; this app places no live orders
+            at all now — every fill, entry or exit, is a simulated paper
+            trade (see `useEngine.ts`). This slot is Autopilot vs Manual
+            instead — who fires an actionable signal, the one choice that's
+            actually live today. Purely local UI state: unlike a broker
+            order, this never touches Angel One and can never be rejected.
           */}
           <button
             onClick={() => engine.setAutomation(automation === "auto" ? "manual" : "auto")}

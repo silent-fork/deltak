@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Crosshair, Lock, Loader2, Minus, Moon, Plus, Zap } from "lucide-react";
+import { Ban, Crosshair, Lock, Loader2, Minus, Moon, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { PanelBootOverlay } from "@/components/PanelBootOverlay";
@@ -570,34 +570,24 @@ export function SignalPanel({
             </span>
           </div>
         ) : signal.actionable ? (
-          /*
-           * Deliberately quiet. A paper fill is a routine act and a full-width
-           * neon slab reads as an alarm — the eye should go to the geometry
-           * above it, not here. Live routing is the exception and keeps the red
-           * fill, because that one is not routine.
-           */
+          /* Deliberately quiet. A paper fill is a routine act and a
+           * full-width neon slab reads as an alarm — the eye should go to
+           * the geometry above it, not here. */
           <Button
-            variant={mode === "live" ? "danger" : "outline"}
+            variant="outline"
             size="sm"
-            className={cn(
-              "h-8 w-full",
-              mode === "live"
-                ? ""
-                : "border-quantum/40 text-quantum hover:border-quantum/70 hover:bg-quantum/10",
-            )}
+            className="h-8 w-full border-quantum/40 text-quantum hover:border-quantum/70 hover:bg-quantum/10"
             onClick={execute}
             disabled={busy || effectiveLots <= 0}
           >
             {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : mode === "live" ? (
-              <Zap className="h-3.5 w-3.5" />
             ) : (
               <Crosshair className="h-3.5 w-3.5" />
             )}
             {busy
               ? "Routing"
-              : `Execute ${mode === "live" ? "Live" : "Paper"} · ${effectiveLots} lot${effectiveLots === 1 ? "" : "s"}`}
+              : `Execute Paper · ${effectiveLots} lot${effectiveLots === 1 ? "" : "s"}`}
           </Button>
         ) : (
           <div className="flex items-start gap-2 rounded border border-zinc-800 bg-zinc-950/60 px-2 py-2 text-[10px] leading-snug text-zinc-500">

@@ -480,14 +480,7 @@ export function UserPill({
                   ) : null}
                 </div>
               </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider",
-                  mode === "live"
-                    ? "border-rose-500/50 bg-rose-500/10 text-rose-300"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-400",
-                )}
-              >
+              <span className="shrink-0 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-400">
                 {mode}
               </span>
             </div>
@@ -545,7 +538,7 @@ export function UserPill({
             trade opens or closes, for either device to show.
           */}
           <Section
-            title={`Paper Wallet · ${mode}`}
+            title="Paper Wallet"
             action={
               <button
                 onClick={() => setConfirmReset((v) => !v)}
