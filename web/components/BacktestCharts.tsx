@@ -1,4 +1,11 @@
-import { EQUITY_CURVE, MODELED_SPREAD, SPREAD_SENSITIVITY } from "@/lib/content/backtest";
+import {
+  EQUITY_CURVE,
+  EXIT_ATTRIBUTION,
+  FOLD_COMPARISON,
+  INDEX_ATTRIBUTION,
+  MODELED_SPREAD,
+  SPREAD_SENSITIVITY,
+} from "@/lib/content/backtest";
 
 /**
  * Every chart on /learn/backtest is plain server-rendered SVG — the data
@@ -199,6 +206,76 @@ export function TradeDiagram({
       <text x={ex} y={y(entry) - 12} fontSize={11} fontWeight={700} fill="#00f0ff" textAnchor="middle" fontFamily="ui-monospace, monospace">{entryLabel}</text>
       <text x={tx} y={y(exitPrice) - 12} fontSize={11} fontWeight={700} fill="#10b981" textAnchor="middle" fontFamily="ui-monospace, monospace">{exitLabel}</text>
     </svg>
+  );
+}
+
+/**
+ * The homepage's "receipts" card — three lenses on the same 692 trades in
+ * the space one equity curve used to take. Capital growth is already a KPI
+ * in the strip beside this card, so repeating it here as a chart would be
+ * the one number the visitor already has; index/exit/fold, by contrast,
+ * aren't shown anywhere else on this page. All three come straight off the
+ * same `lib/content/backtest.ts` arrays the full report reads from.
+ */
+export function PerformanceMosaic() {
+  const foldMax = Math.max(...FOLD_COMPARISON.map((f) => f.expectancy));
+  // TARGET + THESIS_BROKEN + STOP cover 96.6% of trades — the two rarer
+  // reasons (DAYLIGHT, INVALIDATION) are a full-report detail, not a
+  // homepage-teaser one.
+  const topExits = EXIT_ATTRIBUTION.slice(0, 3);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Win rate by index</span>
+          <span className="font-mono text-[10px] text-zinc-600">5 of 5 net positive</span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {INDEX_ATTRIBUTION.map((idx) => (
+            <LabeledBar
+              key={idx.label}
+              label={idx.label}
+              value={idx.winRate}
+              max={100}
+              color="#00f0ff"
+              valueLabel={`${idx.winRate.toFixed(1)}%`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 border-t border-zinc-800/70 pt-4 sm:grid-cols-2">
+        <div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">How trades exit</span>
+          <div className="mt-2.5 flex flex-col gap-2.5">
+            {topExits.map((e) => (
+              <ExitReasonBar key={e.label} label={e.label} pct={e.pct} net={e.net} color={e.color} />
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Out-of-sample check</span>
+          <div className="mt-2.5 flex flex-col gap-2.5">
+            {FOLD_COMPARISON.map((f, i) => (
+              <div key={f.label}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="font-mono text-[10.5px] text-zinc-400">{f.label}</span>
+                  <span className="font-mono text-[10.5px] font-semibold text-emerald-400">+{f.expectancy.toFixed(2)}R</span>
+                </div>
+                <div className="h-2.5 rounded-md bg-zinc-900">
+                  <div
+                    className="h-full rounded-md bg-quantum"
+                    style={{ width: `${(f.expectancy / foldMax) * 100}%`, opacity: 0.5 + i * 0.25 }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
