@@ -24,7 +24,7 @@ import {
 
 import { CtaLink } from "@/components/CtaLink";
 import { Wordmark } from "@/components/Wordmark";
-import { EquityCurveChart } from "@/components/BacktestCharts";
+import { PerformanceMosaic } from "@/components/BacktestCharts";
 
 /**
  * The homepage.
@@ -353,10 +353,12 @@ export default function HomePage() {
       {/*
         The receipts. Every section on this page up to here describes what
         the engine does — this is the one that shows what happened when it
-        actually ran, against 18 months it never got to see coming. The
-        equity curve is the real one from /learn/backtest, not a stand-in
-        graphic, so a visitor who doesn't click through still sees the shape
-        of the result, not just a claim about it.
+        actually ran, against 18 months it never got to see coming. Capital
+        growth already has its own KPI in the strip to the left, so the card
+        doesn't repeat it as a chart — it's three lenses the KPI strip can't
+        show: which indices carried it, how trades actually exit, and
+        whether the untouched test fold held up or fell apart. All three are
+        the real numbers from /learn/backtest, not stand-in graphics.
       */}
       <section className="relative mx-auto max-w-6xl px-5 py-10">
         <div className="dk-panel relative overflow-hidden rounded-2xl p-6 sm:p-10">
@@ -404,15 +406,15 @@ export default function HomePage() {
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Equity curve · log scale</p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">₹1,00,000 → ₹1,07,46,596, 341 marked days</p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Complete analysis</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">5 indices · 3 exit reasons · 3 walk-forward folds</p>
                 </div>
                 <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-400">
-                  +10,647%
+                  692 trades
                 </span>
               </div>
-              <div className="mt-3">
-                <EquityCurveChart />
+              <div className="mt-4">
+                <PerformanceMosaic />
               </div>
             </div>
           </div>

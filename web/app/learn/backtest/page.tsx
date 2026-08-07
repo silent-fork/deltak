@@ -521,6 +521,21 @@ export default function BacktestReportPage() {
             </p>
           </div>
         </section>
+
+        {/* Same tricolour mark the homepage footer ends on — a literal
+            swatch rather than an emoji flag, for the same rendering-
+            consistency reason. */}
+        <p className="relative mx-auto flex max-w-4xl items-center justify-center gap-1.5 px-5 pb-10 text-[11px] text-zinc-600">
+          <span
+            aria-hidden
+            className="inline-flex h-2.5 w-4 shrink-0 flex-col overflow-hidden rounded-[2px] ring-1 ring-white/10"
+          >
+            <span className="h-1/3 w-full bg-[#FF9933]" />
+            <span className="h-1/3 w-full bg-white" />
+            <span className="h-1/3 w-full bg-[#138808]" />
+          </span>
+          Made with <span className="text-rose-400">♥</span> in Bharat
+        </p>
       </LearnChrome>
     </>
   );
