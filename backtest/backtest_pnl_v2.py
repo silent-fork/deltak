@@ -170,7 +170,8 @@ def run(idxs, underlyings, cfg, train, valid, test):
                     net = (exit_price - pos["entry"]) * qty - entry_charge - exit_charge
                     capital += exit_price * qty - exit_charge
                     trades.append({"underlying": u, "day": pos["day"], "action": action,
-                                    "net": net, "protocol": pos["proto"]})
+                                    "net": net, "protocol": pos["proto"],
+                                    "entry": pos["entry"], "stop_pts": pos["stop_pts"], "lots": pos["lots"]})
                     del open_positions[u]
                     st["last_exit_i"] = i
                     st["dwell_key"], st["dwell_n"] = None, 0

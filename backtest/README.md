@@ -77,6 +77,24 @@ fetch_deep.py  →  deep_data/*.json  →  framework.py  →  optimize.py  →  
    options against the wall rather than sells them. Referenced directly in
    the FAQ's backtest-validation answer.
 
+9. **`discount_sweep.py`** — sweeps `limit_discount_pct` (shipped at 3.0%)
+   from 3% to 10% to test whether a deeper limit-entry discount reduces
+   drawdown. Two views: a full-period Rs P&L/Sharpe/max-DD sweep (real-money
+   color, but *not* fold-restricted — picking a value by eyeballing this
+   alone would be exactly the in-sample selection the rest of this pipeline
+   exists to avoid), and an R-space walk-forward view that selects a
+   discount from TRAIN+VALIDATE expectancy only and reports TEST once,
+   unlooked-at until after the choice is made — the same discipline
+   `optimize.py` applies everywhere else. Also reports each config's average
+   lots-per-trade and average entry premium, because a deeper discount fills
+   at a lower premium, which means a smaller absolute stop distance, which
+   means fixed-fractional risk sizing puts *more* lots on each fill — part
+   of any net-P&L change across the sweep is that sizing effect, not purely
+   "better" trades, and the script surfaces it rather than leaving it
+   implicit. See the report's position-sizing section for why this exact
+   confound (smaller stop → bigger size) is already something this codebase
+   watches for.
+
 ## Running it
 
 ```bash
@@ -89,6 +107,7 @@ python final_stats.py        # full stats sheet — R-space + Rs P&L + attributi
 python sharpe_report.py      # sizing-evolution comparison (15% → 6%)
 python rr_ratio.py           # realized risk:reward
 python credit_spread.py      # the seller-side dead end
+python discount_sweep.py     # limit-entry discount sweep, 3-10%
 ```
 
 `optimize.py` builds `index_cache.pkl` from `deep_data/` on first run (a few
