@@ -35,6 +35,12 @@ const config: Config = {
           "Menlo",
           "monospace",
         ],
+        display: [
+          "var(--font-display)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
       },
       boxShadow: {
         quantum: "0 0 0 1px rgba(0,240,255,0.28), 0 0 22px rgba(0,240,255,0.10)",

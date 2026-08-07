@@ -24,7 +24,7 @@ export default function AppleIcon() {
             justifyContent: "center",
             width: 128,
             height: 128,
-            borderRadius: 28,
+            borderRadius: "50%",
             border: "4px solid rgba(0,240,255,0.55)",
             background: "rgba(0,240,255,0.14)",
           }}

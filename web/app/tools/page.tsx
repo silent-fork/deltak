@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
+import { Wordmark } from "@/components/Wordmark";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_DK_SITE_URL ??
@@ -162,9 +163,7 @@ export default function ToolsHubPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
             <Zap className="h-4 w-4 text-quantum" />
           </div>
-          <span className="font-mono text-[15px] font-bold tracking-[0.18em] text-zinc-100">
-            DELTA<span className="text-quantum">K</span>
-          </span>
+          <Wordmark className="text-[15px] tracking-[0.18em]" />
         </Link>
         <CtaLink
           href="/terminal"

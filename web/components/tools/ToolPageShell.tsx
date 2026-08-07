@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { CtaLink } from "@/components/CtaLink";
+import { Wordmark } from "@/components/Wordmark";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_DK_SITE_URL ??
@@ -65,9 +66,7 @@ export function ToolPageShell({
             <span className="flex h-7 w-7 items-center justify-center rounded-md border border-quantum/50 bg-quantum/10">
               <Zap className="h-3.5 w-3.5 text-quantum" />
             </span>
-            <span className="font-mono text-sm font-bold tracking-wider text-zinc-100">
-              DELTA<span className="text-quantum">K</span>
-            </span>
+            <Wordmark className="text-sm tracking-wider" />
           </Link>
           <div className="hidden min-w-0 items-center gap-1.5 sm:flex">
             <Link
