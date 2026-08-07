@@ -55,12 +55,15 @@ function SpotTicker({
   quote,
   active,
   activeTrade,
+  pendingCount,
   onSelect,
 }: {
   quote: SpotQuote;
   active: boolean;
   /** Non-null while this index has at least one open position — drives the corner badge. */
   activeTrade: ActiveTrade | null;
+  /** Resting Autopilot limit orders on this index, not yet filled — a third state alongside "flat" and "open" — see `PendingEntry`. */
+  pendingCount: number;
   onSelect: () => void;
 }) {
   const flash = useTickFlash(quote.ltp);
@@ -125,6 +128,20 @@ function SpotTicker({
                     : "border-rose-300 bg-rose-500",
                 )}
               />
+            </span>
+          ) : null}
+          {/*
+            A resting limit order is neither flat nor open — its own colour
+            (amber, matching the Trade Book's pending badge) rather than
+            overloading the red/green open-position dot with a third meaning.
+          */}
+          {pendingCount > 0 ? (
+            <span
+              title={`${pendingCount} order${pendingCount === 1 ? "" : "s"} pending on ${quote.label} — resting, not yet filled`}
+              className="relative flex h-1.5 w-1.5 shrink-0"
+            >
+              <span className="absolute inset-0 animate-ping rounded-full bg-amber-500 opacity-75" />
+              <span className="relative h-1.5 w-1.5 rounded-full border border-amber-300 bg-amber-500" />
             </span>
           ) : null}
         </span>
@@ -213,6 +230,15 @@ export function Header({
     return map;
   }, [snapshot?.ledger?.open_positions]);
 
+  /** Same rollup, for resting `PendingEntry` orders — the header rail's feed for the ticker's amber dot. */
+  const pendingByUnderlying = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of snapshot?.pending_entries ?? []) {
+      map[p.underlying] = (map[p.underlying] ?? 0) + 1;
+    }
+    return map;
+  }, [snapshot?.pending_entries]);
+
   const engine = useEngineContext();
   const clock = useIstClock();
   const marketOpen = snapshot?.market_open ?? false;
@@ -258,6 +284,7 @@ export function Header({
               quote={quote}
               active={quote.underlying === selected}
               activeTrade={activeByUnderlying[quote.underlying] ?? null}
+              pendingCount={pendingByUnderlying[quote.underlying] ?? 0}
               onSelect={() => onSelect(quote.underlying)}
             />
           ))}
@@ -273,6 +300,7 @@ export function Header({
               quote={quote}
               active={quote.underlying === selected}
               activeTrade={activeByUnderlying[quote.underlying] ?? null}
+              pendingCount={pendingByUnderlying[quote.underlying] ?? 0}
               onSelect={() => onSelect(quote.underlying)}
             />
           ))}
