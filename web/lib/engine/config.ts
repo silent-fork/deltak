@@ -559,7 +559,17 @@ export const DEFAULT_CONFIG: EngineConfig = {
   vixStopMultiplier: { Calm: 1, Normal: 1, Elevated: 1.25, Panic: 1.5 },
   vixRiskPctMultiplier: { Calm: 1, Normal: 1, Elevated: 0.75, Panic: 0.5 },
 
-  paperCapital: 25_000,
+  // Raised from 25,000 — the sizing fix above (riskPct/maxPositionCapitalPct)
+  // was corrected against real 1-lot economics at current NSE/BSE lot sizes,
+  // but a Rs 25,000 float still meant a single NIFTY/BANKNIFTY/SENSEX lot
+  // consumed 40-56% of the whole account outright, leaving almost no room
+  // for more than one position at a time regardless of the risk caps. At
+  // Rs 1,00,000 the same 1-lot costs (~Rs 10,000-14,000) sit at a much
+  // saner 10-14% of capital, and FINNIFTY (~18% floor) becomes reliably
+  // affordable too — only BANKEX (whose own 1-lot premium cost can exceed
+  // Rs 30,000) stays capital-gated most of the time, which is now a
+  // property of BANKEX specifically rather than of the account size.
+  paperCapital: 100_000,
   slippagePct: 0.0015,
   costPerOrder: 25,
 };
