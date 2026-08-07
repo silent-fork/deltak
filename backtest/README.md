@@ -77,6 +77,43 @@ fetch_deep.py  →  deep_data/*.json  →  framework.py  →  optimize.py  →  
    options against the wall rather than sells them. Referenced directly in
    the FAQ's backtest-validation answer.
 
+9. **`discount_sweep.py`** — sweeps `limit_discount_pct` (shipped at 3.0%)
+   from 3% to 10% to test whether a deeper limit-entry discount reduces
+   drawdown. Two views: a full-period Rs P&L/Sharpe/max-DD sweep (real-money
+   color, but *not* fold-restricted — picking a value by eyeballing this
+   alone would be exactly the in-sample selection the rest of this pipeline
+   exists to avoid), and an R-space walk-forward view that selects a
+   discount from TRAIN+VALIDATE expectancy only and reports TEST once,
+   unlooked-at until after the choice is made — the same discipline
+   `optimize.py` applies everywhere else. Also reports each config's average
+   lots-per-trade and average entry premium, because a deeper discount fills
+   at a lower premium, which means a smaller absolute stop distance, which
+   means fixed-fractional risk sizing puts *more* lots on each fill — part
+   of any net-P&L change across the sweep is that sizing effect, not purely
+   "better" trades, and the script surfaces it rather than leaving it
+   implicit. See the report's position-sizing section for why this exact
+   confound (smaller stop → bigger size) is already something this codebase
+   watches for.
+
+10. **`drawdown_robustness.py`** — the follow-up `discount_sweep.py` itself
+    calls for: that first pass found expectancy climbing all the way to 10%,
+    the top of the tested range, and flagged that the trend hadn't actually
+    plateaued. This extends the sweep to 20% and answers the three questions
+    that raises — does it plateau (no, not by 20% either, and the sample
+    thins out too fast to trust anything past ~14-16%), where does the edge
+    actually come from (fill rate: `framework.simulate_index` now accepts an
+    optional `stats` dict and counts placed/filled/expired orders directly —
+    59.8% of signals fill at 3%, 6.7% at 20%, so a deeper discount doesn't
+    make trades better so much as it makes the strategy *pickier*), is it
+    concentrated in one or two indexes (checked per-index at the naive
+    winner vs a sample-size-aware pick), and does the edge survive the same
+    adverse-spread stress every other config in this pipeline is checked
+    against (yes, at every discount level tested). The naive walk-forward
+    rule (max TRAIN+VALIDATE expectancy, no sample-size floor) always walks
+    to the edge of whatever range you give it — the script computes that
+    number and then a second, sample-size-floored version side by side, on
+    purpose, since the first one alone is a trap.
+
 ## Running it
 
 ```bash
@@ -89,6 +126,8 @@ python final_stats.py        # full stats sheet — R-space + Rs P&L + attributi
 python sharpe_report.py      # sizing-evolution comparison (15% → 6%)
 python rr_ratio.py           # realized risk:reward
 python credit_spread.py      # the seller-side dead end
+python discount_sweep.py     # limit-entry discount sweep, 3-10%
+python drawdown_robustness.py  # extended to 20%, fill-rate + concentration + spread stress
 ```
 
 `optimize.py` builds `index_cache.pkl` from `deep_data/` on first run (a few

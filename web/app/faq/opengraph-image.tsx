@@ -5,7 +5,7 @@ import { WallDiagram } from "@/lib/og/wallDiagram";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
-  "Quantum Horizon FAQ — DKMS strategy, the 3% limit-entry discount, thesis tracking, risk sizing and the mobile companion, explained.";
+  "Quantum Horizon FAQ — DKMS strategy, the 12% limit-entry discount, thesis tracking, risk sizing and the mobile companion, explained.";
 
 export default function FaqOpengraphImage() {
   return new ImageResponse(
@@ -118,10 +118,10 @@ export default function FaqOpengraphImage() {
               <div style={{ display: "flex", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase", color: "#71717a" }}>
                 Limit entry
               </div>
-              <div style={{ display: "flex", fontSize: 12, color: "#52525b" }}>−3.0% · 900s timeout</div>
+              <div style={{ display: "flex", fontSize: 12, color: "#52525b" }}>−12% · 900s timeout</div>
             </div>
             <div style={{ display: "flex", marginTop: 14 }}>
-              <WallDiagram width={452} height={200} annotation={{ xFrac: 0.56, label: "−3% limit" }} />
+              <WallDiagram width={452} height={200} annotation={{ xFrac: 0.56, label: "−12% limit" }} />
             </div>
           </div>
         </div>

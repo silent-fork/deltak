@@ -16,7 +16,7 @@ def r_space_rr():
 
     cfg = dict(F.DEFAULT_CFG)
     cfg["spread_pct"] = 1.0
-    cfg["limit_discount_pct"] = 3.0
+    cfg["limit_discount_pct"] = 12.0
     cfg["thesis_exit"] = True
 
     m, buckets = O.run_cfg(idxs, cfg, train, valid, test)
@@ -48,7 +48,7 @@ def rupee_rr():
     B.RISK_PCT = 6.0
     cfg = dict(F.DEFAULT_CFG)
     cfg["spread_pct"] = 1.0
-    cfg["limit_discount_pct"] = 3.0
+    cfg["limit_discount_pct"] = 12.0
     cfg["limit_timeout_bars"] = 3
     cfg["thesis_exit"] = True
 

@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt =
-  "DKMS Backtesting & Performance Report — an equity curve growing from one lakh to 28.37 lakh rupees over 18 months, Sharpe 3.30, max drawdown -43.6%, win rate 52.2%.";
+  "DKMS Backtesting & Performance Report — an equity curve growing from one lakh to 1.07 crore rupees over 18 months, Sharpe 6.06, max drawdown -11.2%, win rate 71.8%.";
 
 /**
  * A 50-point downsample of the real EQUITY_CURVE from lib/content/backtest.ts
@@ -12,16 +12,16 @@ export const alt =
  * only changes when the backtest itself is re-run, same cadence as the page.
  */
 const EQUITY_SAMPLE: [number, number][] = [
-  [99410, 0.0], [109126, -0.8], [116175, -1.96], [101916, -13.99], [106615, -10.02],
-  [72853, -38.52], [75671, -36.14], [79817, -32.64], [107774, -9.05], [116049, -5.2],
-  [192284, 0.0], [242051, -7.4], [239302, -8.87], [276005, 0.0], [296022, -3.97],
-  [354856, -15.66], [482944, -5.65], [863100, 0.0], [941851, 0.0], [964643, -0.65],
-  [1342228, 0.0], [1379919, -2.58], [1318005, -6.95], [1074868, -24.12], [897310, -36.65],
-  [868921, -38.66], [948690, -33.02], [1074386, -24.15], [874615, -38.25], [1355684, -4.29],
-  [1414466, -3.08], [1559044, -0.62], [1704520, 0.0], [1669460, -2.06], [1785245, 0.0],
-  [1960566, 0.0], [2250274, 0.0], [2223472, -1.19], [2044286, -9.15], [2136196, -5.07],
-  [2172272, -3.47], [2322783, 0.0], [2353054, 0.0], [2410287, -0.79], [2519656, -1.62],
-  [2596535, -0.84], [2527897, -3.46], [2634469, -1.85], [2915646, 0.0], [2837362, -2.68],
+  [100000, 0.0], [101096, 0.0], [168529, 0.0], [182549, -6.43], [233247, 0.0],
+  [289161, 0.0], [375113, 0.0], [630796, 0.0], [830976, 0.0], [820816, -2.91],
+  [1062158, 0.0], [1177135, -3.68], [1285067, 0.0], [1533578, 0.0], [1955606, 0.0],
+  [2149992, 0.0], [2505509, 0.0], [2981052, 0.0], [3414163, 0.0], [3639920, 0.0],
+  [4303260, 0.0], [4402300, -0.32], [4785957, 0.0], [5146301, 0.0], [5275617, -0.1],
+  [5426838, 0.0], [5793170, 0.0], [5998527, 0.0], [6066604, -1.33], [6529104, 0.0],
+  [6877712, 0.0], [7356863, 0.0], [7668992, -0.05], [7926353, -0.14], [8208852, 0.0],
+  [8244447, -0.71], [8653783, 0.0], [8897960, 0.0], [8964408, -0.33], [9024260, 0.0],
+  [9101512, 0.0], [9252403, 0.0], [9369985, 0.0], [9600172, 0.0], [9808513, 0.0],
+  [9920402, -0.17], [10222833, 0.0], [10448715, 0.0], [10737267, 0.0], [10746596, -0.02],
 ];
 
 function buildPath() {
@@ -39,10 +39,10 @@ function buildPath() {
 }
 
 const KPIS = [
-  { label: "SHARPE", value: "3.30" },
-  { label: "MAX DD", value: "−43.6%" },
-  { label: "WIN RATE", value: "52.2%" },
-  { label: "R:R", value: "1.17:1" },
+  { label: "SHARPE", value: "6.06" },
+  { label: "MAX DD", value: "−11.2%" },
+  { label: "WIN RATE", value: "71.8%" },
+  { label: "R:R", value: "1.58:1" },
 ];
 
 export default function BacktestOpengraphImage() {
@@ -181,8 +181,8 @@ export default function BacktestOpengraphImage() {
                   alignItems: "flex-end",
                 }}
               >
-                <div style={{ display: "flex", fontSize: 26, fontWeight: 700, color: "#34d399" }}>28.4×</div>
-                <div style={{ display: "flex", fontSize: 12, color: "#52525b" }}>₹1L → ₹28.37L</div>
+                <div style={{ display: "flex", fontSize: 26, fontWeight: 700, color: "#34d399" }}>107.5×</div>
+                <div style={{ display: "flex", fontSize: 12, color: "#52525b" }}>₹1L → ₹1.07Cr</div>
               </div>
             </div>
             <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ marginTop: 14 }}>

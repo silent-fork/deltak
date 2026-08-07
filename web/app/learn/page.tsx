@@ -202,17 +202,17 @@ export default function LearnHubPage() {
                 Tested against 18 months it didn&apos;t get to see coming
               </h2>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
-                The full DKMS walk-forward backtest — attribution by index and protocol, the risk-sizing
-                history and a worked trade, numbers included.
+                The full DKMS walk-forward backtest — strategy configuration, attribution by index and
+                protocol, and a worked trade, numbers included.
               </p>
             </div>
           </div>
 
           <div className="relative flex shrink-0 items-center justify-between gap-5 border-t border-quantum/15 pt-4 sm:justify-start sm:gap-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
             {[
-              { label: "Sharpe", value: "3.30" },
-              { label: "Max DD", value: "−43.6%" },
-              { label: "Win rate", value: "52.2%" },
+              { label: "Sharpe", value: "6.06" },
+              { label: "Max DD", value: "−11.2%" },
+              { label: "Win rate", value: "71.8%" },
             ].map((k) => (
               <div key={k.label}>
                 <div className="font-mono text-[15px] font-semibold text-zinc-100">{k.value}</div>

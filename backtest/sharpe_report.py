@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Rupee-equity Sharpe/drawdown for OLD (marketable entry, no thesis-exit,
-riskPct=15 -- the pre-fix shipped config) vs NEW (limit entry 3.0% +
-thesis-exit, riskPct=6 -- the current shipped config), full 370-day
-calendar (every trading day in the dataset gets a day-end equity mark,
-not just days a trade closed on).
+Rupee-equity Sharpe/drawdown across four configurations in sequence: OLD
+(marketable entry, no thesis-exit, riskPct=15 -- the pre-fix shipped
+config), the signal fix isolated at OLD sizing, the risk cut to 6% (still
+at the original 3% discount), and the current shipped config (riskPct=6,
+limit entry 12% -- widened from 3% after discount_sweep.py/
+drawdown_robustness.py). Full 370-day calendar (every trading day in the
+dataset gets a day-end equity mark, not just days a trade closed on).
 """
 import math
 import os
@@ -85,5 +87,9 @@ if __name__ == "__main__":
                 limit_discount=3.0, thesis_exit=True)
 
     run_variant(idxs, underlyings, train, valid, test,
-                "NEW strategy, current shipped sizing", risk_pct=6.0,
+                "NEW strategy, risk cut to 6% (still 3% discount)", risk_pct=6.0,
                 limit_discount=3.0, thesis_exit=True)
+
+    run_variant(idxs, underlyings, train, valid, test,
+                "NEW strategy, current shipped config", risk_pct=6.0,
+                limit_discount=12.0, thesis_exit=True)

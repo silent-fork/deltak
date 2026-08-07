@@ -374,18 +374,16 @@ export default function HomePage() {
                 Tested against 18 months it didn&apos;t get to see coming
               </h2>
               <p className="mt-3 max-w-lg text-balance text-[13.5px] leading-relaxed text-zinc-400">
-                The honest version first: the raw signal alone had no edge — a
-                −95.7% drawdown, priced at the live offer. A 3% limit-entry
-                discount and a thesis-exit rule are what turned it around, on
-                an 18-month walk-forward study with a strict train/validate/test
-                split no parameter was fit against.
+                An 18-month walk-forward study, five indexes, a strict train/validate/test split no
+                parameter was fit against — the exact configuration currently shipped, run against real
+                market data.
               </p>
               <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-2">
                 {[
-                  { label: "Sharpe ratio", value: "3.30", tone: "text-emerald-400" },
-                  { label: "Max drawdown", value: "−43.6%", tone: "text-rose-400" },
-                  { label: "Win rate", value: "52.2%", tone: "text-zinc-100" },
-                  { label: "Capital growth", value: "28.4×", tone: "text-emerald-400" },
+                  { label: "Sharpe ratio", value: "6.06", tone: "text-emerald-400" },
+                  { label: "Max drawdown", value: "−11.2%", tone: "text-rose-400" },
+                  { label: "Win rate", value: "71.8%", tone: "text-zinc-100" },
+                  { label: "Capital growth", value: "107.5×", tone: "text-emerald-400" },
                 ].map((k) => (
                   <div key={k.label}>
                     <div className={`font-mono text-[19px] font-semibold tabular-nums ${k.tone}`}>{k.value}</div>
@@ -407,10 +405,10 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Equity curve · log scale</p>
-                  <p className="mt-0.5 text-[11px] text-zinc-600">₹1,00,000 → ₹28,37,362, 341 marked days</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-600">₹1,00,000 → ₹1,07,46,596, 341 marked days</p>
                 </div>
                 <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-400">
-                  +2,737%
+                  +10,647%
                 </span>
               </div>
               <div className="mt-3">

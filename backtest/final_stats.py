@@ -4,8 +4,10 @@ Final shipped DKMS config, full stats sheet.
 
 Signal generation is UNCHANGED framework.DEFAULT_CFG (same protocols, stops,
 targets, dwell, windows as always shipped) -- the only changes are execution
-(limit_discount_pct=3.0, thesis_exit=True) and, in the Rs P&L section,
-position sizing (riskPct=6, current shipped values for the rest).
+(limit_discount_pct=12.0, thesis_exit=True; widened from the originally
+shipped 3.0 after discount_sweep.py/drawdown_robustness.py -- see those for
+why 12.0 and not deeper) and, in the Rs P&L section, position sizing
+(riskPct=6, current shipped values for the rest).
 """
 import os
 import statistics
@@ -25,7 +27,7 @@ def r_space_report():
 
     cfg = dict(F.DEFAULT_CFG)
     cfg["spread_pct"] = 1.0
-    cfg["limit_discount_pct"] = 3.0
+    cfg["limit_discount_pct"] = 12.0
     cfg["thesis_exit"] = True
 
     m, buckets = O.run_cfg(idxs, cfg, train, valid, test)
@@ -84,7 +86,7 @@ def rupee_report():
     B.RISK_PCT = 6.0
     cfg = dict(F.DEFAULT_CFG)
     cfg["spread_pct"] = 1.0
-    cfg["limit_discount_pct"] = 3.0
+    cfg["limit_discount_pct"] = 12.0
     cfg["limit_timeout_bars"] = 3
     cfg["thesis_exit"] = True
 
