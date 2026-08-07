@@ -509,10 +509,10 @@ export const TradeBook = memo(function TradeBook({
                 {key === "open" && pendingEntries.length > 0 ? (
                   <span
                     title={`${pendingEntries.length} order(s) resting, not yet filled`}
-                    className="flex items-center gap-1 text-amber-300"
+                    className="flex items-center gap-0.5 text-amber-300"
                   >
-                    <span className="h-1 w-1 rounded-full bg-amber-400" />
-                    {pendingEntries.length}
+                    <Clock className="h-2.5 w-2.5 shrink-0" />
+                    <span>{pendingEntries.length}</span>
                   </span>
                 ) : null}
               </span>
