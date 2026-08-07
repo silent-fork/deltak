@@ -128,20 +128,29 @@ export function SpreadSensitivityChart() {
   );
 }
 
+/**
+ * `grid-cols-[84px_1fr_84px]` alone lets a grid track's default `min-width:
+ * auto` win over its declared size — a label with enough intrinsic content
+ * (e.g. "BANKNIFTY") silently forces that column wider than 84px, stealing
+ * space from the `1fr` bar track. Below ~380px that stole nearly the whole
+ * bar, rendering every row as a sliver regardless of its actual value.
+ * `minmax(0, …)` pins each track's minimum to 0 so declared widths hold, and
+ * `truncate`/`min-w-0` on the cells stop overflow from fighting it further.
+ */
 export function DivergingBar({ label, value, maxAbs }: { label: string; value: number; maxAbs: number }) {
   const w = (Math.abs(value) / maxAbs) * 48;
   const good = value >= 0;
   return (
-    <div className="grid grid-cols-[84px_1fr_84px] items-center gap-2.5">
-      <div className="text-[12px] font-semibold text-zinc-300">{label}</div>
-      <div className="relative h-5 rounded-md bg-zinc-900">
+    <div className="grid grid-cols-[minmax(0,68px)_minmax(0,1fr)_minmax(0,68px)] items-center gap-2 sm:grid-cols-[minmax(0,84px)_minmax(0,1fr)_minmax(0,84px)] sm:gap-2.5">
+      <div className="truncate text-[11px] font-semibold text-zinc-300 sm:text-[12px]">{label}</div>
+      <div className="relative h-5 min-w-0 rounded-md bg-zinc-900">
         <div className="absolute bottom-0 top-0 left-1/2 w-px bg-zinc-700" />
         <div
           className={`absolute bottom-[2px] top-[2px] rounded ${good ? "bg-emerald-500" : "bg-rose-500"}`}
           style={good ? { left: "calc(50% + 1px)", width: `calc(${w}% - 1px)` } : { right: "calc(50% + 1px)", width: `calc(${w}% - 1px)` }}
         />
       </div>
-      <div className={`text-right font-mono text-[11.5px] tabular-nums ${good ? "text-emerald-400" : "text-rose-400"}`}>
+      <div className={`truncate text-right font-mono text-[11px] tabular-nums ${good ? "text-emerald-400" : "text-rose-400"} sm:text-[11.5px]`}>
         {value >= 0 ? "+" : ""}{fmtCompactINR(value)}
       </div>
     </div>
@@ -151,12 +160,12 @@ export function DivergingBar({ label, value, maxAbs }: { label: string; value: n
 export function LabeledBar({ label, value, max, color, valueLabel }: { label: string; value: number; max: number; color: string; valueLabel: string }) {
   const w = (value / max) * 100;
   return (
-    <div className="grid grid-cols-[84px_1fr_74px] items-center gap-2.5">
-      <div className="text-[12px] font-semibold text-zinc-300">{label}</div>
-      <div className="relative h-5 rounded-md bg-zinc-900">
+    <div className="grid grid-cols-[minmax(0,72px)_minmax(0,1fr)_minmax(0,48px)] items-center gap-2 sm:grid-cols-[minmax(0,84px)_minmax(0,1fr)_minmax(0,74px)] sm:gap-2.5">
+      <div className="truncate text-[10.5px] font-semibold text-zinc-300 sm:text-[12px]">{label}</div>
+      <div className="relative h-5 min-w-0 rounded-md bg-zinc-900">
         <div className="absolute inset-y-[2px] left-[2px] rounded" style={{ width: `calc(${w}% - 4px)`, background: color }} />
       </div>
-      <div className="text-right font-mono text-[11.5px] tabular-nums text-zinc-100">{valueLabel}</div>
+      <div className="truncate text-right font-mono text-[10.5px] tabular-nums text-zinc-100 sm:text-[11.5px]">{valueLabel}</div>
     </div>
   );
 }
@@ -165,12 +174,12 @@ export function ExitReasonBar({ label, pct, net, color }: { label: string; pct: 
   const good = net >= 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-300">
-          <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
-          {label}
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5 truncate text-[11px] font-semibold text-zinc-300 sm:text-[11.5px]">
+          <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
+          <span className="truncate">{label}</span>
         </span>
-        <span className={`font-mono text-[11px] ${good ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className={`shrink-0 whitespace-nowrap font-mono text-[10.5px] ${good ? "text-emerald-400" : "text-rose-400"} sm:text-[11px]`}>
           {pct}% · {good ? "+" : ""}{fmtCompactINR(net)}
         </span>
       </div>
@@ -225,30 +234,37 @@ export function PerformanceMosaic() {
   const topExits = EXIT_ATTRIBUTION.slice(0, 3);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4">
       <div>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-1.5 flex items-center justify-between sm:mb-2">
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Win rate by index</span>
           <span className="font-mono text-[10px] text-zinc-600">5 of 5 net positive</span>
         </div>
-        <div className="flex flex-col gap-1.5">
-          {INDEX_ATTRIBUTION.map((idx) => (
-            <LabeledBar
-              key={idx.label}
-              label={idx.label}
-              value={idx.winRate}
-              max={100}
-              color="#00f0ff"
-              valueLabel={`${idx.winRate.toFixed(1)}%`}
-            />
+        <div className="flex flex-col gap-1 sm:gap-1.5">
+          {INDEX_ATTRIBUTION.map((idx, i) => (
+            <div key={idx.label} className={i >= 3 ? "hidden sm:block" : undefined}>
+              <LabeledBar
+                label={idx.label}
+                value={idx.winRate}
+                max={100}
+                color="#00f0ff"
+                valueLabel={`${idx.winRate.toFixed(1)}%`}
+              />
+            </div>
           ))}
+          {/* Same rows the sm:block toggle above hides — collapsed to one
+              line on mobile instead of full bar rows, so the card stays
+              honest about there being 5 without costing height. */}
+          <div className="pt-0.5 font-mono text-[10px] text-zinc-600 sm:hidden">
+            + {INDEX_ATTRIBUTION.slice(3).map((idx) => `${idx.label} ${idx.winRate.toFixed(1)}%`).join(" · ")}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 border-t border-zinc-800/70 pt-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 border-t border-zinc-800/70 pt-3 sm:grid-cols-2 sm:gap-4 sm:pt-4">
         <div>
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">How trades exit</span>
-          <div className="mt-2.5 flex flex-col gap-2.5">
+          <div className="mt-2 flex flex-col gap-2 sm:mt-2.5 sm:gap-2.5">
             {topExits.map((e) => (
               <ExitReasonBar key={e.label} label={e.label} pct={e.pct} net={e.net} color={e.color} />
             ))}
@@ -257,14 +273,14 @@ export function PerformanceMosaic() {
 
         <div>
           <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">Out-of-sample check</span>
-          <div className="mt-2.5 flex flex-col gap-2.5">
+          <div className="mt-2 flex flex-col gap-2 sm:mt-2.5 sm:gap-2.5">
             {FOLD_COMPARISON.map((f, i) => (
               <div key={f.label}>
                 <div className="mb-1 flex items-center justify-between">
                   <span className="font-mono text-[10.5px] text-zinc-400">{f.label}</span>
                   <span className="font-mono text-[10.5px] font-semibold text-emerald-400">+{f.expectancy.toFixed(2)}R</span>
                 </div>
-                <div className="h-2.5 rounded-md bg-zinc-900">
+                <div className="h-2 rounded-md bg-zinc-900 sm:h-2.5">
                   <div
                     className="h-full rounded-md bg-quantum"
                     style={{ width: `${(f.expectancy / foldMax) * 100}%`, opacity: 0.5 + i * 0.25 }}
