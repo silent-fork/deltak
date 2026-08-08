@@ -27,7 +27,7 @@ export default function Icon() {
           background: "#09090b",
         }}
       >
-        <BrandMark box={26} />
+        <BrandMark box={30} />
       </div>
     ),
     { ...size },
