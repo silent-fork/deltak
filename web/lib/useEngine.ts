@@ -2179,18 +2179,31 @@ export function useEngine(simulate: boolean) {
    * once that's confirmed. Doing it the other way round (reset locally,
    * clear the DB best-effort after) would leave a tab reading "fresh start"
    * while a failed clear left the old trades still sitting in Supabase.
+   *
+   * `preset` lets the operator pick a starting balance other than the
+   * default (see `UserPill`'s reset panel) — a smaller float needs a much
+   * higher `riskPct` to clear the same per-index 1-lot floors the default
+   * 6% was tuned against at Rs 1,00,000 (see `DEFAULT_CONFIG.riskPct`'s own
+   * doc comment), so the two travel together rather than picking a capital
+   * alone and leaving risk sizing mismatched against it.
    */
-  const resetPaper = useCallback(async () => {
+  const resetPaper = useCallback(async (preset?: { capital: number; riskPct: number }) => {
     await api.resetPaper();
-    ledgerRef.current.reset();
+    ledgerRef.current.reset(preset?.capital);
+    if (preset) cfgRef.current.riskPct = preset.riskPct;
     scaledRef.current.clear();
     scaledInRef.current.clear();
     // Otherwise the next login re-seeds the wallet from the pre-reset
     // checkpoint still sitting in Supabase, silently undoing the reset.
     saveWallet(ledgerRef.current);
     setWalletResetAt(Date.now());
-    log("INFO", "Paper wallet reset — history cleared, capital back to starting.");
-    track("paper_wallet_reset");
+    log(
+      "INFO",
+      `Paper wallet reset — history cleared, capital back to ${
+        preset ? `Rs ${preset.capital.toLocaleString("en-IN")}` : "starting"
+      }.`,
+    );
+    track("paper_wallet_reset", preset ? { capital: preset.capital, risk_pct: preset.riskPct } : undefined);
   }, [log]);
 
   return {
