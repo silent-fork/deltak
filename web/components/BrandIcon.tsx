@@ -41,12 +41,12 @@ export function BrandIcon({
   return (
     <div className={cn("relative flex h-full w-full items-center justify-center", className)}>
       <span
-        className="inline-flex items-center font-mono font-extrabold leading-none text-quantum"
+        className="inline-flex items-end font-mono font-extrabold leading-none text-quantum"
         style={{ fontSize: s.font, textShadow }}
       >
         K
         <span
-          className="inline-block bg-quantum"
+          className={cn("inline-block bg-quantum", glow && "animate-pulse-ring")}
           style={{
             width: s.cursorW,
             height: s.cursorH,
