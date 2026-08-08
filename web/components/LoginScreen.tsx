@@ -1,6 +1,7 @@
 "use client";
 
 import { LockKeyhole, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { BrandIcon } from "@/components/BrandIcon";
@@ -121,7 +122,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
 
       <div className="relative w-full max-w-[380px]">
         {/* Brand */}
-        <div className="mb-7 flex items-center gap-2.5">
+        <Link href="/" className="mb-7 flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
             <BrandIcon size="md" />
           </div>
@@ -131,7 +132,7 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
               Terminal · DKMS
             </div>
           </div>
-        </div>
+        </Link>
 
         {/*
           The card itself — `dk-panel` is the same glass surface the home
