@@ -19,7 +19,7 @@ export default function AppleIcon() {
           background: "#09090b",
         }}
       >
-        <BrandMark box={128} />
+        <BrandMark box={160} />
       </div>
     ),
     { ...size },
