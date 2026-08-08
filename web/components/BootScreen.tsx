@@ -272,7 +272,7 @@ export function BootScreen({
             literal rather than a chip row, in keeping with the window
             above it. */}
         <div
-          className="animate-fade-up px-1 text-center font-mono text-[10px] leading-relaxed text-zinc-600"
+          className="mx-auto max-w-xs animate-fade-up px-1 text-center font-mono text-[10px] leading-relaxed text-zinc-600"
           style={{ animationDelay: "380ms" }}
         >
           <span className="text-zinc-700">instruments </span>

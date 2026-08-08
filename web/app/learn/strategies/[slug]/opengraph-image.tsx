@@ -94,11 +94,6 @@ export default async function StrategyOpengraphImage({
           >
             <BrandMark box={40} />
           </div>
-          <div style={{ display: "flex", fontSize: 22, fontWeight: 700, color: "#f4f4f5" }}>
-            <span style={{ display: "flex" }}>DELTA</span>
-            <span style={{ display: "flex", color: "#00f0ff", marginLeft: -3 }}>K</span>
-          </div>
-          <div style={{ display: "flex", fontSize: 16, color: "#52525b" }}>·</div>
           <div style={{ display: "flex", fontSize: 16, color: "#71717a" }}>Quantum Horizon Wiki</div>
         </div>
 

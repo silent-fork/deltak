@@ -65,14 +65,6 @@ export default function OpengraphImage() {
           >
             <BrandMark box={48} />
           </div>
-          <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#f4f4f5" }}>
-            <span style={{ display: "flex" }}>DELTA</span>
-            {/* satori lays out each colour run as its own flex box, so the
-                gap between "DELTA" and "K" is real box-to-box spacing, not
-                inline text flow like a real browser — pulled back in with a
-                negative margin rather than left as two separate words. */}
-            <span style={{ display: "flex", color: "#00f0ff", marginLeft: -4 }}>K</span>
-          </div>
         </div>
 
         <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "space-between", gap: 40, marginTop: 12 }}>
