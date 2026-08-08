@@ -23,6 +23,7 @@ import { PairMobileSection } from "@/components/PairMobileSection";
 import { track } from "@/lib/analytics";
 import { api } from "@/lib/api";
 import { DEFAULT_CONFIG, istParts } from "@/lib/engine/config";
+import { RESET_PRESETS } from "@/lib/engine/resetPresets";
 import { mergeBook } from "@/lib/engine/book";
 import type { ExecutionMode, LedgerSnapshot, UserProfile } from "@/lib/types";
 import { useTradeArchive } from "@/lib/useTradeArchive";
@@ -322,6 +323,10 @@ export function UserPill({
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [resetPresetIndex, setResetPresetIndex] = useState(() => {
+    const i = RESET_PRESETS.findIndex((p) => p.capital === DEFAULT_CONFIG.paperCapital);
+    return i === -1 ? RESET_PRESETS.length - 1 : i;
+  });
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Same contract as the log menu: click-away closes, Escape closes.
@@ -389,7 +394,7 @@ export function UserPill({
     setResetBusy(true);
     setResetError(null);
     try {
-      await engine.resetPaper();
+      await engine.resetPaper(RESET_PRESETS[resetPresetIndex]);
       setConfirmReset(false);
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Reset failed";
@@ -553,9 +558,40 @@ export function UserPill({
               <div className="mb-2 rounded border border-rose-500/50 bg-rose-500/10 p-2">
                 <p className="text-[10px] leading-snug text-rose-200">
                   Reset the paper wallet? Every paper position and order —
-                  open and closed — is deleted, and capital returns to{" "}
-                  {money(DEFAULT_CONFIG.paperCapital, 0)}. This can&apos;t be undone.
+                  open and closed — is deleted. This can&apos;t be undone.
                 </p>
+                {/*
+                  A smaller starting balance needs a much higher riskPct to
+                  clear the same per-index 1-lot floors the default 6% was
+                  tuned against at Rs 1,00,000 — each option below carries
+                  its own paired risk percentage rather than leaving that
+                  mismatched against whatever capital gets picked.
+                */}
+                <div className="mt-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Starting balance">
+                  {RESET_PRESETS.map((preset, i) => (
+                    <button
+                      key={preset.capital}
+                      type="button"
+                      role="radio"
+                      aria-checked={resetPresetIndex === i}
+                      onClick={() => setResetPresetIndex(i)}
+                      disabled={resetBusy}
+                      className={cn(
+                        "flex flex-col items-start rounded border px-2 py-1 text-left transition-colors disabled:opacity-50",
+                        resetPresetIndex === i
+                          ? "border-rose-400/70 bg-rose-500/20"
+                          : "border-zinc-700 bg-zinc-900/60 hover:border-zinc-600",
+                      )}
+                    >
+                      <span className="text-[10.5px] font-semibold text-zinc-100">
+                        {money(preset.capital, 0)}
+                      </span>
+                      <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+                        {preset.riskPct}% risk
+                      </span>
+                    </button>
+                  ))}
+                </div>
                 {resetError ? (
                   <p className="mt-1.5 text-[10px] text-rose-300">{resetError}</p>
                 ) : null}
