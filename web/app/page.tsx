@@ -19,7 +19,6 @@ import {
   TrendingDown,
   TrendingUp,
   Waves,
-  Zap,
 } from "lucide-react";
 
 import { BrandIcon } from "@/components/BrandIcon";
@@ -538,7 +537,7 @@ export default function HomePage() {
           />
           <div className="relative flex flex-col items-center gap-3.5 sm:flex-row">
             <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-quantum/30 bg-quantum/10 sm:flex">
-              <Zap className="h-5 w-5 text-quantum" />
+              <BrandIcon size="lg" />
             </span>
             <div>
               <h2 className="text-[14px] font-bold text-zinc-50">

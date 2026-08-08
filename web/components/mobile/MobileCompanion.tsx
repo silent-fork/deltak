@@ -327,7 +327,7 @@ export function MobileCompanion({
   const mode = data?.signal?.mode ?? "paper";
 
   return (
-    <main className="dk-grid-bg relative h-dvh overflow-hidden bg-zinc-950">
+    <main className="dk-grid-bg relative h-dvh animate-in overflow-hidden bg-zinc-950 fade-in duration-500">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-quantum/[0.08] blur-[110px]"

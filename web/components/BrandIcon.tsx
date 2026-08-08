@@ -10,11 +10,12 @@ import { cn } from "@/lib/utils";
  * Fills whatever fixed-size box the caller already wraps it in (every call
  * site already has its own `h-N w-N rounded-md border ...` badge div, with
  * per-context variations — an extra glow shadow here, a fade-up animation
- * there — not worth collapsing into one shared wrapper). Only four sizes
+ * there — not worth collapsing into one shared wrapper). Only five sizes
  * exist across the app today, so `size` picks one rather than taking an
  * arbitrary number.
  */
 const SIZES = {
+  "2xs": { font: 6, cursorW: 2.5, cursorH: 5.5 },
   xs: { font: 10, cursorW: 4, cursorH: 9.5 },
   sm: { font: 14, cursorW: 5.5, cursorH: 13 },
   md: { font: 16, cursorW: 6, cursorH: 15 },
