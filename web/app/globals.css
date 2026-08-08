@@ -209,11 +209,38 @@
    * as "the report continues" — every dk-panel card (KPI tiles, charts,
    * the tier-comparison matrix) and every table stays on one page as a
    * unit, letting the break fall between them instead of through them.
+   * The attribute selectors catch the report's other bordered boxes that
+   * don't carry the .dk-panel class itself — the disclaimer, the "backtested
+   * not live" callout, the KPI strip, the footer CTA — anything built from
+   * Tailwind's rounded-lg/rounded-xl + border utilities directly.
    */
   .dk-panel,
   table,
-  svg {
+  svg,
+  [class*="rounded-lg"][class*="border"],
+  [class*="rounded-xl"][class*="border"] {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /*
+   * A section label left alone at the bottom of a page, with its content
+   * pushed to the next, reads as a mistake — chain break-after: avoid from
+   * the heading through its lead paragraph so the pagination engine is
+   * forced to carry both forward onto the same page as what follows them,
+   * rather than stranding either one.
+   */
+  h2,
+  h3,
+  h2 + p,
+  h3 + p {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  /* No single line stranded alone at the top or bottom of a page. */
+  p {
+    orphans: 3;
+    widows: 3;
   }
 }
