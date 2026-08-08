@@ -1,8 +1,8 @@
 "use client";
 
-import { Zap } from "lucide-react";
 import Link from "next/link";
 
+import { BrandIcon } from "@/components/BrandIcon";
 import { track } from "@/lib/analytics";
 import { useTransitionLink } from "@/lib/useTransitionLink";
 
@@ -56,8 +56,17 @@ export function CtaLink({
       {/* A clean swap, not an overlay — a dimmed label with an icon stacked
           on top of it read as broken (letters bleeding through the glow)
           rather than loading. Nothing else on the button while it's pending,
-          same as the label itself only ever shows one thing at a time. */}
-      {pending ? <Zap aria-hidden className="h-4 w-4 animate-dk-charge fill-current" /> : children}
+          same as the label itself only ever shows one thing at a time. The
+          bare K+cursor mark, not the bordered badge — a button is already
+          its own frame, so a second border around the glyph inside it
+          would be one too many. */}
+      {pending ? (
+        <span aria-hidden className="inline-flex h-4 w-4 shrink-0 animate-dk-charge items-center justify-center">
+          <BrandIcon size="xs" />
+        </span>
+      ) : (
+        children
+      )}
     </Link>
   );
 }

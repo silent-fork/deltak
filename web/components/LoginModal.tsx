@@ -1,8 +1,9 @@
 "use client";
 
-import { ShieldAlert, Zap } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
+import { BrandIcon } from "@/components/BrandIcon";
 import { useEngineContext } from "@/components/EngineProvider";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -152,11 +153,15 @@ export function LoginModal({
             written to disk.
           </p>
           <Button type="submit" variant="quantum" disabled={!valid || busy}>
-            {/* Same charging-bolt loading glyph as everywhere else on the
-                site (see `dk-charge`, `CtaLink`) rather than a bespoke key
-                icon — one consistent "in progress" language, not a second
-                one just for this button. */}
-            {busy ? <Zap className="h-3.5 w-3.5 animate-dk-charge fill-current" /> : null}
+            {/* Same charging K+cursor mark as everywhere else on the site
+                (see `dk-charge`, `CtaLink`) rather than a bespoke key icon —
+                one consistent "in progress" language, not a second one just
+                for this button. */}
+            {busy ? (
+              <span aria-hidden className="inline-flex h-3.5 w-3.5 shrink-0 animate-dk-charge items-center justify-center">
+                <BrandIcon size="xs" />
+              </span>
+            ) : null}
             {busy ? "Authenticating" : "Connect"}
           </Button>
         </div>
