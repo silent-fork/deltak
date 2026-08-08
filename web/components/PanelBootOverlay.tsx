@@ -1,6 +1,8 @@
 "use client";
 
-import { Loader2, Zap } from "lucide-react";
+import { Loader2 } from "lucide-react";
+
+import { BrandIcon } from "@/components/BrandIcon";
 
 /**
  * A panel-scoped rendition of the terminal's own boot sequence.
@@ -28,7 +30,7 @@ export function PanelBootOverlay({ label, compact = false }: { label: string; co
         className="absolute inset-0 z-20 flex items-center justify-center gap-2 rounded-md bg-zinc-950/80 backdrop-blur-[2px]"
       >
         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-quantum/40 bg-quantum/10">
-          <Zap className="h-2.5 w-2.5 text-quantum" />
+          <BrandIcon size="xs" />
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
           <Loader2 className="h-3 w-3 animate-spin text-quantum" />
@@ -45,7 +47,7 @@ export function PanelBootOverlay({ label, compact = false }: { label: string; co
       className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-md bg-zinc-950/80 backdrop-blur-[2px]"
     >
       <div className="flex h-8 w-8 items-center justify-center rounded-md border border-quantum/40 bg-quantum/10">
-        <Zap className="h-4 w-4 text-quantum" />
+        <BrandIcon size="md" />
       </div>
       <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400">
         <Loader2 className="h-3.5 w-3.5 animate-spin text-quantum" />
