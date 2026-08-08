@@ -11,6 +11,8 @@ import {
   SpreadSensitivityChart,
   TradeDiagram,
 } from "@/components/BacktestCharts";
+import { BacktestDownloads } from "@/components/BacktestDownloads";
+import { BacktestTierComparison } from "@/components/BacktestTierComparison";
 import { LearnChrome } from "@/components/LearnChrome";
 import { Wordmark } from "@/components/Wordmark";
 import {
@@ -172,6 +174,21 @@ export default function BacktestReportPage() {
                 <span className="text-[10.5px] text-zinc-600">{k.sub}</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* -------------------------------------------- Starting capital tiers */}
+        <section className="relative mx-auto max-w-4xl px-5 pb-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            Starting capital comparison
+          </h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+            The paper wallet&apos;s reset panel offers three starting balances, each paired with the riskPct
+            that balance needs to clear NSE&apos;s real per-index lot-size floors. Run through the same
+            strategy and the same 18 months of data as the report above.
+          </p>
+          <div className="mt-4">
+            <BacktestTierComparison />
           </div>
         </section>
 
@@ -502,6 +519,18 @@ export default function BacktestReportPage() {
                 <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">{r.body}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* --------------------------------------------------- Downloads */}
+        <section className="relative mx-auto max-w-4xl px-5 pb-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Take it with you</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+            Every trade behind this report and the tier comparison above, exported directly — not a sample, the
+            real 672-692 trades each tier took.
+          </p>
+          <div className="mt-4">
+            <BacktestDownloads />
           </div>
         </section>
 
