@@ -2,7 +2,10 @@ import { ImageResponse } from "next/og";
 
 import { BrandMark } from "@/lib/og/brandMark";
 
-/** Same bare mark as `icon.tsx` — no badge box, no border, no background tint — at the size iOS actually asks for. */
+/**
+ * Same bare mark as `icon.tsx` — no badge box, no background, transparent
+ * PNG, sized to 80% of the canvas (10% margin on every side), centered.
+ */
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
@@ -16,10 +19,9 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#09090b",
         }}
       >
-        <BrandMark box={160} />
+        <BrandMark box={144} />
       </div>
     ),
     { ...size },
