@@ -203,4 +203,17 @@
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
   }
+
+  /*
+   * A panel or table split across a page boundary reads as broken, not
+   * as "the report continues" — every dk-panel card (KPI tiles, charts,
+   * the tier-comparison matrix) and every table stays on one page as a
+   * unit, letting the break fall between them instead of through them.
+   */
+  .dk-panel,
+  table,
+  svg {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

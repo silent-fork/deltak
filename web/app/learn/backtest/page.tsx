@@ -2,6 +2,8 @@ import { AlertTriangle, TrendingUp, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 
 import {
+  CombinedDrawdownChart,
+  CombinedEquityCurveChart,
   DivergingBar,
   DrawdownChart,
   EquityCurveChart,
@@ -13,6 +15,7 @@ import {
 } from "@/components/BacktestCharts";
 import { BacktestDownloads } from "@/components/BacktestDownloads";
 import { BacktestTierComparison } from "@/components/BacktestTierComparison";
+import { BacktestTierFolds, BacktestTierMatrix } from "@/components/BacktestTierMatrix";
 import { LearnChrome } from "@/components/LearnChrome";
 import { Wordmark } from "@/components/Wordmark";
 import {
@@ -189,6 +192,46 @@ export default function BacktestReportPage() {
           </p>
           <div className="mt-4">
             <BacktestTierComparison />
+          </div>
+        </section>
+
+        {/* ----------------------------------------------- Combined analysis */}
+        <section className="relative mx-auto max-w-4xl px-5 pb-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            All three tiers, combined
+          </h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+            The tier switcher above shows one balance at a time; these overlay all three on the same axis —
+            equity normalized to 100 at the start (log scale) rather than absolute rupees, since only the
+            curve&apos;s <em>shape</em> is comparable across tiers, not its endpoint.
+          </p>
+
+          <div className="dk-panel mt-4 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold text-zinc-100">Equity curve, all tiers</h3>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">% of starting capital, log scale</span>
+            </div>
+            <div className="mt-3.5">
+              <CombinedEquityCurveChart />
+            </div>
+          </div>
+
+          <div className="dk-panel mt-3 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[13px] font-semibold text-zinc-100">Drawdown from peak, all tiers</h3>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">% from running peak equity</span>
+            </div>
+            <div className="mt-3.5">
+              <CombinedDrawdownChart />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <BacktestTierMatrix />
+          </div>
+
+          <div className="mt-3">
+            <BacktestTierFolds />
           </div>
         </section>
 

@@ -6,6 +6,7 @@ import {
   MODELED_SPREAD,
   SPREAD_SENSITIVITY,
 } from "@/lib/content/backtest";
+import { TIER_EQUITY_CURVES } from "@/lib/content/backtestTierCharts";
 
 /**
  * Every chart on /learn/backtest is plain server-rendered SVG — the data
@@ -292,6 +293,138 @@ export function PerformanceMosaic() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Same log-scale equity curve as `EquityCurveChart`, but one line per
+ * starting-balance tier instead of one panel per tier — normalized to 100
+ * at the start rather than absolute rupees, since the compounded totals
+ * aren't comparable across tiers but the curve's shape (how bumpy, how
+ * deep the drawdowns) is exactly what an overlay makes visible.
+ */
+export function CombinedEquityCurveChart() {
+  const W = 900, H = 280, ML = 50, MR = 10, MT = 14, MB = 26;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const allVals = TIER_EQUITY_CURVES.flatMap((c) => c.points.map((p) => p[1]));
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const logMin = Math.log10(minV * 0.95), logMax = Math.log10(maxV * 1.05);
+  const n = TIER_EQUITY_CURVES[0].points.length;
+  const x = (i: number) => ML + (i / (n - 1)) * plotW;
+  const y = (v: number) => MT + (1 - (Math.log10(v) - logMin) / (logMax - logMin)) * plotH;
+  const ticks = [100, 1000, 10000, 30000].filter((t) => t >= minV * 0.9 && t <= maxV * 1.1);
+  const everyN = Math.ceil(n / 7);
+  const dates = TIER_EQUITY_CURVES[0].points.map((p) => p[0]);
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        role="img"
+        aria-label="Normalized equity curves for all three starting-balance tiers, log scale, all starting at 100"
+      >
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={ML} x2={W - MR} y1={y(t)} y2={y(t)} stroke="#27272a" strokeWidth={1} />
+            <text x={4} y={y(t) + 4} fontSize={10.5} fill="#71717a" fontFamily="ui-monospace, monospace">
+              {t.toLocaleString("en-IN")}%
+            </text>
+          </g>
+        ))}
+        {TIER_EQUITY_CURVES.map((c) => {
+          const lineD = c.points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p[1])}`).join(" ");
+          return (
+            <path
+              key={c.slug}
+              d={lineD}
+              fill="none"
+              stroke={c.color}
+              strokeWidth={c.slug === "100000" ? 2 : 1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={c.slug === "100000" ? 1 : 0.8}
+            />
+          );
+        })}
+        {Array.from({ length: n }, (_, i) => i)
+          .filter((i) => i % everyN === 0)
+          .map((i) => (
+            <text key={i} x={x(i)} y={H - 6} fontSize={10} fill="#71717a" textAnchor="middle" fontFamily="ui-monospace, monospace">
+              {dates[i].slice(0, 7)}
+            </text>
+          ))}
+      </svg>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
+        {TIER_EQUITY_CURVES.map((c) => (
+          <span key={c.slug} className="flex items-center gap-1.5 text-[10.5px] text-zinc-400">
+            <span className="h-2 w-2 rounded-sm" style={{ background: c.color }} />
+            {c.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Running-peak drawdown, computed client-side-free from the normalized equity points above. */
+function drawdownSeries(points: [string, number][]): [string, number][] {
+  let peak = points[0][1];
+  return points.map(([d, v]) => {
+    peak = Math.max(peak, v);
+    return [d, ((v - peak) / peak) * 100] as [string, number];
+  });
+}
+
+/** Same three-tier overlay as `CombinedEquityCurveChart`, drawdown-from-peak instead of level. */
+export function CombinedDrawdownChart() {
+  const W = 900, H = 150, ML = 50, MR = 10, MT = 10, MB = 22;
+  const plotW = W - ML - MR, plotH = H - MT - MB;
+  const series = TIER_EQUITY_CURVES.map((c) => ({ ...c, dd: drawdownSeries(c.points) }));
+  const minDD = Math.min(...series.flatMap((s) => s.dd.map((p) => p[1])));
+  const n = series[0].dd.length;
+  const x = (i: number) => ML + (i / (n - 1)) * plotW;
+  const y = (v: number) => MT + (v / minDD) * plotH;
+  const everyN = Math.ceil(n / 7);
+  const dates = series[0].dd.map((p) => p[0]);
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full"
+      role="img"
+      aria-label="Drawdown from running peak for all three starting-balance tiers"
+    >
+      {[0, minDD].map((t) => (
+        <g key={t}>
+          <line x1={ML} x2={W - MR} y1={y(t)} y2={y(t)} stroke="#27272a" strokeWidth={1} />
+          <text x={4} y={y(t) + 4} fontSize={10.5} fill="#71717a" fontFamily="ui-monospace, monospace">
+            {t.toFixed(0)}%
+          </text>
+        </g>
+      ))}
+      {series.map((s) => {
+        const lineD = s.dd.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p[1])}`).join(" ");
+        return (
+          <path
+            key={s.slug}
+            d={lineD}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={s.slug === "100000" ? 1.8 : 1.3}
+            strokeLinejoin="round"
+            opacity={s.slug === "100000" ? 1 : 0.8}
+          />
+        );
+      })}
+      {Array.from({ length: n }, (_, i) => i)
+        .filter((i) => i % everyN === 0)
+        .map((i) => (
+          <text key={i} x={x(i)} y={H - 4} fontSize={10} fill="#71717a" textAnchor="middle" fontFamily="ui-monospace, monospace">
+            {dates[i].slice(0, 7)}
+          </text>
+        ))}
+    </svg>
   );
 }
 

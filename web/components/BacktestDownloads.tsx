@@ -5,48 +5,50 @@ import { Download, FileJson, FileSpreadsheet, Printer } from "lucide-react";
 import { track } from "@/lib/analytics";
 
 /**
- * Real downloads, not decorative ones — every file here is a direct export
- * off the same backtest run behind the report and the tier comparison
- * above it (`backtest/export_trades.py`), not a fabricated sample: the
- * trade ledgers are the actual 672-692 trades each tier took, with the
- * same protocol (entry reason) and exit-reason fields the attribution
- * tables on this page are built from.
+ * Real downloads, not decorative ones — every file here is generated on
+ * request by /api/backtest/download from the same trade data behind the
+ * report and the tier comparison above it (`backtest/export_trades.py`),
+ * not a fabricated sample and not a pre-baked static file: the trade
+ * ledgers are the actual 672-692 trades each tier took, with the same
+ * protocol (entry reason) and exit-reason fields the attribution tables
+ * on this page are built from, formatted to CSV/JSON when the request
+ * lands rather than shipped as files under public/.
  */
 const FILES = [
   {
-    href: "/downloads/backtest/deltak-trade-ledger-100000.csv",
+    href: "/api/backtest/download?file=ledger-100000",
     icon: FileSpreadsheet,
     title: "Trade ledger — ₹1,00,000 tier",
     body: "Every trade: date, index, protocol, strike, entry/exit price, exit reason, charges, net P&L.",
-    size: "70 KB · CSV",
+    size: "692 trades · CSV",
   },
   {
-    href: "/downloads/backtest/deltak-trade-ledger-50000.csv",
+    href: "/api/backtest/download?file=ledger-50000",
     icon: FileSpreadsheet,
     title: "Trade ledger — ₹50,000 tier",
-    body: "Same fields, the ₹50,000 / 30% risk tier's own 676 trades.",
-    size: "69 KB · CSV",
+    body: "Same fields, the ₹50,000 / 30% risk tier's own trades.",
+    size: "676 trades · CSV",
   },
   {
-    href: "/downloads/backtest/deltak-trade-ledger-25000.csv",
+    href: "/api/backtest/download?file=ledger-25000",
     icon: FileSpreadsheet,
     title: "Trade ledger — ₹25,000 tier",
-    body: "Same fields, the ₹25,000 / 60% risk tier's own 672 trades.",
-    size: "68 KB · CSV",
+    body: "Same fields, the ₹25,000 / 60% risk tier's own trades.",
+    size: "672 trades · CSV",
   },
   {
-    href: "/downloads/backtest/deltak-attribution-summary.csv",
+    href: "/api/backtest/download?file=attribution-summary",
     icon: FileSpreadsheet,
     title: "Attribution summary, all tiers",
     body: "By-index, by-protocol and by-exit-reason rollups for all three tiers in one sheet.",
-    size: "3 KB · CSV",
+    size: "CSV",
   },
   {
-    href: "/downloads/backtest/deltak-backtest-full-export.json",
+    href: "/api/backtest/download?file=full-export",
     icon: FileJson,
     title: "Full export, all tiers",
     body: "Every trade plus its tier's summary stats, structured — for anyone re-processing the data themselves.",
-    size: "930 KB · JSON",
+    size: "JSON",
   },
 ];
 
