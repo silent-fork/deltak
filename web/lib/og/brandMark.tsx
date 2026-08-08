@@ -17,9 +17,9 @@ export function BrandMark({
   box: number;
   color?: string;
 }) {
-  const font = box * 0.5;
-  const cursorW = box * 0.194;
-  const cursorH = box * 0.47;
+  const font = box * 0.64;
+  const cursorW = box * 0.22;
+  const cursorH = box * 0.6;
 
   return (
     <div style={{ display: "flex", width: box, height: box, alignItems: "center", justifyContent: "center" }}>
