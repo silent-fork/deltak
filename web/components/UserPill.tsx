@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   BadgeCheck,
   Building2,
   Check,
@@ -548,129 +549,160 @@ export function UserPill({
               <button
                 onClick={() => setConfirmReset((v) => !v)}
                 title="Reset paper wallet — clears all paper trade history"
-                className="shrink-0 rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+                className={cn(
+                  "shrink-0 rounded p-0.5 transition-colors",
+                  confirmReset
+                    ? "bg-rose-500/15 text-rose-400"
+                    : "text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300",
+                )}
               >
                 <RotateCcw className="h-3 w-3" />
               </button>
             }
           >
-            {confirmReset ? (
-              <div className="mb-2 rounded border border-rose-500/50 bg-rose-500/10 p-2">
-                <p className="text-[10px] leading-snug text-rose-200">
-                  Reset the paper wallet? Every paper position and order —
-                  open and closed — is deleted. This can&apos;t be undone.
-                </p>
-                {/*
-                  A smaller starting balance needs a much higher riskPct to
-                  clear the same per-index 1-lot floors the default 6% was
-                  tuned against at Rs 1,00,000 — each option below carries
-                  its own paired risk percentage rather than leaving that
-                  mismatched against whatever capital gets picked.
-                */}
-                <div className="mt-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Starting balance">
-                  {RESET_PRESETS.map((preset, i) => (
-                    <button
-                      key={preset.capital}
-                      type="button"
-                      role="radio"
-                      aria-checked={resetPresetIndex === i}
-                      onClick={() => setResetPresetIndex(i)}
-                      disabled={resetBusy}
+            {/*
+              An overlay on the stats below, not a block pushing them down —
+              the drawer's own height used to jump every time this opened.
+              Sized to the stats' own footprint (`relative` on this wrapper,
+              `absolute inset-0` on the panel) rather than the drawer.
+            */}
+            <div className="relative">
+              <div className={confirmReset ? "invisible" : undefined} aria-hidden={confirmReset}>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/70">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-quantum/50 to-quantum transition-[width] duration-500"
+                    style={{ width: `${deployedPct}%` }}
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-zinc-600">
+                  <span>{deployedPct.toFixed(0)}% deployed</span>
+                  <span>{money(free, 0)} free</span>
+                </div>
+
+                <div className="mt-2.5">
+                  <Row icon={Wallet} label="Capital" value={money(free, 0)} />
+                  <Row label="Equity" value={money(ledger?.equity ?? 0, 0)} />
+                  <Row label="Deployed" value={money(ledger?.deployed_margin ?? 0, 0)} />
+                  <Row label="Charges" value={money(ledger?.charges ?? 0, 0)} />
+                </div>
+
+                <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-zinc-800/60 pt-2 text-center">
+                  <div>
+                    <p className="dk-label text-[8px]">Open</p>
+                    <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.open_pnl ?? 0))}>
+                      {signedMoney(ledger?.open_pnl ?? 0, 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="dk-label text-[8px]">Booked</p>
+                    <p
                       className={cn(
-                        "flex flex-col items-start rounded border px-2 py-1 text-left transition-colors disabled:opacity-50",
-                        resetPresetIndex === i
-                          ? "border-rose-400/70 bg-rose-500/20"
-                          : "border-zinc-700 bg-zinc-900/60 hover:border-zinc-600",
+                        "mt-0.5 font-mono text-[11px] font-semibold",
+                        pnlTone(ledger?.realised_pnl ?? 0),
                       )}
                     >
-                      <span className="text-[10.5px] font-semibold text-zinc-100">
-                        {money(preset.capital, 0)}
-                      </span>
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-                        {preset.riskPct}% risk
-                      </span>
+                      {signedMoney(ledger?.realised_pnl ?? 0, 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="dk-label text-[8px]">Total</p>
+                    <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.total_pnl ?? 0))}>
+                      {signedMoney(ledger?.total_pnl ?? 0, 0)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-zinc-800/60 pt-2 text-center">
+                  <div>
+                    <p className="dk-label text-[8px]">Open positions</p>
+                    <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{openCount}</p>
+                  </div>
+                  <div>
+                    <p className="dk-label text-[8px]">Closed today</p>
+                    <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{closed}</p>
+                  </div>
+                </div>
+              </div>
+
+              {confirmReset ? (
+                <div className="absolute inset-0 z-10 flex flex-col justify-center rounded-lg border border-rose-500/30 bg-[#0d0a0c]/98 p-2.5 shadow-[0_0_0_1px_rgba(244,63,94,0.06),0_16px_36px_-12px_rgba(0,0,0,0.75)] backdrop-blur-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-500/15">
+                      <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-zinc-100">Reset the paper wallet?</p>
+                      <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
+                        Every paper position and order — open and closed — is deleted. This can&apos;t be
+                        undone.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/*
+                    A smaller starting balance needs a much higher riskPct to
+                    clear the same per-index 1-lot floors the default 6% was
+                    tuned against at Rs 1,00,000 — each option below carries
+                    its own paired risk percentage rather than leaving that
+                    mismatched against whatever capital gets picked.
+                  */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Starting balance">
+                    {RESET_PRESETS.map((preset, i) => (
+                      <button
+                        key={preset.capital}
+                        type="button"
+                        role="radio"
+                        aria-checked={resetPresetIndex === i}
+                        onClick={() => setResetPresetIndex(i)}
+                        disabled={resetBusy}
+                        className={cn(
+                          "flex flex-col items-center gap-0.5 rounded-md border py-1.5 text-center transition-colors disabled:opacity-50",
+                          resetPresetIndex === i
+                            ? "border-quantum/50 bg-quantum/10 shadow-[0_0_0_1px_rgba(0,240,255,0.12)]"
+                            : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "text-[10.5px] font-semibold",
+                            resetPresetIndex === i ? "text-quantum" : "text-zinc-200",
+                          )}
+                        >
+                          {money(preset.capital, 0)}
+                        </span>
+                        <span className="font-mono text-[8.5px] uppercase tracking-wider text-zinc-500">
+                          {preset.riskPct}% risk
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {resetError ? (
+                    <p className="mt-2 text-[10px] text-rose-300">{resetError}</p>
+                  ) : null}
+
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <button
+                      onClick={resetWallet}
+                      disabled={resetBusy}
+                      className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-500/50 bg-rose-500/90 text-[10px] font-semibold uppercase tracking-wider text-white transition-colors hover:bg-rose-500 disabled:opacity-50"
+                    >
+                      {resetBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      Confirm reset
                     </button>
-                  ))}
+                    <button
+                      onClick={() => {
+                        setConfirmReset(false);
+                        setResetError(null);
+                      }}
+                      disabled={resetBusy}
+                      className="flex h-7 items-center rounded-md border border-zinc-700 bg-zinc-900/60 px-3 text-[10px] font-medium uppercase tracking-wider text-zinc-400 transition-colors hover:text-zinc-200 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                {resetError ? (
-                  <p className="mt-1.5 text-[10px] text-rose-300">{resetError}</p>
-                ) : null}
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <button
-                    onClick={resetWallet}
-                    disabled={resetBusy}
-                    className="flex h-6 items-center gap-1 rounded border border-rose-500/60 bg-rose-500/20 px-2 text-[9.5px] font-semibold uppercase tracking-wider text-rose-200 hover:bg-rose-500/30 disabled:opacity-50"
-                  >
-                    {resetBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                    Confirm reset
-                  </button>
-                  <button
-                    onClick={() => {
-                      setConfirmReset(false);
-                      setResetError(null);
-                    }}
-                    disabled={resetBusy}
-                    className="flex h-6 items-center rounded border border-zinc-700 bg-zinc-900/60 px-2 text-[9.5px] font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/70">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-quantum/50 to-quantum transition-[width] duration-500"
-                style={{ width: `${deployedPct}%` }}
-              />
-            </div>
-            <div className="mt-1 flex items-center justify-between font-mono text-[9px] text-zinc-600">
-              <span>{deployedPct.toFixed(0)}% deployed</span>
-              <span>{money(free, 0)} free</span>
-            </div>
-
-            <div className="mt-2.5">
-              <Row icon={Wallet} label="Capital" value={money(free, 0)} />
-              <Row label="Equity" value={money(ledger?.equity ?? 0, 0)} />
-              <Row label="Deployed" value={money(ledger?.deployed_margin ?? 0, 0)} />
-              <Row label="Charges" value={money(ledger?.charges ?? 0, 0)} />
-            </div>
-
-            <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-zinc-800/60 pt-2 text-center">
-              <div>
-                <p className="dk-label text-[8px]">Open</p>
-                <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.open_pnl ?? 0))}>
-                  {signedMoney(ledger?.open_pnl ?? 0, 0)}
-                </p>
-              </div>
-              <div>
-                <p className="dk-label text-[8px]">Booked</p>
-                <p
-                  className={cn(
-                    "mt-0.5 font-mono text-[11px] font-semibold",
-                    pnlTone(ledger?.realised_pnl ?? 0),
-                  )}
-                >
-                  {signedMoney(ledger?.realised_pnl ?? 0, 0)}
-                </p>
-              </div>
-              <div>
-                <p className="dk-label text-[8px]">Total</p>
-                <p className={cn("mt-0.5 font-mono text-[11px] font-semibold", pnlTone(ledger?.total_pnl ?? 0))}>
-                  {signedMoney(ledger?.total_pnl ?? 0, 0)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-zinc-800/60 pt-2 text-center">
-              <div>
-                <p className="dk-label text-[8px]">Open positions</p>
-                <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{openCount}</p>
-              </div>
-              <div>
-                <p className="dk-label text-[8px]">Closed today</p>
-                <p className="mt-0.5 font-mono text-[11px] font-semibold text-zinc-200">{closed}</p>
-              </div>
+              ) : null}
             </div>
           </Section>
 
