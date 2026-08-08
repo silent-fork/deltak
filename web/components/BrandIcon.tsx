@@ -41,7 +41,7 @@ export function BrandIcon({
   return (
     <div className={cn("relative flex h-full w-full items-center justify-center", className)}>
       <span
-        className="inline-flex items-end font-mono font-extrabold leading-none text-quantum"
+        className="inline-flex items-baseline font-mono font-extrabold leading-none text-quantum"
         style={{ fontSize: s.font, textShadow }}
       >
         K
