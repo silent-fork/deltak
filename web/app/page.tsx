@@ -209,7 +209,8 @@ export default function HomePage() {
           <span className="text-quantum [text-shadow:0_0_6px_rgba(0,240,255,0.3)]">
             Quantum Horizon
           </span>{" "}
-          — the options terminal running the DeltaK strategy
+          — the options terminal running the{" "}
+          <Wordmark className="text-3xl tracking-tight sm:text-5xl" glow={false} /> strategy
         </h1>
 
         {/*

@@ -1,6 +1,6 @@
 "use client";
 
-import { LockKeyhole, ShieldAlert, Zap } from "lucide-react";
+import { LockKeyhole, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
 import { BrandIcon } from "@/components/BrandIcon";
@@ -237,13 +237,17 @@ export function LoginScreen({ simulate }: { simulate: boolean }) {
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 text-[13px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-600"
           >
             {/*
-              Same charging-bolt glyph the rest of the site already uses for
-              "something is happening" (see `dk-charge`, `CtaLink`) rather
-              than a bespoke icon per phase — one consistent loading language
-              instead of two more animations to get right. The label beside
-              it still says which wait this is.
+              Same charging K+cursor mark the rest of the site already uses
+              for "something is happening" (see `dk-charge`, `CtaLink`)
+              rather than a bespoke icon per phase — one consistent loading
+              language instead of two more animations to get right. The
+              label beside it still says which wait this is.
             */}
-            {phase ? <Zap className="h-4 w-4 animate-dk-charge fill-current text-zinc-400" /> : null}
+            {phase ? (
+              <span aria-hidden className="inline-flex h-4 w-4 shrink-0 animate-dk-charge items-center justify-center">
+                <BrandIcon size="xs" />
+              </span>
+            ) : null}
             {phase === "verifying"
               ? "Verifying you're human"
               : phase === "authenticating"

@@ -182,7 +182,10 @@ export function BootScreen({
           >
             <BrandIcon size="md" glow={false} />
           </div>
-          <Wordmark className="text-[16px] font-semibold tracking-[0.18em]" glow={false} />
+          <div className="leading-none">
+            <Wordmark className="text-[16px] font-semibold tracking-[0.18em]" glow={false} />
+            <div className="mt-1 text-[9px] uppercase tracking-[0.24em] text-zinc-500">Terminal · DKMS</div>
+          </div>
         </div>
 
         {/* The terminal window — chrome bar, scrolling boot log with a live
@@ -272,7 +275,7 @@ export function BootScreen({
             literal rather than a chip row, in keeping with the window
             above it. */}
         <div
-          className="mx-auto max-w-xs animate-fade-up px-1 text-center font-mono text-[10px] leading-relaxed text-zinc-600"
+          className="mx-auto max-w-xs animate-fade-up px-1 text-center font-mono text-[10px] leading-relaxed text-zinc-600 sm:max-w-none"
           style={{ animationDelay: "380ms" }}
         >
           <span className="text-zinc-700">instruments </span>
