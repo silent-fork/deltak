@@ -19,3 +19,5 @@ next-env.d.ts
 backtest/deep_data/
 backtest/rolling_data/
 backtest/*.pkl
+backtest/exports/
+backtest/__pycache__/

@@ -171,7 +171,10 @@ def run(idxs, underlyings, cfg, train, valid, test):
                     capital += exit_price * qty - exit_charge
                     trades.append({"underlying": u, "day": pos["day"], "action": action,
                                     "net": net, "protocol": pos["proto"],
-                                    "entry": pos["entry"], "stop_pts": pos["stop_pts"], "lots": pos["lots"]})
+                                    "entry": pos["entry"], "stop_pts": pos["stop_pts"], "lots": pos["lots"],
+                                    "opt": pos["opt"], "strike": pos["strike"], "exit_price": exit_price,
+                                    "entry_charge": entry_charge, "exit_charge": exit_charge,
+                                    "stop": pos["stop"], "target": pos["target"]})
                     del open_positions[u]
                     st["last_exit_i"] = i
                     st["dwell_key"], st["dwell_n"] = None, 0
@@ -258,7 +261,11 @@ def run(idxs, underlyings, cfg, train, valid, test):
         net = (exit_price - pos["entry"]) * qty - entry_charge - exit_charge
         capital += exit_price * qty - exit_charge
         trades.append({"underlying": u, "day": pos["day"], "action": "FORCED_CLOSE",
-                        "net": net, "protocol": pos["proto"]})
+                        "net": net, "protocol": pos["proto"],
+                        "entry": pos["entry"], "stop_pts": pos.get("stop_pts", 0), "lots": pos["lots"],
+                        "opt": pos["opt"], "strike": pos["strike"], "exit_price": exit_price,
+                        "entry_charge": entry_charge, "exit_charge": exit_charge,
+                        "stop": pos.get("stop"), "target": pos.get("target")})
 
     return capital, trades, equity_by_day
 
