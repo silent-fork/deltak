@@ -5,8 +5,9 @@ import { BrandMark } from "@/lib/og/brandMark";
 /**
  * Favicon, generated rather than a checked-in binary — the same square mark
  * (`rounded-md`, same as the homepage nav badge) as `apple-icon.tsx`, same
- * border/background opacity, same solid canvas fill, just at the size a
- * browser tab actually asks for. Without the fill this rendered as a
+ * background tint, same solid canvas fill, just at the size a browser tab
+ * actually asks for. No border on the badge here — at 32px a 1.5px stroke
+ * reads as noise, not a frame. Without the canvas fill this rendered as a
  * transparent PNG, composited light or dark depending on the viewer — the
  * opaque canvas makes it look the same everywhere instead of drifting with
  * whatever it's shown against.
@@ -35,7 +36,6 @@ export default function Icon() {
             width: 26,
             height: 26,
             borderRadius: 6,
-            border: "1.5px solid rgba(0,240,255,0.55)",
             background: "rgba(0,240,255,0.14)",
           }}
         >
