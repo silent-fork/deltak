@@ -188,3 +188,19 @@
     animation: dk-charge 0.55s ease-in-out infinite;
   }
 }
+
+/*
+ * Printing (see the backtest report's "Download PDF" button) keeps the
+ * dark theme rather than reskinning to a light print stylesheet — most
+ * browsers strip background colors on print by default, which would
+ * leave every dk-panel and KPI tile a borderless void; this forces them
+ * through instead so a printed/PDF'd report looks like the page it came
+ * from. Chrome/Print-to-PDF honors this without the user needing to find
+ * the "background graphics" toggle themselves.
+ */
+@media print {
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+}
