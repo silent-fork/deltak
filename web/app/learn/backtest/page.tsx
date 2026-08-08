@@ -12,6 +12,7 @@ import {
   TradeDiagram,
 } from "@/components/BacktestCharts";
 import { LearnChrome } from "@/components/LearnChrome";
+import { Wordmark } from "@/components/Wordmark";
 import {
   COVERAGE_END,
   COVERAGE_START,
@@ -125,7 +126,8 @@ export default function BacktestReportPage() {
         <section className="relative mx-auto max-w-4xl px-5 pb-6 pt-4 text-center">
           <p className="dk-label text-[10.5px] text-quantum">Backtesting &amp; Performance Report</p>
           <h1 className="mt-1.5 text-balance text-2xl font-bold tracking-tight text-zinc-50 sm:text-3xl">
-            The DeltaK Matrix Strategy, run 18 months past its own Quantum Horizon
+            The <Wordmark className="text-2xl tracking-tight sm:text-3xl" glow={false} /> Matrix Strategy, run 18
+            months past its own Quantum Horizon
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-[13.5px] leading-relaxed text-zinc-400">
             A walk-forward study of DKMS across five Indian index option chains — the exact configuration
