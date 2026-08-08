@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Zap } from "lucide-react";
+import { ArrowRight, ChevronRight, Database } from "lucide-react";
 import Link from "next/link";
 
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
@@ -104,7 +104,9 @@ export function ToolFooterMark({ sourceNote }: { sourceNote: string }) {
   return (
     <div className="flex shrink-0 flex-col items-center justify-center gap-1.5 py-2">
       <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-zinc-700">
-        <Zap className="h-2.5 w-2.5" />
+        {/* A data-source glyph, not the brand mark — this line is citing
+            where the numbers came from, not signing the page. */}
+        <Database className="h-3 w-3 shrink-0" />
         {sourceNote}
       </span>
       <span className="flex items-center gap-1.5 text-[10px] text-zinc-600">

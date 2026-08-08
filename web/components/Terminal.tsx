@@ -264,7 +264,11 @@ export function Terminal() {
 
   return (
     <EngineProvider engine={engine}>
-      <div className="dk-grid-bg relative flex h-dvh flex-col overflow-hidden bg-zinc-950">
+      <div className="dk-grid-bg relative flex h-dvh animate-in flex-col overflow-hidden bg-zinc-950 fade-in duration-500">
+        {/* Boot screen unmounts and this mounts in the same tick — a plain
+            fade rather than nothing takes the edge off what would otherwise
+            be an instant, jarring cut from one full-screen layout to a very
+            different one. */}
         {/* The same top-lit glow the homepage's hero and the boot sequence
             both sit under — dimmer here, since it has to sit behind a dense
             header and cards rather than open space, but it's what ties the

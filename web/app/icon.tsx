@@ -37,9 +37,14 @@ export default function Icon() {
             height: 26,
             borderRadius: 6,
             background: "rgba(0,240,255,0.14)",
+            overflow: "hidden",
           }}
         >
-          <BrandMark box={26} />
+          {/* A larger mark than the badge itself, clipped to its rounded
+              corners — at 32px total, the mark drawn to fit the badge
+              exactly left too much empty tint around it; this fills the
+              badge the way the live UI's badge does. */}
+          <BrandMark box={34} />
         </div>
       </div>
     ),
