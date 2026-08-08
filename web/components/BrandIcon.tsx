@@ -42,7 +42,7 @@ export function BrandIcon({
   return (
     <div className={cn("relative flex h-full w-full items-center justify-center", className)}>
       <span
-        className="inline-flex items-baseline font-mono font-extrabold leading-none text-quantum"
+        className="inline-flex items-center font-mono font-extrabold leading-none text-quantum"
         style={{ fontSize: s.font, textShadow }}
       >
         K
@@ -52,6 +52,13 @@ export function BrandIcon({
             width: s.cursorW,
             height: s.cursorH,
             marginLeft: s.font * 0.22,
+            // The K's cap-height sits slightly above this row's vertical
+            // center (monospace fonts reserve more line-box space below the
+            // baseline than above the cap, for descenders K doesn't have),
+            // so centering the cursor on the row centers it a couple of
+            // px below the K's own visible glyph — nudge it up to match
+            // the letterform itself, not the invisible line-box around it.
+            transform: `translateY(-${s.font * 0.09}px)`,
             boxShadow: cursorShadow,
           }}
         />
